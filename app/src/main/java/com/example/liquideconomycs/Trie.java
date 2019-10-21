@@ -13,7 +13,6 @@ import java.util.Collections;
 import java.util.Comparator;
 
 public class Trie {
-    RandomAccessFile TrieRoot;
     RandomAccessFile TrieNodes;
     private byte[] hashSize = new byte[20];
     private static byte NODE = (byte)0xFF;
@@ -21,9 +20,24 @@ public class Trie {
     private static String BREAK = "TRIE_BREAK_REDUCE";
     private static byte[] EMPTY_STRING = null;
     Trie(String nodeDir) throws FileNotFoundException {
-        TrieNodes= new RandomAccessFile(nodeDir+"/trieNodes.dat", "rw");
-        TrieRoot= new RandomAccessFile(nodeDir+"/trieRoot.dat", "rw");
+        TrieNodes = new RandomAccessFile(nodeDir+"/trieNodes.dat", "rw");
     }
+
+    //node
+    //type(1)/key size(1)/key(0-19)                             /child lenght(1)/child array(1-256*8)/hash coordinate(8)/
+    //00     /00         /00000000000000000000000000000000000000/00             /0000000000000000 /0000000000000000  / max 286 (ideal 10000000000=75GB)
+    //account
+    //type(1)/key(1)/age(4)  /
+    //00     /00    /00000000/max 6 (ideal 10000000000=55GB)
+
+    //hashNode
+    //type(1)/key size(1)/key(0-31)                             /child lenght(1)/child array(1-256*8)
+    //00     /00         /00000000000000000000000000000000000000/00             /0000000000000000  max 290 (ideal 10000000000=75GB)
+    //hashAccount
+    //type(1)/key(1)
+    //00     /00    max 2 (ideal 10000000000=18GB)
+    //summ = ~224GB (ideal trie per 10000000000 accounts story)
+
 
     class node {
         byte[]   bType;
@@ -46,11 +60,10 @@ public class Trie {
         }
     }
 
-    public byte[] getHash(RandomAccessFile TrieNodes) throws IOException {
+    public byte[] getHash(long coordonate) throws IOException {
         ArrayList dHashes = new ArrayList();
-
         Long step;
-        for (step = 0L; step < TrieNodes.length();) {
+        for (step = coordonate; step < TrieNodes.length();) {
             TrieNodes.seek(step);
             node NodeData = getData(step, TrieNodes);
             dHashes.add(NodeData.bHash);//old hash

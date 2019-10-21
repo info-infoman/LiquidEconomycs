@@ -51,7 +51,7 @@ public class Core {
                     //peerGroup.put()
                     //init
                     mTrie = new Trie(nodeDir);
-                    HashAccountRoot = mTrie.getHash(mTrie.TrieRoot);
+                    HashAccountRoot = mTrie.getHash(0l);
 
                     mOut.onStart();
                     mStarted = true;
