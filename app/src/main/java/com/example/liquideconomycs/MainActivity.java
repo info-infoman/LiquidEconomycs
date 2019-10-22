@@ -17,6 +17,7 @@ import com.dlazaro66.qrcodereaderview.QRCodeReaderView.OnQRCodeReadListener;
 import com.google.android.material.snackbar.Snackbar;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -26,6 +27,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
+
+import com.google.common.primitives.Bytes;
+import com.google.common.primitives.Ints;
+import com.google.common.primitives.Longs;
 
 public class MainActivity extends AppCompatActivity implements ActivityCompat.OnRequestPermissionsResultCallback, OnQRCodeReadListener {
 
@@ -39,20 +44,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     private CheckBox            flashlightCheckBox;
     private CheckBox            enableDecodingCheckBox;
     private PointsOverlayView   pointsOverlayView;
-    private Core                        core = new Core(new Core.Out(){
-        private static final String TAG = "Core";
-
-        @Override
-        public void onStart() {
-            Log.d(TAG, "Core is started!");
-        }
-
-        @Override
-        public void onError(Exception error) {
-            Log.e(TAG, "Error!", error);
-        }
-    });
-
+    private Trie                     mTrie;
+    private byte[]                   HashAccountRoot;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -78,7 +71,18 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         }
         /////////////////////////////////////////////////////////////////////////////
         if (nodeDirReference.exists()) {
-            core.Start(nodeDir);
+            try {
+                mTrie = new Trie(nodeDir);
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+            }
+
+
+            try {
+                HashAccountRoot = mTrie.GetHash(Longs.toByteArray(0L));
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
 
 

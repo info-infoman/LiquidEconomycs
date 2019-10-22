@@ -1,118 +1,122 @@
 package com.example.liquideconomycs;
 
+import com.google.common.primitives.Bytes;
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
 
+import java.io.ByteArrayInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.io.BufferedInputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 
+import static org.bitcoinj.core.Utils.sha256hash160;
+
 public class Trie {
-    RandomAccessFile TrieNodes;
+    private RandomAccessFile TrieNodes;
     private byte[] hashSize = new byte[20];
-    private static byte NODE = (byte)0xFF;
-    private static byte ACCOUNT = (byte)0x01;
+    private static byte NODE = 1;
+    private static byte ACCOUNT = 2;
     private static String BREAK = "TRIE_BREAK_REDUCE";
     private static byte[] EMPTY_STRING = null;
     Trie(String nodeDir) throws FileNotFoundException {
         TrieNodes = new RandomAccessFile(nodeDir+"/trieNodes.dat", "rw");
     }
 
+    //we need save 10 000 000 000+ account for all people
+    // and we need have sync func like "all for all" between two people(personal accounts trie), who met by chance
     //node
-    //type(1)/key size(1)/key(0-19)                             /child lenght(1)/child array(1-256*8)/hash coordinate(8)/
-    //00     /00         /00000000000000000000000000000000000000/00             /0000000000000000 /0000000000000000  / max 286 (ideal 10000000000=75GB)
+    //type(1)/key size(1)/key(0-19)                             /hash sha256 (32)/child lenght(1)/child array(1-256*8)
+    //00     /00         /00000000000000000000000000000000000000/00x32           /00             /0000000000000000 max 2102 (ideal 10000000000=76GB)
     //account
-    //type(1)/key(1)/age(4)  /
-    //00     /00    /00000000/max 6 (ideal 10000000000=55GB)
+    //type(1)/key(1)/age(2)  /
+    //00     /00    /0000/max 4 (ideal 10000000000=37GB)
+    //total 113GB(ideal trie for 10 000 000 000 accounts)
 
-    //hashNode
-    //type(1)/key size(1)/key(0-31)                             /child lenght(1)/child array(1-256*8)
-    //00     /00         /00000000000000000000000000000000000000/00             /0000000000000000  max 290 (ideal 10000000000=75GB)
-    //hashAccount
-    //type(1)/key(1)
-    //00     /00    max 2 (ideal 10000000000=18GB)
-    //summ = ~224GB (ideal trie per 10000000000 accounts story)
+    //return account age or position of node(where we are stopped)
+    public byte[] Find(byte[] key, byte[] pos) throws IOException {
+        TrieNodes.seek(Longs.fromByteArray(pos));
+        if(TrieNodes.readByte()==ACCOUNT){
+            byte[] Age = new byte[2];
+            TrieNodes.read(Age, 1, 2);
+            return Age;
+        }else{
+            byte KeySize = TrieNodes.readByte();
+            TrieNodes.seek(KeySize+32);
+            byte ChildLenght = TrieNodes.readByte();
 
-
-    class node {
-        byte[]   bType;
-        int      KeySize;
-        byte[]   bKey;
-        byte[]   bHash;
-        long     childSize;
-        int      age;
-        long     step;
-
-        node(byte[] a, int b, byte[] c, byte[] d, long e, int f, long g)
-        {
-            bType = a;
-            KeySize = b;
-            bKey = c;
-            bHash = d;
-            childSize = e;
-            age = f;
-            step = g;
-        }
-    }
-
-    public byte[] getHash(long coordonate) throws IOException {
-        ArrayList dHashes = new ArrayList();
-        Long step;
-        for (step = coordonate; step < TrieNodes.length();) {
-            TrieNodes.seek(step);
-            node NodeData = getData(step, TrieNodes);
-            dHashes.add(NodeData.bHash);//old hash
-            step = NodeData.step;
-        }
-
-        Collections.sort(dHashes, new Comparator<byte[]>() {
-            @Override
-            public int compare(byte[] x, byte[] y) {
-                for (int i = x.length - 1; i >= 0; i--) {
-                    int r = x[i] - y[i];
-                    if (r != 0) {
-                        return r;
-                    }
-                }
-                return 0;
+            if(ChildLenght<key[0]){
+                return pos;
+            }else{
+                TrieNodes.seek((key[0]*8)-8);
+                byte[] p = new byte[8];
+                TrieNodes.read(p, 0, 8);
+                ByteBuffer buffer = ByteBuffer.allocate(KeySize-1);
+                return Find(buffer.put(key, KeySize+1, KeySize).array(), p);
             }
-
-        });
-
-        ByteBuffer buffer = ByteBuffer.allocate(dHashes.size());
-        for (int i = 0; i < dHashes.size(); i++) {
-            buffer.put((byte[]) dHashes.get(i));
         }
-
-        return  CRC64.fromBytes(buffer.array()).getBytes();
     }
+
+    public byte[] GetHash(byte[] pos) throws IOException {
+        TrieNodes.seek(Longs.fromByteArray(pos));
+        byte[] Hash = new byte[32];
+        byte Type = TrieNodes.readByte();
+        byte KeySize = TrieNodes.readByte();
+        if(Type==NODE) {
+            TrieNodes.read(Hash, KeySize, 32);
+        }else if(Type==ACCOUNT){
+            byte[] Key = new byte[KeySize];
+            TrieNodes.read(Key, 0, KeySize);
+            byte[] Age = new byte[2];
+            TrieNodes.read(Age, 0, 2);
+            byte[] ChildArray= new byte[0];
+            Hash = CalcHash(Type, Key, ChildArray, Age);
+        }else{
+            return null;
+        }
+        return Hash;
+    }
+
+    private byte[] CalcHash(byte Type, byte[] Key, byte[] ChildArray, byte[] Age) throws IOException {
+        byte[] Hash;
+        if(Type==NODE) {
+            byte[] Digest=Key;
+            ByteBuffer buffer = ByteBuffer.allocate(8);
+            for(int i = 0; i < ChildArray.length+1;) {
+                Digest = Bytes.concat(Digest, GetHash(buffer.put(ChildArray, i, 8).array()));
+                i = i + 8;
+            }
+            buffer.clear();
+            Hash = sha256hash160(Digest);
+        }else if(Type==ACCOUNT){
+            Hash = sha256hash160(Bytes.concat(Key, Age));
+        }else{
+            return null;
+        }
+        return Hash;
+    }
+
+
+
+
+
+
 
     private node getData(Long step, RandomAccessFile trieNodes) throws IOException {
         //long newLong = Longs.fromByteArray(oldLongByteArray);
         //int newInt = Ints.fromByteArray(oldIntByteArray);
         //trieNodes.seek(step);
-        byte[] bType = new byte[0];
-        trieNodes.read(bType,0,1);
-        //TrieNodes.seek(1);
-
-        byte[] bKeySize = new byte[0];
-        trieNodes.read(bKeySize,0,1);
-        int KeySize = Ints.fromByteArray(bKeySize);
-
-        //TrieNodes.seek(1);
-        byte[] bKey = new byte[KeySize];
-        trieNodes.read(bKey,0, KeySize);
-
-        //TrieNodes.seek(KeySize);
-
-        //TrieNodes.seek(8);
-        byte[] bHash = new byte[8];
-        byte[] bChildSize = new byte[8];
+        byte Type = trieNodes.readByte();
+        byte KeySize = trieNodes.readByte();
+        byte[] Key = new byte[KeySize];
+        trieNodes.read(Key,0, KeySize);
+        byte[] HashPos = new byte[8];
+        byte childLenght = trieNodes.readByte();
         long childSize = 0L;
         byte[] bAge = new byte[2];
         int age = 0;
@@ -131,16 +135,7 @@ public class Trie {
         return new node (bType, KeySize, bKey, bHash, childSize, age, step);
     }
 
-    private long exist(byte[] key, RandomAccessFile trieNodes, Long start, Long end) throws IOException {
-        Long step=start;
-        for (; step < end;) {
-            trieNodes.seek(step);
-            node d = getData(step, trieNodes);
-            step=d.step;
-            if(d.bKey.equals(key)) return step;
-        }
-        return -1;
-    }
+
 
     // a reduce implementation you can "break" out of
     private reduseCallBack reduce(byte[] accumulator, RandomAccessFile trieNodes, Long start, Long end , byte[] result) throws IOException {
