@@ -51,12 +51,9 @@ public class Trie {
         byte Type = key.length > 1 ? NODE : LEAF;
         if(Type==LEAF){
             Leaves.seek(Longs.fromByteArray(pos));
-            ByteBuffer buffer = ByteBuffer.allocate(10);
             byte[] Age = new byte[2];
             Leaves.read(Age, 1, 2);
-            buffer.put(Age);
-            buffer.put(pos);
-            return buffer.array(); //account age && position
+            return Bytes.concat(Age,pos); //account age && position
         }else{
             TrieNodes.seek(Longs.fromByteArray(pos));
             byte KeySize = TrieNodes.readByte();
