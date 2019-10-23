@@ -1,5 +1,7 @@
 package com.example.liquideconomycs;
 
+import android.service.autofill.FieldClassification;
+
 import com.google.common.primitives.Bytes;
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
@@ -48,9 +50,10 @@ public class Trie {
         }else{
             byte KeySize = TrieNodes.readByte();
             TrieNodes.seek(KeySize+32);
-            byte ChildLenght = TrieNodes.readByte();
+            byte[] ChildPos=new byte[32];
+            TrieNodes.read(ChildPos,0,32);
 
-            if(ChildLenght<key[0]){
+            if(!CheckChild(ChildPos, Ints.fromBytes((byte)0, (byte)0, (byte)0, key[0]))){
                 return pos;
             }else{
                 TrieNodes.seek((key[0]*8)-8);
@@ -60,6 +63,39 @@ public class Trie {
                 return Find(buffer.put(key, KeySize+1, KeySize).array(), p);
             }
         }
+    }
+
+    private boolean CheckChild(byte[]child, int key){
+            byte mask=(byte)255; //1111 1111
+            int del=(int)Math.floor(key/8);//0
+            int pos=key-(del*8);//0
+            if(del>pos) del=del-1;
+            byte prepare=child[del];
+            if(pos==2){
+                prepare = (byte)(prepare<<1);
+            }
+            if(pos==3){
+                prepare = (byte)(prepare<<2);
+            }
+            if(pos==4){
+                prepare = (byte)(prepare<<3);
+            }
+            if(pos==5){
+                prepare = (byte)(prepare<<4);
+            }
+            if(pos==6){
+                prepare = (byte)(prepare<<5);//1100 0000
+            }
+            if(pos==7){
+                prepare = (byte)(prepare<<6);//1100 0000
+            }
+            if(pos==0){//for pos 8
+                prepare = (byte)(prepare<<7);
+            }
+            //for pos 1
+            prepare = (byte)(prepare>>7);
+
+            return prepare==mask;
     }
 
     public byte[] GetHash(byte[] pos) throws IOException {
@@ -208,4 +244,44 @@ public class Trie {
     }
 
 
+    public static void main(String[] args) {
+        byte key = 16;
+        byte[] child=new byte[2];
+        child[0]=(byte)255;
+        child[1]=(byte)254;
+        byte mask=1; //0001
+        int f =(key/8)-1;
+        int pos = key-(f*8);
+        byte prepare=child[f];
+        if(pos==1){
+            prepare = (byte)(prepare>>7);
+        }
+        if(pos==2){
+            prepare = (byte)(prepare<<1);
+        }
+        if(pos==3){
+            prepare = (byte)(prepare<<2);
+        }
+        if(pos==4){
+            prepare = (byte)(prepare<<3);
+        }
+        if(pos==5){
+            prepare = (byte)(prepare<<4);
+        }
+        if(pos==6){
+            prepare = (byte)(prepare<<5);
+        }
+        if(pos==7){
+            prepare = (byte)(prepare<<6);
+        }
+        if(pos==8){
+            prepare = (byte)(prepare<<7);
+        }
+        if(prepare==mask){
+            System.out.println(1);
+        }else{
+            System.out.println(0);
+        }
+
+    }
 }
