@@ -13,45 +13,48 @@ import java.nio.ByteBuffer;
 import static org.bitcoinj.core.Utils.sha256hash160;
 
 public class Trie {
-    private RandomAccessFile trieNodes, leaves, freeSpaceNodes, freeSpaceLeaves;
+    private RandomAccessFile trie, freeSpace;
     private byte[] hashSize = new byte[20];
     private static byte[] rootPos = Longs.toByteArray(0L);
-    private static byte NODE = 1; //
-    private static byte LEAF = 2;
-    private static byte BRANCH = 3;
-    private static byte ROOT = 4;
+    private static byte ROOT = 1; //
+    private static byte BRANCH = 2;
+    private static byte LEAF = 3;
     private static String BREAK = "TRIE_BREAK_REDUCE";
     private static byte[] EMPTY_STRING = null;
     Trie(String nodeDir) throws FileNotFoundException {
-        trieNodes = new RandomAccessFile(nodeDir+ "/nodes.dat", "rw");
-        leaves = new RandomAccessFile(nodeDir+ "/leaves.dat", "rw");
-        freeSpaceNodes = new RandomAccessFile(nodeDir+ "/freeSpaceNodes.dat", "rw");
-        freeSpaceLeaves = new RandomAccessFile(nodeDir+ "/freeSpaceLeaves.dat", "rw");
+        trie = new RandomAccessFile(nodeDir+ "/trie.dat", "rw");
+        freeSpace = new RandomAccessFile(nodeDir+ "/freeSpace.dat", "rw");
     }
 
     //we need save 10 000 000 000+ account for all people
     // and we need have sync func like "all for all" between two people(personal accounts trie), who met by chance
-    //       Lp       Ad         Bp      Lp  Ad         Bp     Lp   Ad         Bp   Lp   Ad
-    //1)ROOT(FF)-FFFF(FF) 2)ROOT(FF)-FF(FF)-(FF) 3)ROOT(FF)-FF(FF)-(FF) 4)ROOT(FF)-(FF)(FF)-(FF)
-    //                                     -(0F)                  -(OF)
-    //                                                        (OF)-(OF)
-    //
-    //                                                                             RQ
+    //Compress by key & adaptive points size & save age in leaf (Lp - leaf point, Bp - branch point, Ad - account data):
+    //     Lp        Ad      Bp  Bp    Lp  Ad       Bp  Bp  Bp  lp  Ad
+    //1)R (FF)FFFFFF(FF) 2)R(FF)(FF)FF(FF)(FF) 3)R (FF)(FF)(FF)(FF)(FF) 1) insert FFFFFFFFFF
+    //                          \     \  \(0F)         \  \    \  \(0F) 2) insert FFF0FFFFFF, FFFFFFFF0F, FFFFFFAFFF
+    //                           |     |                |  |    |       3) insert FFFFRQAFFF
+    //                           |     Lp  Ad           |  |    |Lp  Ad
+    //                           |    (AF)(FF)          |  \    (AF)(FF)
+    //                           |                      |   Lp    Ad
+    //                           |LP     Ad           Lp|  (RQ)AF(FF)
+    //                          (F0)FFFF(FF)          (F0)FFFF(FF)
+    //if key size 20 and age 2:
+    // Lp-76b            Bp-143b Lp-191b        Bp-222b Lp-249b
+    // total insert 22*5 = 110 byte, trie size 471 byte (but this is a lazy expansion, when the tree is compacted, compression will occur)
     //ROOT(content BRANCH or LEAF)
     //hash sha256hash160(20)/child pointers array(32)  /child array(1-256*8)
     //00*20                 /00*32                     /0000000000000000 max 2100 byte
-    //BRANCH(content LEAF)
+    //BRANCH(content child BRANCH & LEAF)
     //type(1)/key size(1)/key(1-19)/hash sha256hash160(20)/leafPointers array(32)  /leafArray(1-256*8)
     //00     /00         /00*19    /00*20                 /00*32                   /00*8              max 2121 byte (ideal ‭39 062 500‬(leaves) =~301Mb)
     //LEAF(content account age)
-    //type(1)/key size(1)/key(1-19)/hash sha256hash160(20)/agePointers array(32)  /ageArray(1-256*2)/
-    //00     /00         /00*19    /00*20                 /00*32                  /00*2               max 585 (ideal 10000000000(account)=21GB)
+    //type(1)/key size(1)/key(1-20)/hash sha256hash160(20)/agePointers array(32)  /ageArray(1-256*2)/
+    //00     /00         /00*20    /00*20                 /00*32                  /00*2               max 585 (ideal 10000000000(account)=21GB)
     //total 22GB(ideal trie for 10 000 000 000 accounts)
     //
-    //we are save all change: 1st in a free space pointers at , 2st in apped bytes in files nodes.dat && leaves.dat
-    //free space pointers register it is special buffer  for story free pointers in nodes.dat && leaves.dat
-    //deserialize = /size(2 bytes)/point(8 bytes)/ for nodes.dat. For 10 000 000 pointers *10 bytes = ~ 95Mb
-    //deserialize = /point(8 bytes)/ for leaves.dat. For 10 000 000 pointers *8 bytes = ~ 76Mb
+    //we are save all change: 1st in a free space pointers at , 2st in apped bytes in files trie.dat
+    //free space pointers register it is special buffer  for story free pointers in trie.dat
+    //deserialize = /size(2 bytes)/point(8 bytes)/ for trie.dat. For 10 000 000 pointers *10 bytes = ~ 95Mb
 
     public boolean insert(byte[] key, byte[] age) throws IOException {
         ByteArrayInputStream fined = new ByteArrayInputStream(find(key, rootPos));
