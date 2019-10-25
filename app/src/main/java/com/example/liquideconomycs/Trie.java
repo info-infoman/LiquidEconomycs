@@ -29,8 +29,8 @@ public class Trie {
     //we need save 10 000 000 000+ account for all people
     // and we need have sync func like "all for all" between two people(personal accounts trie), who met by chance
     //Compress by key & adaptive points size & save age in leaf (Lp - leaf point, Bp - branch point, Ad - account data):
-    //     Lp        Ad      Bp  Bp    Lp  Ad       Bp  Bp  Bp  lp  Ad
-    //1)R (FF)FFFFFF(FF) 2)R(FF)(FF)FF(FF)(FF) 3)R (FF)(FF)(FF)(FF)(FF) 1) insert FFFFFFFFFF
+    //     Bp     Lp  Ad      Bp  Bp    Lp  Ad       Bp  Bp  Bp  lp  Ad
+    //1)R(FF)FFFF(FF)(FF) 2)R(FF)(FF)FF(FF)(FF) 3)R (FF)(FF)(FF)(FF)(FF) 1) insert FFFFFFFFFF
     //                          \     \  \(0F)         \  \    \  \(0F) 2) insert FFF0FFFFFF, FFFFFFFF0F, FFFFFFAFFF
     //                           |     |                |  |    |       3) insert FFFFRQAFFF
     //                           |     Lp  Ad           |  |    |Lp  Ad
@@ -41,15 +41,15 @@ public class Trie {
     //if key size 20 and age 2:
     // Lp-76b            Bp-143b Lp-191b        Bp-222b Lp-249b
     // total insert 22*5 = 110 byte, trie size 471 byte (but this is a lazy expansion, when the tree is compacted, compression will occur)
-    //ROOT(content BRANCH or LEAF)
-    //hash sha256hash160(20)/child pointers array(32)  /child array(1-256*8)
-    //00*20                 /00*32                     /0000000000000000 max 2100 byte
+    //ROOT(content BRANCH)
+    //type(1)/hash sha256hash160(20)/child point array(1-256*8)
+    //00     /00*20                 /0000000000000000 max 2100 byte
     //BRANCH(content child BRANCH & LEAF)
-    //type(1)/key size(1)/key(1-19)/hash sha256hash160(20)/leafPointers array(32)  /leafArray(1-256*8)
-    //00     /00         /00*19    /00*20                 /00*32                   /00*8              max 2121 byte (ideal ‭39 062 500‬(leaves) =~301Mb)
+    //type(1)/key size(1)/key(1-19)/hash sha256hash160(20)/childsMap(32)  /leafPointArray(1-256*8)
+    //00     /00         /00*19    /00*20                 /00*32          /00*8              max 2121 byte (ideal ‭39 062 500‬(leaves) =~301Mb)
     //LEAF(content account age)
-    //type(1)/key size(1)/key(1-20)/hash sha256hash160(20)/agePointers array(32)  /ageArray(1-256*2)/
-    //00     /00         /00*20    /00*20                 /00*32                  /00*2               max 585 (ideal 10000000000(account)=21GB)
+    //type(1)/key size(1)/key(1-20)/hash sha256hash160(20)/childsMap(32)  /ageArray(1-256*2)/
+    //00     /00         /00*20    /00*20                 /00*32          /00*2               max 585 (ideal 10000000000(account)=21GB)
     //total 22GB(ideal trie for 10 000 000 000 accounts)
     //
     //we are save all change: 1st in a free space pointers at , 2st in apped bytes in files trie.dat
@@ -57,7 +57,7 @@ public class Trie {
     //deserialize = /size(2 bytes)/point(8 bytes)/ for trie.dat. For 10 000 000 pointers *10 bytes = ~ 95Mb
 
     public boolean insert(byte[] key, byte[] age) throws IOException {
-        ByteArrayInputStream fined = new ByteArrayInputStream(find(key, rootPos));
+        ByteArrayInputStream fined = new ByteArrayInputStream(search(key, rootPos));
         boolean result = recursiveInsert(key, age, fined);
         fined.close();
         return result;
@@ -72,10 +72,10 @@ public class Trie {
             byte[] ageL=new byte[2];
             fined.read(ageL,0,2);
             if(ageL==age) return false;
-            leaves.seek(Longs.fromByteArray(pos));
-            leaves.write(age, 0,2);
+            trie.seek(Longs.fromByteArray(pos));
+            trie.write(age, 0,2);
             return true;
-        }else{
+        }else if{
             byte[] keyN=new byte[8];
             fined.read(keyN,0,8);
             if(type[0]==BRANCH){
@@ -87,50 +87,107 @@ public class Trie {
         }
     }
 
-    public byte[] find(byte[] key, byte[] pos) throws IOException {
-        byte type = key.length > 1 ? key.length == 20 ? ROOT : NODE : LEAF;
-        if(type==LEAF){
-            leaves.seek(Longs.fromByteArray(pos));
-            byte[] age = new byte[2];
-            leaves.read(age, 0, 2);
-            ByteBuffer buffer = ByteBuffer.allocate(11);
-            return buffer.put(type).put(pos).put(age).array(); //account age && position
-        }else{
-            trieNodes.seek(Longs.fromByteArray(pos));
-            if(type==ROOT){
-
+    public byte[] search(byte[] key, byte[] pos) throws IOException {
+        trie.seek(Longs.fromByteArray(pos));
+        byte type = key.length == 20 ? ROOT : trie.readByte();
+        if(type==ROOT){
+            trie.seek(20);
+            byte[] childPos=new byte[8];
+            trie.read(childPos,(key[0]*8),8);
+            if(Ints.fromByteArray(childPos)>0){
+                ByteBuffer buffer = ByteBuffer.allocate(key.length-1);
+                byte[] child = search(buffer.put(key, key.length+1, key.length).array(), childPos);
+                ByteBuffer rtBuffer = ByteBuffer.allocate(2+child.length);
+                //todo key?
+                return rtBuffer.put(ROOT).put(key[0]).put(child).array();
             }
-            byte keySize = trieNodes.readByte();
-            byte[] keyN = new byte[keySize];
-            trieNodes.read(keyN,0,keySize);
-            trieNodes.seek(20); //hash
-            byte[] childsPos=new byte[32];
-            trieNodes.read(childsPos,0,32);
-            int ChildsCount=getChildsCount(childsPos);
-            byte[] childs=new byte[ChildsCount*8];
-            trieNodes.read(childs,0,ChildsCount*8);
-
-            if(!checkChild(childsPos, Ints.fromBytes((byte)0, (byte)0, (byte)0, key[0]))){
-                ByteBuffer buffer = ByteBuffer.allocate(9+keySize+32+ChildsCount*8);
-                return buffer.put(BRANCH).put(pos).put(keyN).put(childsPos).put(childs).array();//position & kay & offsets key of node branch
+            byte[] childs =  new byte[2048];
+            return null;
+        }else{
+            byte keySize = trie.readByte();
+            byte[] keyNode = new byte[keySize];
+            trie.read(keyNode,0,keySize);
+            //todo compare keyNode vs key
+            trie.seek(20); //hash
+            byte[] childsMap=new byte[32];
+            trie.read(childsMap,0,32);
+            int childsCount=getChildsCount(childsMap);
+            byte[] childsArraySize= type == BRANCH ? Ints.toByteArray(childsCount*8) : Ints.toByteArray(childsCount*2);
+            byte[] childs = type == BRANCH ? new byte[childsCount*8] : new byte[childsCount*2];
+            trie.read(childs,0,childs.length);
+            //search exist true of prefix of key in childsMap
+            //if not found return position node & keyNode(full key node) & childsMap & childsArray(node pointers or age)
+            //else search in child, return prefix [0] of keyNode
+            if(!checkChild(childsMap, Ints.fromBytes((byte)0, (byte)0, (byte)0, key[0]))){
+                ByteBuffer buffer = ByteBuffer.allocate(10+keySize+32+childsArraySize.length+childs.length);
+                return buffer.put(type).put(pos).put(keySize).put(keyNode).put(childsMap).put(childsArraySize).put(childs).array();
             }else{
-                trieNodes.seek((key[0]*8)-8);
-                byte[] p = new byte[8];
-                trieNodes.read(p, 0, 8); //get file point
-                ByteBuffer buffer = ByteBuffer.allocate(keySize-1);
-                byte[] child = find(buffer.put(key, keySize+1, keySize).array(), p);
-                ByteBuffer rtBuffer = ByteBuffer.allocate(10+child.length);
-                return rtBuffer.put(NODE).put(pos).put(key[0]).put(child).array();//position && offsets key && node child
+                int childPosInMap = getChildPos(childsMap, Ints.fromBytes((byte)0, (byte)0, (byte)0, key[0]));
+                if(type == BRANCH){
+                    trie.seek((childPosInMap*8)-8);
+                    byte[] childPos = new byte[8];
+                    trie.read(childPos, 0, 8);
+                    ByteBuffer buffer = ByteBuffer.allocate(keySize-1);
+                    byte[] child = search(buffer.put(key, keySize+1, keySize).array(), childPos);
+                    ByteBuffer rtBuffer = ByteBuffer.allocate(10+keySize+32+childsArraySize.length+childs.length+child.length);
+                    //todo key?
+                    return rtBuffer.put(BRANCH).put(pos).put(keySize).put(keyNode).put(childsMap).put(childsArraySize).put(childs).put(child).array();
+                }else{
+                    //todo key?
+                    trie.seek((childPosInMap*2)-2);
+                    byte[] childAge = new byte[2];
+                    trie.read(childAge, 0, 2);
+                    ByteBuffer rtBuffer = ByteBuffer.allocate(10+keySize+2+32+childsArraySize.length+childs.length);
+                    return rtBuffer.put(LEAF).put(pos).put(keySize).put(keyNode).put(childAge).put(childsMap).put(childsArraySize).put(childs).array();
+                }
             }
         }
     }
 
-    private int getChildsCount(byte[]child){
+    private int getChildPos(byte[]childsMap, int key){
         int result=0;
         byte mask=(byte)255; //1111 1111
-        for(int i=0;i<32;i++){
-            byte prepare=child[i];
-            for(i=0;i<7;i++){
+        for(int s=0;s<32;s++){
+            byte prepare=childsMap[s];
+            for(int i=0;i<7;i++){
+                if(i==2){
+                    prepare = (byte)(prepare<<1);
+                }
+                if(i==3){
+                    prepare = (byte)(prepare<<2);
+                }
+                if(i==4){
+                    prepare = (byte)(prepare<<3);
+                }
+                if(i==5){
+                    prepare = (byte)(prepare<<4);
+                }
+                if(i==6){
+                    prepare = (byte)(prepare<<5);//1100 0000
+                }
+                if(i==7){
+                    prepare = (byte)(prepare<<6);//1100 0000
+                }
+                if(i==0){//for pos 8
+                    prepare = (byte)(prepare<<7);
+                }
+                //for pos 1
+                prepare = (byte)(prepare>>7);
+
+                if(prepare==mask) result=result+1;
+
+                if(s+i==key) return result;
+            }
+        }
+        return result;
+    }
+
+    private int getChildsCount(byte[]childsMap){
+        int result=0;
+        byte mask=(byte)255; //1111 1111
+        for(int s=0;s<32;s++){
+            byte prepare=childsMap[s];
+            for(int i=0;i<7;i++){
                 if(i==2){
                     prepare = (byte)(prepare<<1);
                 }
@@ -161,12 +218,12 @@ public class Trie {
         return result;
     }
 
-    private boolean checkChild(byte[]child, int key){
+    private boolean checkChild(byte[]childsMap, int key){
             byte mask=(byte)255; //1111 1111
             int del=(int)Math.floor(key/8);//0
             int pos=key-(del*8);//0
             if(del>pos) del=del-1;
-            byte prepare=child[del];
+            byte prepare=childsMap[del];
             if(pos==2){
                 prepare = (byte)(prepare<<1);
             }
@@ -194,38 +251,39 @@ public class Trie {
             return prepare==mask;
     }
 
-    public byte[] getHash(byte[] pos, byte type, byte[] key) throws IOException {
+    public byte[] getHash(byte[] pos) throws IOException {
         byte[] hash = new byte[20];
-        if(type==NODE) {
-            trieNodes.seek(Longs.fromByteArray(pos));
-            byte keySize = trieNodes.readByte();
-            trieNodes.read(hash, keySize, 20);
-        }else if(type==LEAF){
-            //todo we are need to save key suffix in LEAF?
-            leaves.seek(Longs.fromByteArray(pos));
-            byte[] age = new byte[2];
-            leaves.read(age, 0, 2);
-            byte[] childArray= new byte[0];
-            hash=calcHash(type, key, childArray, age);
-        }else{
-            hash = null;
+        trie.seek(Longs.fromByteArray(pos)+1);
+        byte type = trie.readByte();
+        if(type==ROOT){
+            trie.read(hash, 0, 20);
+        }else {
+            byte keySize = trie.readByte();
+            trie.read(hash, keySize, 20);
         }
         return hash;
     }
 
-    private byte[] calcHash(byte type, byte[] key, byte[] childArray, byte[] age) throws IOException {
+    private byte[] calcHash(byte type, byte[] key, byte[] childArray) throws IOException {
         byte[] hash;
-        if(type==NODE) {
+        if(type==BRANCH || type==ROOT) {
             byte[] digest=key;
             ByteBuffer buffer = ByteBuffer.allocate(8);
-            for(int i = 0; i < childArray.length+1;) {
-                digest = Bytes.concat(digest, getHash(buffer.put(childArray, i, 8).array(), type, key));
+            for(int i = 0; i < childArray.length+1;i++) {
+                digest = Bytes.concat(digest, getHash(buffer.put(childArray, i, 8).array()));
                 i = i + 8;
             }
             buffer.clear();
             hash = sha256hash160(digest);
         }else if(type==LEAF){
-            hash = sha256hash160(Bytes.concat(key, age));
+            byte[] digest=key;
+            ByteBuffer buffer = ByteBuffer.allocate(2);
+            for(int i = 0; i < childArray.length+1;i++) {
+                digest = Bytes.concat(digest, getHash(buffer.put(childArray, i, 2).array()));
+                i = i + 2;
+            }
+            buffer.clear();
+            hash = sha256hash160(digest);
         }else{
             hash = null;
         }
