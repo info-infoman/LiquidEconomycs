@@ -89,6 +89,10 @@ public class Trie {
                 res = recursiveInsert(buffer.put(key, 1, 20).array(), age, fined);
                 if(res) {
                     //todo calc hash & save change
+                    byte[] childArray= new byte[2048];
+                    fined.read(childArray,21,2048);
+                    trie.seek(1);
+                    trie.write(calcHash(ROOT, null, childArray),0,20);
                     return true;
                 }else{
                     return false;
@@ -143,7 +147,7 @@ public class Trie {
                 byte[] child = search(buffer.put(key, key.length+1, key.length).array(), childPos);
                 ByteBuffer rtBuffer = ByteBuffer.allocate(2+child.length);
                 //todo key?
-                return rtBuffer.put(ROOT).put(key[0]).put(child).array();
+                return rtBuffer.put(child).put(ROOT).put(key[0]).array();
             }
             ByteBuffer rtBuffer = ByteBuffer.allocate(2);
             return rtBuffer.put(ROOT).put(key[0]).array();
@@ -175,7 +179,7 @@ public class Trie {
                     byte[] child = search(buffer.put(key, 1, keySize).array(), childPos);
                     ByteBuffer rtBuffer = ByteBuffer.allocate(10+keySize+32+childsArraySize.length+childs.length+child.length);
                     //todo key?
-                    return rtBuffer.put(BRANCH).put(pos).put(keySize).put(keyNode).put(childsMap).put(childsArraySize).put(childs).put(child).array();
+                    return rtBuffer.put(child).put(BRANCH).put(pos).put(keySize).put(keyNode).put(childsMap).put(childsArraySize).put(childs).array();
                 }else{
                     //todo key?
                     trie.seek((childPosInMap*2)-2);
