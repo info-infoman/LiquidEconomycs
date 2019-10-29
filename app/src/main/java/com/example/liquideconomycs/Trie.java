@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
+import java.util.BitSet;
 
 import static org.bitcoinj.core.Utils.sha256hash160;
 
@@ -46,10 +47,10 @@ public class Trie {
     //type(1)/hash sha256hash160(20)/child point array(1-256*8)
     //00     /00*20                 /0000000000000000 max 2069 byte
     //BRANCH(content child BRANCH & LEAF)
-    //type(1)/key size(1)/key(1-19)/hash sha256hash160(20)/childsMap(32)  /leafPointArray(1-256*8)
+    //type(1)/key size(1)/key(1-17)/hash sha256hash160(20)/childsMap(32)  /leafPointArray(1-256*8)
     //00     /00         /00*19    /00*20                 /00*32          /00*8              max 2121 byte (ideal ‭39 062 500‬(leaves) =~301Mb)
     //LEAF(content account age)
-    //type(1)/key size(1)/key(1-20)/hash sha256hash160(20)/childsMap(32)  /ageArray(1-256*2)/
+    //type(1)/key size(1)/key(1-18)/hash sha256hash160(20)/childsMap(32)  /ageArray(1-256*2)/
     //00     /00         /00*20    /00*20                 /00*32          /00*2               max 585 (ideal 10000000000(account)=21GB)
     //total 22GB(ideal trie for 10 000 000 000 accounts)
     //
@@ -57,71 +58,91 @@ public class Trie {
     //free space pointers register it is special buffer  for story free pointers in trie.dat
     //deserialize = /size(2 bytes)/point(8 bytes)/ for trie.dat. For 10 000 000 pointers *10 bytes = ~ 95Mb
 
-    public boolean insert(byte[] key, byte[] age) throws IOException {
+    public byte[] insert(byte[] key, byte[] age) throws IOException {
         ByteArrayInputStream fined = new ByteArrayInputStream(search(key, rootPos));
-        boolean result = recursiveInsert(key, age, fined);
+        byte[] result = recursiveInsert(key, age, fined, 0);
         fined.close();
         return result;
     }
 
-    private boolean recursiveInsert(byte[] key, byte[] age, ByteArrayInputStream fined) throws IOException {
-        boolean res;
+    private byte[] recursiveInsert(byte[] key, byte[] age, ByteArrayInputStream fined, long pos) throws IOException {
+        byte[] hash;
+        BitSet childsMap = new BitSet(256);
         if(fined.available()>0){
             byte[] type=new byte[1];
             fined.read(type,0,1);
             if(type[0]==ROOT){
-                fined.skip(1);
-                byte[] pos=new byte[8];
-                fined.read(pos,(key[0]*8),8);
-                if(Ints.fromByteArray(pos)==0){
-                    //todo insert leaf
-                    trie.seek(2070);
+                if(pos==0){
+                    //todo find free space
+                    trie.seek(trie.length()+1);
+                    pos=trie.getFilePointer();
+                    //
                     trie.write(LEAF);
-                    byte[] keyL=new byte[18];
-                    trie.write(Ints.toByteArray(18));
-                    trie.write(keyL);
-                    byte[] tmpL=new byte[52];
-                    trie.write(tmpL);
-                    trie.write(Longs.toByteArray(2070),21+(key[0]*8),8);
-                    return insert(key, age);
+                    ByteBuffer buffer = ByteBuffer.allocate(18);
+                    byte[] lKey= buffer.put(key, 1, 18).array();
+                    trie.writeByte(lKey.length);
+                    trie.write(lKey);
+                    hash=calcHash(LEAF, lKey, age);
+                    trie.write(hash);
+                    childsMap.set(key[19], true);
+                    trie.write(childsMap.toByteArray());
+                    trie.write(age);
                 }
-                ByteBuffer buffer = ByteBuffer.allocate(19);
-                res = recursiveInsert(buffer.put(key, 1, 20).array(), age, fined);
-                if(res) {
-                    //todo calc hash & save change
-                    byte[] childArray= new byte[2048];
-                    fined.read(childArray,21,2048);
-                    trie.seek(1);
-                    trie.write(calcHash(ROOT, null, childArray),0,20);
-                    return true;
-                }else{
-                    return false;
-                }
+                //set pos
+                trie.seek(22+((key[0]*8)-8));
+                trie.write(Longs.toByteArray(pos));
+                trie.seek(22);
+                byte[] childArray= new byte[2048];
+                trie.read(childArray,0,2048);
+                trie.seek(2);
+                hash=calcHash(ROOT, null, childArray);
+                trie.write(hash);
+                return hash;
+
             }else{
+                byte[] selfPos= new byte[8];
+                fined.read(selfPos,0,8);
+                byte[] selfKeySize= new byte[1];
+                fined.read(selfKeySize,0,1);
+                byte[] selfKey= new byte[selfKeySize[0]];
+                fined.read(selfKey,0,selfKeySize[0]);
+                byte[] selfChildMap= new byte[32];
+                fined.read(selfChildMap,0,32);
+                byte[] selfChildArraySize= new byte[8];
+                fined.read(selfChildArraySize,0,8);
+                byte[] selfChildArray= new byte[Ints.fromByteArray(selfChildArraySize)];
+                fined.read(selfChildArray,0,Ints.fromByteArray(selfChildArraySize));
                 if(type[0]==BRANCH){
-                    byte[] pos=new byte[8];
-                    fined.read(pos,0,8);
-                    byte[] keySize=new byte[1];
-                    fined.read(keySize,0,1);
-                    byte[] keyNode=new byte[keySize[0]];
-                    fined.read(keyNode,0,keySize[0]);
-                    byte[] childsMap=new byte[32];
-                    fined.read(childsMap,0,32);
-                    byte[] childsArraySize=new byte[4];
-                    fined.read(childsArraySize,0,4);
-                    int childsCount=Ints.fromByteArray(childsArraySize)/8;
-                    byte[] childs = new byte[childsCount*8];
-                    fined.read(childs,0,childsCount*8);
-                    ByteBuffer buffer = ByteBuffer.allocate(19);
-                    res = recursiveInsert(buffer.put(key, 1, 20).array(), age, fined);
-                    if(res) {
-                        //todo calc hash & save change
-                        return true;
-                    }else{
-                        return false;
+                    if(pos==0){
+                        //todo find free space
+                        trie.seek(trie.length()+1);
+                        pos=trie.getFilePointer();
+                        //
+                        trie.write(LEAF);
+                        ByteBuffer buffer = ByteBuffer.allocate(18);
+                        byte[] lKey= buffer.put(key, 1, 18).array();
+                        trie.writeByte(lKey.length);
+                        trie.write(lKey);
+                        hash=calcHash(LEAF, lKey, age);
+                        trie.write(hash);
+
+                        childsMap.set(key[19], true);
+                        trie.write(childsMap.toByteArray());
+                        trie.write(age);
                     }
+                    childsMap.valueOf(selfChildMap);
+                    childsMap.set(selfKey[selfKeySize[0]-1], true);
+
+                    trie.seek(Longs.fromByteArray(selfPos)+2+selfKeySize[0]+21);//go to child map
+                    trie.write(childsMap.toByteArray());
+                    //todo create new childs array
+                    //todo create new hash
+                    //todo if fined is available()>0 recursiveInsert()
+
+                    return res;
 
                 }else{
+
                     return true;
                 }
             }
@@ -130,6 +151,15 @@ public class Trie {
             trie.write(ROOT);
             byte[] trieTmp =new byte[2069];
             trie.write(trieTmp);
+            trie.write(LEAF);
+            ByteBuffer buffer = ByteBuffer.allocate(18);
+            byte[] lKey= buffer.put(key, 1, 18).array();
+            trie.writeByte(lKey.length);
+            trie.write(lKey);
+            byte[] tmpL=new byte[52];
+            trie.write(tmpL);
+            trie.seek(22+(key[0]*8));
+            trie.write(Longs.toByteArray(2070));
             return insert(key, age);
         }
 
@@ -139,9 +169,9 @@ public class Trie {
         trie.seek(Longs.fromByteArray(pos));
         byte type = key.length == 20 ? ROOT : trie.readByte();
         if(type==ROOT){
-            trie.seek(20);
+            trie.seek(trie.getFilePointer()+21+(key[0]*8));
             byte[] childPos=new byte[8];
-            trie.read(childPos,(key[0]*8),8);
+            trie.read(childPos,0,8);
             if(Ints.fromByteArray(childPos)>0){
                 ByteBuffer buffer = ByteBuffer.allocate(key.length-1);
                 byte[] child = search(buffer.put(key, key.length+1, key.length).array(), childPos);
@@ -156,7 +186,7 @@ public class Trie {
             byte[] keyNode = new byte[keySize];
             trie.read(keyNode,0,keySize);
             //todo compare keyNode vs key
-            trie.seek(20); //hash
+            trie.seek(trie.getFilePointer()+21); //skip hash
             byte[] childsMap=new byte[32];
             trie.read(childsMap,0,32);
             int childsCount=getChildsCount(childsMap);
@@ -171,8 +201,9 @@ public class Trie {
                 return buffer.put(type).put(pos).put(keySize).put(keyNode).put(childsMap).put(childsArraySize).put(childs).array();
             }else{
                 int childPosInMap = getChildPos(childsMap, Ints.fromBytes((byte)0, (byte)0, (byte)0, key[0]));
+                trie.seek(trie.getFilePointer() - childs.length);//go back to childsArray[0]
                 if(type == BRANCH){
-                    trie.seek((childPosInMap*8)-8);
+                    trie.seek(trie.getFilePointer()+(childPosInMap*8)-8);
                     byte[] childPos = new byte[8];
                     trie.read(childPos, 0, 8);
                     ByteBuffer buffer = ByteBuffer.allocate(keySize-1);
@@ -182,7 +213,7 @@ public class Trie {
                     return rtBuffer.put(child).put(BRANCH).put(pos).put(keySize).put(keyNode).put(childsMap).put(childsArraySize).put(childs).array();
                 }else{
                     //todo key?
-                    trie.seek((childPosInMap*2)-2);
+                    trie.seek(trie.getFilePointer()+(childPosInMap*2)-2);
                     byte[] childAge = new byte[2];
                     trie.read(childAge, 0, 2);
                     ByteBuffer rtBuffer = ByteBuffer.allocate(10+keySize+2+32+childsArraySize.length+childs.length);
@@ -195,7 +226,7 @@ public class Trie {
     private int getChildPos(byte[]childsMap, int key){
         int result=0;
         byte mask=(byte)255; //1111 1111
-        for(int s=0;s<32;s++){
+        for(int s=0;s<33;s++){
             byte prepare=childsMap[s];
             for(int i=0;i<7;i++){
                 if(i==2){
@@ -224,7 +255,7 @@ public class Trie {
 
                 if(prepare==mask) result=result+1;
 
-                if(s+i==key) return result;
+                if((s*8)+i==key) return result;
             }
         }
         return result;
@@ -301,13 +332,14 @@ public class Trie {
 
     public byte[] getHash(byte[] pos) throws IOException {
         byte[] hash = new byte[20];
-        trie.seek(Longs.fromByteArray(pos)+1);
+        trie.seek(Longs.fromByteArray(pos));
         byte type = trie.readByte();
         if(type==ROOT){
             trie.read(hash, 0, 20);
         }else {
             byte keySize = trie.readByte();
-            trie.read(hash, keySize, 20);
+            trie.seek(trie.getFilePointer()+keySize+1);
+            trie.read(hash, 0, 20);
         }
         return hash;
     }
@@ -317,18 +349,18 @@ public class Trie {
         if(type==BRANCH || type==ROOT) {
             byte[] digest=key;
             ByteBuffer buffer = ByteBuffer.allocate(8);
-            for(int i = 0; i < childArray.length+1;i++) {
+            for(int i = 0; i < childArray.length+1;) {
                 digest = Bytes.concat(digest, getHash(buffer.put(childArray, i, 8).array()));
-                i = i + 8;
+                i = i + 9;
             }
             buffer.clear();
             hash = sha256hash160(digest);
         }else if(type==LEAF){
             byte[] digest=key;
             ByteBuffer buffer = ByteBuffer.allocate(2);
-            for(int i = 0; i < childArray.length+1;i++) {
+            for(int i = 0; i < childArray.length+1;) {
                 digest = Bytes.concat(digest, getHash(buffer.put(childArray, i, 2).array()));
-                i = i + 2;
+                i = i + 3;
             }
             buffer.clear();
             hash = sha256hash160(digest);
@@ -337,4 +369,5 @@ public class Trie {
         }
         return hash;
     }
+
 }
