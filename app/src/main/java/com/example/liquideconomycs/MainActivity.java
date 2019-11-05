@@ -1,6 +1,10 @@
 package com.example.liquideconomycs;
 
 import android.Manifest;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
 import android.graphics.PointF;
@@ -27,10 +31,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import com.google.common.primitives.Bytes;
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
+
+import static com.example.liquideconomycs.Core_.EXTRA_PARAM_B;
 
 public class MainActivity extends AppCompatActivity implements ActivityCompat.OnRequestPermissionsResultCallback, OnQRCodeReadListener {
 
@@ -71,6 +78,11 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         }
         /////////////////////////////////////////////////////////////////////////////
         if (nodeDirReference.exists()) {
+            IntentFilter filter = new IntentFilter();
+            filter.addAction(Core_.BROADCAST_ACTION_BAZ);
+            LocalBroadcastManager bm = LocalBroadcastManager.getInstance(this);
+            bm.registerReceiver(mBroadcastReceiver, filter);
+
             try {
                 mTrie = new Trie(nodeDir);
             } catch (FileNotFoundException e) {
@@ -79,7 +91,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
 
             try {
-                HashAccountRoot = mTrie.GetHash(Longs.toByteArray(0L));
+                HashAccountRoot = mTrie.getHash(0L);
+                resultTextView.setText(HashAccountRoot.toString());
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -88,6 +101,28 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
     }
 
+    // handler for received data from service
+    private final BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (intent.getAction().equals(Core_.BROADCAST_ACTION_BAZ)) {
+                final String param = intent.getStringExtra(EXTRA_PARAM_B);
+                // do something
+            }
+        }
+    };
+
+    @Override
+    protected void onDestroy() {
+        LocalBroadcastManager bm = LocalBroadcastManager.getInstance(this);
+        bm.unregisterReceiver(mBroadcastReceiver);
+        super.onDestroy();
+    }
+
+    // send data to MyService
+    protected void communicateToService(String parameter) {
+        Core_.startActionFoo(this, parameter);
+    }
     /*private void wsOnConnected(){
         client.send(new byte[] {(byte) 0xDE, (byte) 0xAD, (byte) 0xBE, (byte) 0xEF });
         //client.disconnect();

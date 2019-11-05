@@ -21,8 +21,8 @@ public class Trie {
     private static byte ROOT = 1; //
     private static byte BRANCH = 2;
     private static byte LEAF = 3;
-    private static String BREAK = "TRIE_BREAK_REDUCE";
-    private static byte[] EMPTY_STRING = null;
+    private static byte FOUND = 0;
+    private static byte NOTFOUND = 1;
     Trie(String nodeDir) throws FileNotFoundException {
         trie = new RandomAccessFile(nodeDir+ "/trie.dat", "rw");
         freeSpace = new RandomAccessFile(nodeDir+ "/freeSpace.dat", "rw");
@@ -71,6 +71,8 @@ public class Trie {
         if(fined.available()>0){
             byte[] type=new byte[1];
             fined.read(type,0,1);
+            byte[] found=new byte[1];
+            fined.read(found,0,1);
             if(type[0]==ROOT){
                 if(pos==0){
                     //todo find free space
@@ -249,16 +251,60 @@ public class Trie {
                         trie.write(childArray);
                         return recursiveInsert(key, age, fined, pos);
                     }else{
-                        //todo insert suffix to childArray
-                        int childPosInMap = getChildPos(selfChildMap, Ints.fromBytes((byte) 0, (byte) 0, (byte) 0, key[0]));
-                        trie.seek(Longs.fromByteArray(selfPos)+2+selfKeySize[0]+20+32+(childPosInMap*2)-2);
-                        trie.write(Longs.toByteArray(pos));
-                        trie.seek(Longs.fromByteArray(selfPos)+2+selfKeySize[0]+20+33);
-                        trie.read(selfChildArray,0,selfChildArraySize);
-                        hash=calcHash(BRANCH, selfKey, selfChildArray);
-                        trie.seek(Longs.fromByteArray(selfPos)+2+selfKeySize[0]+1);
-                        trie.write(hash);
-                        return recursiveInsert(key, age, fined, Longs.fromByteArray(selfPos));
+                        if(found[0] == FOUND) {
+                            //todo insert suffix to childArray
+                            int childPosInMap = getChildPos(selfChildMap, Ints.fromBytes((byte) 0, (byte) 0, (byte) 0, key[0]));
+                            trie.seek(Longs.fromByteArray(selfPos) + 2 + selfKeySize[0] + 20 + 32 + (childPosInMap * 2) - 2);
+                            trie.write(Longs.toByteArray(pos));
+                            trie.seek(Longs.fromByteArray(selfPos) + 2 + selfKeySize[0] + 20 + 33);
+                            trie.read(selfChildArray, 0, selfChildArraySize);
+                            hash = calcHash(BRANCH, selfKey, selfChildArray);
+                            trie.seek(Longs.fromByteArray(selfPos) + 2 + selfKeySize[0] + 1);
+                            trie.write(hash);
+                            return recursiveInsert(key, age, fined, Longs.fromByteArray(selfPos));
+                        }else{
+                            int size=0;
+                            for(int i = 0; i<key[key.length-1];i++){
+                                if(checkChild(selfChildMap, Ints.fromBytes((byte) 0, (byte) 0, (byte) 0, key[i]))){
+                                    size=size+1;
+                                }
+                            }
+
+                            byte[] childArray_1= new byte[size*2];
+                            trie.seek(Longs.fromByteArray(selfPos) + 2 + selfKeySize[0] + 20 + 33);
+                            trie.read(childArray_1, 0, size*2);
+
+
+                            size=0;
+                            for(int i = key[key.length]; i<257;i++){
+                                if(checkChild(selfChildMap, Ints.fromBytes((byte) 0, (byte) 0, (byte) 0, key[i]))){
+                                    size=size+1;
+                                }
+                            }
+
+                            byte[] childArray_3= new byte[size*2];
+                            trie.seek(Longs.fromByteArray(selfPos) + 2 + selfKeySize[0] + 20 + 32 + (childArray_1.length+1));
+                            trie.read(childArray_3, 0, size*2);
+
+                            //todo find free space
+                            trie.seek(trie.length()+1);
+                            long posLeaf=trie.getFilePointer();
+                            trie.write(LEAF);
+                            trie.writeByte(selfKeySize[0]);
+                            trie.write(selfKey);
+                            trie.write(new byte[20]);
+                            childsMap = new BitSet(256);//get clear child map
+                            childsMap.set(key[key.length-1], true);
+                            trie.write(childsMap.toByteArray());
+                            trie.write(childArray_1);
+                            trie.write(age);
+                            trie.write(childArray_3);
+
+                            trie.seek(posLeaf + 2 + selfKeySize[0]);
+                            hash=calcHash(LEAF, selfKey, Bytes.concat(childArray_1, age, childArray_3));
+                            trie.write(hash);
+                            return recursiveInsert(key, age, fined, posLeaf);
+                        }
                     }
                 }
             }
@@ -295,6 +341,7 @@ public class Trie {
         return null;
     }
 
+    //
     public byte[] search(byte[] key, byte[] pos) throws IOException {
         trie.seek(Longs.fromByteArray(pos));
         byte type = key.length == 20 ? ROOT : trie.readByte();
@@ -334,21 +381,24 @@ public class Trie {
                     trie.read(childPos, 0, 8);
                     byte[] child = search(suffixKey, childPos);
                     ByteBuffer rtBuffer = ByteBuffer.allocate(child.length + 10 + keySize + 32 + 4 + 5);
-                    //ret ...00/00/0000000000000000/00/00n/0000000000000000000000000000000000000000000000000000000000000000/00000000
-                    return rtBuffer.put(child).put(BRANCH).put(pos).put(keySize).put(keyNode).put(childsMap).put(Ints.toByteArray(childsCount)).array();
+                    //    child/ type/found/self pos        /keySize/keyNode/childsMap                                                       /childsCount
+                    //ret ...00/00   /00   /0000000000000000/00     /00n    /0000000000000000000000000000000000000000000000000000000000000000/00000000
+                    return rtBuffer.put(child).put(BRANCH).put(FOUND).put(pos).put(keySize).put(keyNode).put(childsMap).put(Ints.toByteArray(childsCount)).array();
                 }else{
                     trie.seek(trie.getFilePointer() + (childPosInMap * 2) - 2);
                     byte[] age = new byte[2];
                     trie.read(age, 0, 2);
                     ByteBuffer rtBuffer = ByteBuffer.allocate(10 + keySize + 32 + 4 + 5 + 2);
-                    //ret /00/0000000000000000/00/00n/0000000000000000000000000000000000000000000000000000000000000000/00000000/0000/00/00...
-                    return rtBuffer.put(LEAF).put(pos).put(keySize).put(keyNode).put(childsMap).put(Ints.toByteArray(childsCount)).put(age).put((byte)key.length).put(key).array();
+                    //    / type/found/self pos        /keySize/keyNode/childsMap                                                       /childsCount/age  /key.length/key
+                    //ret /00   /00   /0000000000000000/00     /00n    /0000000000000000000000000000000000000000000000000000000000000000/00000000   /0000/00         /00...
+                    return rtBuffer.put(LEAF).put(FOUND).put(pos).put(keySize).put(keyNode).put(childsMap).put(Ints.toByteArray(childsCount)).put(age).put((byte)key.length).put(key).array();
                 }
             }
 
             ByteBuffer rtBuffer = ByteBuffer.allocate(10 + keySize + 32 + 4 +5);
-            //ret /00/0000000000000000/00/00n/0000000000000000000000000000000000000000000000000000000000000000/00000000/00/00...
-            return rtBuffer.put(type).put(pos).put(keySize).put(keyNode).put(childsMap).put(Ints.toByteArray(childsCount)).put((byte)key.length).put(key).array();
+            //    /type/not found/self pos        /keySize/keyNode/childsMap                                                       /childsCount/key.length/key
+            //ret /00  /00       /0000000000000000/00     /00n    /0000000000000000000000000000000000000000000000000000000000000000/00000000   /00        /00...
+            return rtBuffer.put(type).put(NOTFOUND).put(pos).put(keySize).put(keyNode).put(childsMap).put(Ints.toByteArray(childsCount)).put((byte)key.length).put(key).array();
 
         }
     }
@@ -480,7 +530,7 @@ public class Trie {
             byte[] digest=key;
             ByteBuffer buffer = ByteBuffer.allocate(8);
             for(int i = 0; i < childArray.length+1;) {
-                digest = Bytes.concat(digest, getHash(buffer.put(childArray, i, 8).array()));
+                digest = Bytes.concat(digest, getHash(Longs.fromByteArray(buffer.put(childArray, i, 8).array())));
                 i = i + 9;
             }
             buffer.clear();
@@ -489,7 +539,7 @@ public class Trie {
             byte[] digest=key;
             ByteBuffer buffer = ByteBuffer.allocate(2);
             for(int i = 0; i < childArray.length+1;) {
-                digest = Bytes.concat(digest, getHash(buffer.put(childArray, i, 2).array()));
+                digest = Bytes.concat(digest, getHash(Longs.fromByteArray(buffer.put(childArray, i, 2).array())));
                 i = i + 3;
             }
             buffer.clear();

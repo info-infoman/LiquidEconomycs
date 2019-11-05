@@ -9,6 +9,7 @@ android {
         versionCode 1
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        multiDexEnabled true
     }
     buildTypes {
         release {
@@ -30,4 +31,5 @@ dependencies {
     implementation "com.android.support:design:28.0.0"
     implementation "com.google.guava:guava:12.0.1"
     implementation 'org.bitcoinj:bitcoinj-core:0.15.5'
+    implementation 'com.android.support:multidex:1.0.3'
 }
