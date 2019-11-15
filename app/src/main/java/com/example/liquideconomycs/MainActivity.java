@@ -1,7 +1,9 @@
 package com.example.liquideconomycs;
 
 import android.Manifest;
+import android.app.ActivityManager;
 import android.content.BroadcastReceiver;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -9,7 +11,6 @@ import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
 import android.graphics.PointF;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.CheckBox;
@@ -26,6 +27,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import androidx.annotation.NonNull;
@@ -37,7 +39,7 @@ import com.google.common.primitives.Bytes;
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
 
-import static com.example.liquideconomycs.Core_.EXTRA_PARAM_B;
+import static com.example.liquideconomycs.TrieProcessor.EXTRA_PARAM_B;
 
 public class MainActivity extends AppCompatActivity implements ActivityCompat.OnRequestPermissionsResultCallback, OnQRCodeReadListener {
 
@@ -51,8 +53,19 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     private CheckBox            flashlightCheckBox;
     private CheckBox            enableDecodingCheckBox;
     private PointsOverlayView   pointsOverlayView;
-    private Trie                     mTrie;
+
     private byte[]                   HashAccountRoot;
+
+    // handler for received data from service
+    private final BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (intent.getAction().equals(TrieProcessor.BROADCAST_ACTION_BAZ)) {
+                final String param = intent.getStringExtra(EXTRA_PARAM_B);
+                resultTextView.setText(param);
+            }
+        }
+    };
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -70,47 +83,25 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             requestINTERNETPermission();
         }
 
-        ///////////init trie db//////////////////////////////////////////////////////
-        String nodeDir=getApplicationContext().getFilesDir().getAbsolutePath()+"/db";
+        ///////////init trie//////////////////////////////////////////////////////
+        String nodeDir=getApplicationContext().getFilesDir().getAbsolutePath()+"/trie";
         File nodeDirReference=new File(nodeDir);
         while (!nodeDirReference.exists()) {
-            copyAssetFolder(getApplicationContext().getAssets(), "db", nodeDir);
+            copyAssetFolder(getApplicationContext().getAssets(), "trie", nodeDir);
         }
         /////////////////////////////////////////////////////////////////////////////
         if (nodeDirReference.exists()) {
             IntentFilter filter = new IntentFilter();
-            filter.addAction(Core_.BROADCAST_ACTION_BAZ);
+            filter.addAction(TrieProcessor.BROADCAST_ACTION_BAZ);
             LocalBroadcastManager bm = LocalBroadcastManager.getInstance(this);
             bm.registerReceiver(mBroadcastReceiver, filter);
 
-            try {
-                mTrie = new Trie(nodeDir);
-            } catch (FileNotFoundException e) {
-                e.printStackTrace();
-            }
-
-
-            try {
-                HashAccountRoot = mTrie.getHash(0L);
-                resultTextView.setText(HashAccountRoot.toString());
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+            TrieProcessor.startActionGetHash(this,0L);
+            //
         }
 
 
     }
-
-    // handler for received data from service
-    private final BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            if (intent.getAction().equals(Core_.BROADCAST_ACTION_BAZ)) {
-                final String param = intent.getStringExtra(EXTRA_PARAM_B);
-                // do something
-            }
-        }
-    };
 
     @Override
     protected void onDestroy() {
@@ -119,10 +110,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         super.onDestroy();
     }
 
-    // send data to MyService
-    protected void communicateToService(String parameter) {
-        Core_.startActionFoo(this, parameter);
-    }
     /*private void wsOnConnected(){
         client.send(new byte[] {(byte) 0xDE, (byte) 0xAD, (byte) 0xBE, (byte) 0xEF });
         //client.disconnect();
@@ -289,5 +276,23 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         while ((read = in.read(buffer)) != -1) {
             out.write(buffer, 0, read);
         }
+    }
+
+    private boolean isServiceRunning() {
+        ActivityManager activityManager = (ActivityManager)getSystemService(ACTIVITY_SERVICE);
+        List<ActivityManager.RunningServiceInfo> serviceList = activityManager.getRunningServices(Integer.MAX_VALUE);
+
+        if (serviceList.size() <= 0) {
+            return false;
+        }
+        for (int i = 0; i < serviceList.size(); i++) {
+            ActivityManager.RunningServiceInfo serviceInfo = serviceList.get(i);
+            ComponentName serviceName = serviceInfo.service;
+            if (serviceName.getClassName().equals(TrieProcessor.class.getName())) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
