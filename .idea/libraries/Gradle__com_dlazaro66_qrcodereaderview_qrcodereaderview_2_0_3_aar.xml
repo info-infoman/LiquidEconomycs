@@ -1,8 +1,8 @@
 <component name="libraryTable">
   <library name="Gradle: com.dlazaro66.qrcodereaderview:qrcodereaderview:2.0.3@aar">
     <CLASSES>
-      <root url="jar://$USER_HOME$/.gradle/caches/transforms-2/files-2.1/80a680e3b8e37347c85fb1c929a42622/qrcodereaderview-2.0.3/jars/classes.jar!/" />
-      <root url="file://$USER_HOME$/.gradle/caches/transforms-2/files-2.1/80a680e3b8e37347c85fb1c929a42622/qrcodereaderview-2.0.3/res" />
+      <root url="jar://$USER_HOME$/.gradle/caches/transforms-2/files-2.1/efdd9c2f7f198a5b23e48ab056f815e2/qrcodereaderview-2.0.3/jars/classes.jar!/" />
+      <root url="file://$USER_HOME$/.gradle/caches/transforms-2/files-2.1/efdd9c2f7f198a5b23e48ab056f815e2/qrcodereaderview-2.0.3/res" />
     </CLASSES>
     <JAVADOC>
       <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/com.dlazaro66.qrcodereaderview/qrcodereaderview/2.0.3/94601f5468feab76f6e18314e6d8b1d6fe9f46de/qrcodereaderview-2.0.3-javadoc.jar!/" />

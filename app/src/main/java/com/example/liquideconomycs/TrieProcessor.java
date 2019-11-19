@@ -14,34 +14,46 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 public class TrieProcessor extends IntentService {
     private Trie      mTrie;
-    private String nodeDir=getApplicationContext().getFilesDir().getAbsolutePath()+"/trie";
 
-    //input params
-    private static final String EXTRA_PARAM_POS = "com.example.liquideconomycs.TrieProcessor.extra.POS";
-    private static final String EXTRA_PARAM_KEY = "com.example.liquideconomycs.TrieProcessor.extra.KEY";
-    private static final String EXTRA_PARAM_VALUE = "com.example.liquideconomycs.TrieProcessor.extra.VALUE";
+    public static final String EXTRA_MASTER = "com.example.liquideconomycs.TrieProcessor.extra.MASTER";
+    public static final String EXTRA_CMD = "com.example.liquideconomycs.TrieProcessor.extra.CMD";
+    private static final String EXTRA_nodeDir = "com.example.liquideconomycs.TrieProcessor.extra.nodeDir";
     //input fnc
     private static final String ACTION_GetHash = "com.example.liquideconomycs.TrieProcessor.action.GetHash";
     private static final String ACTION_Insert = "com.example.liquideconomycs.TrieProcessor.action.Insert";
 
-    public static final String BROADCAST_ACTION_BAZ = "com.example.liquideconomycs.TrieProcessor.broadcast_action.BAZ";
-    public static final String EXTRA_PARAM_B = "com.example.liquideconomycs.TrieProcessor.extra.PARAM_B";
+    //input params
+    private static final String EXTRA_POS = "com.example.liquideconomycs.TrieProcessor.extra.POS";
+    private static final String EXTRA_KEY = "com.example.liquideconomycs.TrieProcessor.extra.KEY";
+    private static final String EXTRA_VALUE = "com.example.liquideconomycs.TrieProcessor.extra.VALUE";
+
+
+    public static final String BROADCAST_ACTION_ANSWER = "com.example.liquideconomycs.TrieProcessor.broadcast_action.ANSWER";
+    public static final String EXTRA_ANSWER = "com.example.liquideconomycs.TrieProcessor.extra.ANSWER";
 
 
     // called by activity to communicate to service
-    public static void startActionGetHash(Context context, long pos) {
+    public static void startActionGetHash(Context context, String master, long pos, String nodeDir) {
         Intent intent = new Intent(context, TrieProcessor.class);
         intent.setAction(ACTION_GetHash);
-        intent.putExtra(EXTRA_PARAM_POS, pos);
+
+        intent.putExtra(EXTRA_nodeDir, nodeDir);
+        intent.putExtra(EXTRA_MASTER, master);
+        intent.putExtra(EXTRA_POS, pos);
         context.startService(intent);
     }
 
     // called by activity to communicate to service
-    public static void startActionInsert(Context context, byte[] key, byte[] value) {
+    public static void startActionInsert(Context context, String master, byte[] key, byte[] value, String nodeDir) {
+
         Intent intent = new Intent(context, TrieProcessor.class);
+
         intent.setAction(ACTION_Insert);
-        intent.putExtra(EXTRA_PARAM_KEY, key);
-        intent.putExtra(EXTRA_PARAM_VALUE, value);
+
+        intent.putExtra(EXTRA_nodeDir, nodeDir);
+        intent.putExtra(EXTRA_MASTER, master);
+        intent.putExtra(EXTRA_KEY, key);
+        intent.putExtra(EXTRA_VALUE, value);
         context.startService(intent);
     }
 
@@ -54,11 +66,14 @@ public class TrieProcessor extends IntentService {
         if (intent != null) {
             final String action = intent.getAction();
             if (ACTION_GetHash.equals(action)) {
-                final long pos = intent.getLongExtra(EXTRA_PARAM_POS,0L);
+                final String master = intent.getStringExtra(EXTRA_MASTER);
+                final String cmd = "GetHash";
+                final long pos = intent.getLongExtra(EXTRA_POS,0L);
+                final String nodeDir = intent.getStringExtra(EXTRA_nodeDir);
                 ////////////////////////////////////////////////////////////////
                 try {
                     mTrie = new Trie(nodeDir);
-                    broadcastActionBaz(mTrie.getHash(pos).toString());
+                    broadcastActionMsg(master, cmd, mTrie.getHash(pos));
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -66,13 +81,15 @@ public class TrieProcessor extends IntentService {
             }
 
             if (ACTION_Insert.equals(action)) {
-
-                final byte[] key = intent.getByteArrayExtra(EXTRA_PARAM_KEY);
-                final byte[] value = intent.getByteArrayExtra(EXTRA_PARAM_VALUE);
+                final String master = intent.getStringExtra(EXTRA_MASTER);
+                final String cmd = "Insert";
+                final byte[] key = intent.getByteArrayExtra(EXTRA_KEY);
+                final byte[] value = intent.getByteArrayExtra(EXTRA_VALUE);
+                final String nodeDir = intent.getStringExtra(EXTRA_nodeDir);
                 ////////////////////////////////////////////////////////////////
                 try {
                     mTrie = new Trie(nodeDir);
-                    broadcastActionBaz(mTrie.insert(key,value).toString());
+                    broadcastActionMsg(master, cmd, mTrie.insert(key,value));
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -82,12 +99,16 @@ public class TrieProcessor extends IntentService {
     }
 
     // called to send data to Activity
-    public void broadcastActionBaz(String param) {
-        Intent intent = new Intent(BROADCAST_ACTION_BAZ);
-        intent.putExtra(EXTRA_PARAM_B, param);
+    public void broadcastActionMsg(String master, String cmd, byte[] answer) {
+        Intent intent = new Intent(BROADCAST_ACTION_ANSWER);
+        intent.putExtra(EXTRA_MASTER, master);
+        intent.putExtra(EXTRA_CMD, cmd);
+        intent.putExtra(EXTRA_ANSWER, answer);
         LocalBroadcastManager bm = LocalBroadcastManager.getInstance(this);
         bm.sendBroadcast(intent);
     }
+
+
 }
 /*
 mExtraHeaders = Arrays.asList(new BasicNameValuePair("Cookie", "session=abcd"));

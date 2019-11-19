@@ -4,11 +4,14 @@ import android.Manifest;
 import android.app.ActivityManager;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
+import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
 import android.graphics.PointF;
 import android.os.Bundle;
 import android.view.View;
@@ -38,8 +41,15 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 import com.google.common.primitives.Bytes;
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
+import com.google.common.primitives.Shorts;
 
-import static com.example.liquideconomycs.TrieProcessor.EXTRA_PARAM_B;
+import org.bitcoinj.core.ECKey;
+
+import static com.example.liquideconomycs.TrieProcessor.EXTRA_MASTER;
+import static com.example.liquideconomycs.TrieProcessor.EXTRA_CMD;
+import static com.example.liquideconomycs.TrieProcessor.EXTRA_ANSWER;
+
+
 
 public class MainActivity extends AppCompatActivity implements ActivityCompat.OnRequestPermissionsResultCallback, OnQRCodeReadListener {
 
@@ -53,16 +63,29 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     private CheckBox            flashlightCheckBox;
     private CheckBox            enableDecodingCheckBox;
     private PointsOverlayView   pointsOverlayView;
-
-    private byte[]                   HashAccountRoot;
+    public  boolean             synchronizes;
+    DBHelper                    dbHelper;
+    private byte[]              myPubKey;
+    private byte[]              myPrivKey;
+    private String              myManifest;
 
     // handler for received data from service
     private final BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            if (intent.getAction().equals(TrieProcessor.BROADCAST_ACTION_BAZ)) {
-                final String param = intent.getStringExtra(EXTRA_PARAM_B);
-                resultTextView.setText(param);
+            if (intent.getAction().equals(TrieProcessor.BROADCAST_ACTION_ANSWER)) {
+                final String master = intent.getStringExtra(EXTRA_MASTER);
+                final String cmd = intent.getStringExtra(EXTRA_CMD);
+                final byte[] answer = intent.getByteArrayExtra(EXTRA_ANSWER);
+                if(master=="Main"){
+
+                }
+                //resultTextView.setText(param);
+            }
+
+            if (intent.getAction().equals(Sync.BROADCAST_ACTION_END)) {
+                synchronizes=false;
+                //resultTextView.setText(param);
             }
         }
     };
@@ -92,12 +115,52 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         /////////////////////////////////////////////////////////////////////////////
         if (nodeDirReference.exists()) {
             IntentFilter filter = new IntentFilter();
-            filter.addAction(TrieProcessor.BROADCAST_ACTION_BAZ);
+            filter.addAction(TrieProcessor.BROADCAST_ACTION_ANSWER);
+            filter.addAction(Sync.BROADCAST_ACTION_END);
             LocalBroadcastManager bm = LocalBroadcastManager.getInstance(this);
             bm.registerReceiver(mBroadcastReceiver, filter);
 
-            TrieProcessor.startActionGetHash(this,0L);
+            synchronizes = isSyncRunning();
+
+            //init db
+            ContentValues cv = new ContentValues();
+            // подключаемся к БД
+            dbHelper = new DBHelper(this);
+            SQLiteDatabase db = dbHelper.getWritableDatabase();
+            Cursor c = db.query("users",
+                    null,
+                    "privKey <> ?", null,
+                    null,
+                    null,
+                    null,
+                    String.valueOf(1));
+            if (c.moveToFirst()) {
+                int idColIndex = c.getColumnIndex("id");
+                int pubKeyColIndex = c.getColumnIndex("pubKey");
+                int privKeyColIndex = c.getColumnIndex("privKey");
+                int manifestColIndex = c.getColumnIndex("manifest");
+                do {
+                    myPubKey = c.getBlob(pubKeyColIndex);
+                    myPrivKey = c.getBlob(privKeyColIndex);
+                    myManifest = c.getString(manifestColIndex);
+                } while (c.moveToNext());
+            }else{
+                ECKey myECKey=new ECKey();
+                myPrivKey = myECKey.getPrivKeyBytes();
+                myPubKey = myECKey.getPubKey();
+                myManifest = "";
+                //todo ask manifest
+                cv.put("pubKey", myPubKey);
+                cv.put("privKey", myPrivKey);
+                cv.put("manifest", myManifest);
+                Long index = db.insert("users", null, cv);
+                cv.clear();
+                TrieProcessor.startActionInsert(this,"Main",myPubKey, Shorts.toByteArray(index.shortValue()), nodeDir);
+                //ECKey myECKey1= new ECKey().fromPrivate(myPrivateKey);
+            }
+            //TrieProcessor.startActionGetHash(this,"Main",0L);
             //
+            //Sync.startActionSync(String signalServer, byte[] pubKey);
         }
 
 
@@ -278,7 +341,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         }
     }
 
-    private boolean isServiceRunning() {
+    private boolean isSyncRunning() {
         ActivityManager activityManager = (ActivityManager)getSystemService(ACTIVITY_SERVICE);
         List<ActivityManager.RunningServiceInfo> serviceList = activityManager.getRunningServices(Integer.MAX_VALUE);
 
@@ -288,7 +351,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         for (int i = 0; i < serviceList.size(); i++) {
             ActivityManager.RunningServiceInfo serviceInfo = serviceList.get(i);
             ComponentName serviceName = serviceInfo.service;
-            if (serviceName.getClassName().equals(TrieProcessor.class.getName())) {
+            if (serviceName.getClassName().equals(Sync.class.getName())) {
                 return true;
             }
         }

@@ -58,7 +58,9 @@ public class Trie {
     //deserialize = /size(2 bytes)/point(8 bytes)/ for trie.dat. For 10 000 000 pointers *10 bytes = ~ 95Mb
 
     public byte[] insert(byte[] key, byte[] age) throws IOException {
-        ByteArrayInputStream fined = new ByteArrayInputStream(search(key, rootPos));
+        byte[] s = search(key, rootPos);
+        if
+        ByteArrayInputStream fined = new ByteArrayInputStream();
         long pos = recursiveInsert(key, age, fined, 0);
         fined.close();
         return getHash(pos);
@@ -342,63 +344,67 @@ public class Trie {
 
     //
     public byte[] search(byte[] key, byte[] pos) throws IOException {
-        trie.seek(Longs.fromByteArray(pos));
-        byte type = key.length == 20 ? ROOT : trie.readByte();
-        if(type==ROOT){
-            trie.seek(trie.getFilePointer()+21+(key[0]*8));
-            byte[] childPos=new byte[8];
-            trie.read(childPos,0,8);
-            if(Longs.fromByteArray(childPos)!=0){
-                byte[] child = search(key, childPos);
-                ByteBuffer rtBuffer = ByteBuffer.allocate(child.length+1);
-                return rtBuffer.put(child).put(ROOT).array();
-            }
-            ByteBuffer rtBuffer = ByteBuffer.allocate(1);
-            return rtBuffer.put(ROOT).array();
-        }else{
-            byte keySize = trie.readByte();
-            byte[] keyNode = new byte[keySize];
-            trie.read(keyNode,0,keySize);
-            //todo compare keyNode vs key
-            trie.seek(trie.getFilePointer()+21); //skip hash
-            byte[] childsMap=new byte[32];
-            trie.read(childsMap,0,32);
-            int childsCount=getChildsCount(childsMap);
-
-            ByteBuffer compareKey = ByteBuffer.allocate(keyNode.length);
-            compareKey.put(key, 0, keyNode.length).array();
-
-            ByteBuffer sKey = ByteBuffer.allocate(key.length-keyNode.length);
-            byte[] suffixKey = sKey.put(key, keyNode.length, key.length).array();
-            //found
-            if (compareKey.put(key, 0, keyNode.length).array()==keyNode && checkChild(childsMap, Ints.fromBytes((byte) 0, (byte) 0, (byte) 0, suffixKey[0]))) {
-                int childPosInMap = getChildPos(childsMap, Ints.fromBytes((byte) 0, (byte) 0, (byte) 0, suffixKey[0]));
-
-                if(type == BRANCH) {
-                    trie.seek(trie.getFilePointer() + (childPosInMap * 8) - 8);
-                    byte[] childPos = new byte[8];
-                    trie.read(childPos, 0, 8);
-                    byte[] child = search(suffixKey, childPos);
-                    ByteBuffer rtBuffer = ByteBuffer.allocate(child.length + 10 + keySize + 32 + 4 + 5);
-                    //    child/ type/found/self pos        /keySize/keyNode/childsMap                                                       /childsCount
-                    //ret ...00/00   /00   /0000000000000000/00     /00n    /0000000000000000000000000000000000000000000000000000000000000000/00000000
-                    return rtBuffer.put(child).put(BRANCH).put(FOUND).put(pos).put(keySize).put(keyNode).put(childsMap).put(Ints.toByteArray(childsCount)).array();
-                }else{
-                    trie.seek(trie.getFilePointer() + (childPosInMap * 2) - 2);
-                    byte[] age = new byte[2];
-                    trie.read(age, 0, 2);
-                    ByteBuffer rtBuffer = ByteBuffer.allocate(10 + keySize + 32 + 4 + 5 + 2);
-                    //    / type/found/self pos        /keySize/keyNode/childsMap                                                       /childsCount/age  /key.length/key
-                    //ret /00   /00   /0000000000000000/00     /00n    /0000000000000000000000000000000000000000000000000000000000000000/00000000   /0000/00         /00...
-                    return rtBuffer.put(LEAF).put(FOUND).put(pos).put(keySize).put(keyNode).put(childsMap).put(Ints.toByteArray(childsCount)).put(age).put((byte)key.length).put(key).array();
+        if(trie.length()>0) {
+            trie.seek(Longs.fromByteArray(pos));
+            byte type = key.length == 20 ? ROOT : trie.readByte();
+            if (type == ROOT) {
+                trie.seek(trie.getFilePointer() + 21 + (key[0] * 8));
+                byte[] childPos = new byte[8];
+                trie.read(childPos, 0, 8);
+                if (Longs.fromByteArray(childPos) != 0) {
+                    byte[] child = search(key, childPos);
+                    ByteBuffer rtBuffer = ByteBuffer.allocate(child.length + 1);
+                    return rtBuffer.put(child).put(ROOT).array();
                 }
+                ByteBuffer rtBuffer = ByteBuffer.allocate(1);
+                return rtBuffer.put(ROOT).array();
+            } else {
+                byte keySize = trie.readByte();
+                byte[] keyNode = new byte[keySize];
+                trie.read(keyNode, 0, keySize);
+                //todo compare keyNode vs key
+                trie.seek(trie.getFilePointer() + 21); //skip hash
+                byte[] childsMap = new byte[32];
+                trie.read(childsMap, 0, 32);
+                int childsCount = getChildsCount(childsMap);
+
+                ByteBuffer compareKey = ByteBuffer.allocate(keyNode.length);
+                compareKey.put(key, 0, keyNode.length).array();
+
+                ByteBuffer sKey = ByteBuffer.allocate(key.length - keyNode.length);
+                byte[] suffixKey = sKey.put(key, keyNode.length, key.length).array();
+                //found
+                if (compareKey.put(key, 0, keyNode.length).array() == keyNode && checkChild(childsMap, Ints.fromBytes((byte) 0, (byte) 0, (byte) 0, suffixKey[0]))) {
+                    int childPosInMap = getChildPos(childsMap, Ints.fromBytes((byte) 0, (byte) 0, (byte) 0, suffixKey[0]));
+
+                    if (type == BRANCH) {
+                        trie.seek(trie.getFilePointer() + (childPosInMap * 8) - 8);
+                        byte[] childPos = new byte[8];
+                        trie.read(childPos, 0, 8);
+                        byte[] child = search(suffixKey, childPos);
+                        ByteBuffer rtBuffer = ByteBuffer.allocate(child.length + 10 + keySize + 32 + 4 + 5);
+                        //    child/ type/found/self pos        /keySize/keyNode/childsMap                                                       /childsCount
+                        //ret ...00/00   /00   /0000000000000000/00     /00n    /0000000000000000000000000000000000000000000000000000000000000000/00000000
+                        return rtBuffer.put(child).put(BRANCH).put(FOUND).put(pos).put(keySize).put(keyNode).put(childsMap).put(Ints.toByteArray(childsCount)).array();
+                    } else {
+                        trie.seek(trie.getFilePointer() + (childPosInMap * 2) - 2);
+                        byte[] age = new byte[2];
+                        trie.read(age, 0, 2);
+                        ByteBuffer rtBuffer = ByteBuffer.allocate(10 + keySize + 32 + 4 + 5 + 2);
+                        //    / type/found/self pos        /keySize/keyNode/childsMap                                                       /childsCount/age  /key.length/key
+                        //ret /00   /00   /0000000000000000/00     /00n    /0000000000000000000000000000000000000000000000000000000000000000/00000000   /0000/00         /00...
+                        return rtBuffer.put(LEAF).put(FOUND).put(pos).put(keySize).put(keyNode).put(childsMap).put(Ints.toByteArray(childsCount)).put(age).put((byte) key.length).put(key).array();
+                    }
+                }
+
+                ByteBuffer rtBuffer = ByteBuffer.allocate(10 + keySize + 32 + 4 + 5);
+                //    /type/not found/self pos        /keySize/keyNode/childsMap                                                       /childsCount/key.length/key
+                //ret /00  /00       /0000000000000000/00     /00n    /0000000000000000000000000000000000000000000000000000000000000000/00000000   /00        /00...
+                return rtBuffer.put(type).put(NOTFOUND).put(pos).put(keySize).put(keyNode).put(childsMap).put(Ints.toByteArray(childsCount)).put((byte) key.length).put(key).array();
+
             }
-
-            ByteBuffer rtBuffer = ByteBuffer.allocate(10 + keySize + 32 + 4 +5);
-            //    /type/not found/self pos        /keySize/keyNode/childsMap                                                       /childsCount/key.length/key
-            //ret /00  /00       /0000000000000000/00     /00n    /0000000000000000000000000000000000000000000000000000000000000000/00000000   /00        /00...
-            return rtBuffer.put(type).put(NOTFOUND).put(pos).put(keySize).put(keyNode).put(childsMap).put(Ints.toByteArray(childsCount)).put((byte)key.length).put(key).array();
-
+        }else{
+            return null;
         }
     }
 
@@ -535,13 +541,7 @@ public class Trie {
             buffer.clear();
             hash = sha256hash160(digest);
         }else if(type==LEAF){
-            byte[] digest=key;
-            ByteBuffer buffer = ByteBuffer.allocate(2);
-            for(int i = 0; i < childArray.length+1;) {
-                digest = Bytes.concat(digest, getHash(Longs.fromByteArray(buffer.put(childArray, i, 2).array())));
-                i = i + 3;
-            }
-            buffer.clear();
+            byte[] digest=Bytes.concat(key, childArray);
             hash = sha256hash160(digest);
         }else{
             hash = null;
