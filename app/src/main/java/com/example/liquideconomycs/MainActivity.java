@@ -129,17 +129,19 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             SQLiteDatabase db = dbHelper.getWritableDatabase();
             Cursor c = db.query("users",
                     null,
-                    "privKey <> ?", null,
+                    "privKey NOT NULL", null,
                     null,
                     null,
                     null,
                     String.valueOf(1));
+            Long index = 0L;
             if (c.moveToFirst()) {
                 int idColIndex = c.getColumnIndex("id");
                 int pubKeyColIndex = c.getColumnIndex("pubKey");
                 int privKeyColIndex = c.getColumnIndex("privKey");
                 int manifestColIndex = c.getColumnIndex("manifest");
                 do {
+                    index = index+1;
                     myPubKey = c.getBlob(pubKeyColIndex);
                     myPrivKey = c.getBlob(privKeyColIndex);
                     myManifest = c.getString(manifestColIndex);
@@ -147,17 +149,19 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             }else{
                 ECKey myECKey=new ECKey();
                 myPrivKey = myECKey.getPrivKeyBytes();
-                myPubKey = myECKey.getPubKey();
+                myPubKey = myECKey.getPubKeyHash();
                 myManifest = "";
                 //todo ask manifest
                 cv.put("pubKey", myPubKey);
                 cv.put("privKey", myPrivKey);
                 cv.put("manifest", myManifest);
-                Long index = db.insert("users", null, cv);
+                index = db.insert("users", null, cv);
                 cv.clear();
-                TrieProcessor.startActionInsert(this,"Main",myPubKey, Shorts.toByteArray(index.shortValue()), nodeDir);
                 //ECKey myECKey1= new ECKey().fromPrivate(myPrivateKey);
             }
+
+            TrieProcessor.startActionInsert(this,"Main",myPubKey, Shorts.toByteArray(index.shortValue()), nodeDir);
+
             //TrieProcessor.startActionGetHash(this,"Main",0L);
             //
             //Sync.startActionSync(String signalServer, byte[] pubKey);
