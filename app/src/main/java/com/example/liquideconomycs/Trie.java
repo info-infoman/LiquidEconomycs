@@ -9,6 +9,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.BitSet;
 
 import static org.bitcoinj.core.Utils.sha256hash160;
@@ -64,8 +65,9 @@ public class Trie {
             trie.write(ROOT);
             byte[] trieTmp =new byte[2068];
             trie.write(trieTmp);
+            s = search(key, rootPos);
         }
-        ByteArrayInputStream fined = new ByteArrayInputStream(search(key, rootPos));
+        ByteArrayInputStream fined = new ByteArrayInputStream(s);
         long pos = recursiveInsert(key, age, fined, 0);
         fined.close();
         return getHash(pos);
@@ -103,8 +105,8 @@ public class Trie {
                 trie.seek(21);
                 byte[] childArray= new byte[2048];
                 trie.read(childArray,0,2048);
-                trie.seek(1);
                 hash=calcHash(ROOT, new byte[1], childArray);
+                trie.seek(1);
                 trie.write(hash);
                 return 0L;
 
@@ -323,12 +325,9 @@ public class Trie {
 
     private byte[] getCommonKey(byte[] selfKey, byte[] key) {
         for(int i = 1; i < selfKey.length; i++){
-            ByteBuffer sK = ByteBuffer.allocate(selfKey.length-i);
-            ByteBuffer k = ByteBuffer.allocate((key.length-i));
-            sK.put(selfKey, 0, selfKey.length-i);
-            k.put(key, 0, (key.length-i));
-            if(sK.equals(k)){
-                return sK.array();
+            byte[] sK = getBytesPart(key, 0, selfKey.length-i);
+            if(Arrays.equals(getBytesPart(key, 0, selfKey.length-i),getBytesPart(key, 0, key.length-i))){
+                return sK;
             }
         }
         return null;
@@ -338,9 +337,9 @@ public class Trie {
     public byte[] search(byte[] key, byte[] pos) throws IOException {
         if(trie.length()>0) {
             trie.seek(Longs.fromByteArray(pos));
-            byte type = key.length == 20 ? ROOT : trie.readByte();
+            byte type = trie.readByte();
             if (type == ROOT) {
-                trie.seek(trie.getFilePointer() + 21 + ((key[0]&0xFF) * 8));
+                trie.seek(trie.getFilePointer() + 20 + ((key[0]&0xFF) * 8)-8);
                 byte[] childPos = new byte[8];
                 trie.read(childPos, 0, 8);
                 if (Longs.fromByteArray(childPos) != 0) {
@@ -355,18 +354,14 @@ public class Trie {
                 byte[] keyNode = new byte[keySize];
                 trie.read(keyNode, 0, keySize);
                 //todo compare keyNode vs key
-                trie.seek(trie.getFilePointer() + 21); //skip hash
+                trie.seek(trie.getFilePointer() + 20); //skip hash
                 byte[] childsMap = new byte[32];
                 trie.read(childsMap, 0, 32);
                 int childsCount = getChildsCount(childsMap);
 
-                ByteBuffer compareKey = ByteBuffer.allocate(keyNode.length);
-                compareKey.put(key, 0, keyNode.length).array();
-
-                ByteBuffer sKey = ByteBuffer.allocate(key.length - keyNode.length);
-                byte[] suffixKey = sKey.put(key, keyNode.length, key.length).array();
+                byte[] suffixKey = getBytesPart(key, keyNode.length, key.length - keyNode.length);
                 //found
-                if (compareKey.put(key, 0, keyNode.length).array() == keyNode && checkChild(childsMap, (suffixKey[0]&0xFF))) {
+                if (Arrays.equals(getBytesPart(key, 0, keyNode.length), keyNode) && checkChild(childsMap, (suffixKey[0]&0xFF))) {
                     int childPosInMap = getChildPos(childsMap, (suffixKey[0]&0xFF));
 
                     if (type == BRANCH) {
@@ -383,7 +378,7 @@ public class Trie {
                         byte[] age = new byte[2];
                         trie.read(age, 0, 2);
                         //todo
-                        ByteBuffer rtBuffer = ByteBuffer.allocate(10 + 1 + (keySize&0xFF) + 32 + 4 + 1 + key.length);
+                        ByteBuffer rtBuffer = ByteBuffer.allocate(10 + 1 + (keySize&0xFF) + 32 + 4 + 2 + 1 + key.length);
                         //    / type/found/self pos        /keySize/keyNode/childsMap                                                       /childsCount/age  /key.length/key
                         //ret /00   /00   /0000000000000000/00     /00n    /0000000000000000000000000000000000000000000000000000000000000000/00000000   /0000/00         /00...
                         return rtBuffer.put(LEAF).put(FOUND).put(pos).put(keySize).put(keyNode).put(childsMap).put(Ints.toByteArray(childsCount)).put(age).put((byte) key.length).put(key).array();
@@ -402,110 +397,21 @@ public class Trie {
     }
 
     private int getChildPos(byte[]childsMap, int key){
-        int result=0;
-        byte mask=(byte)255; //1111 1111
-        for(int s=0;s<33;s++){
-            byte prepare=childsMap[s];
-            for(int i=0;i<7;i++){
-                if(i==2){
-                    prepare = (byte)(prepare<<1);
-                }
-                if(i==3){
-                    prepare = (byte)(prepare<<2);
-                }
-                if(i==4){
-                    prepare = (byte)(prepare<<3);
-                }
-                if(i==5){
-                    prepare = (byte)(prepare<<4);
-                }
-                if(i==6){
-                    prepare = (byte)(prepare<<5);//1100 0000
-                }
-                if(i==7){
-                    prepare = (byte)(prepare<<6);//1100 0000
-                }
-                if(i==0){//for pos 8
-                    prepare = (byte)(prepare<<7);
-                }
-                //for pos 1
-                prepare = (byte)(prepare>>7);
-
-                if(prepare==mask) result=result+1;
-
-                if((s*8)+i==key) return result;
-            }
+        int result=1;
+        BitSet prepare = BitSet.valueOf(childsMap);
+        for(int i = 0; i < key;i++){
+            if(prepare.get(i)) result=result+1;
         }
         return result;
     }
 
     private int getChildsCount(byte[]childsMap){
-        int result=0;
-        byte mask=(byte)255; //1111 1111
-        for(int s=0;s<32;s++){
-            byte prepare=childsMap[s];
-            for(int i=0;i<7;i++){
-                if(i==2){
-                    prepare = (byte)(prepare<<1);
-                }
-                if(i==3){
-                    prepare = (byte)(prepare<<2);
-                }
-                if(i==4){
-                    prepare = (byte)(prepare<<3);
-                }
-                if(i==5){
-                    prepare = (byte)(prepare<<4);
-                }
-                if(i==6){
-                    prepare = (byte)(prepare<<5);//1100 0000
-                }
-                if(i==7){
-                    prepare = (byte)(prepare<<6);//1100 0000
-                }
-                if(i==0){//for pos 8
-                    prepare = (byte)(prepare<<7);
-                }
-                //for pos 1
-                prepare = (byte)(prepare>>7);
-
-                if(prepare==mask) result=result+1;
-            }
-        }
-        return result;
+        return BitSet.valueOf(childsMap).cardinality();
     }
 
     private boolean checkChild(byte[]childsMap, int key){
-            byte mask=(byte)255; //1111 1111
-            int del=(int)Math.floor(key/8);//0
-            int pos=key-(del*8);//0
-            if(del>pos) del=del-1;
-            byte prepare=childsMap[del];
-            if(pos==2){
-                prepare = (byte)(prepare<<1);
-            }
-            if(pos==3){
-                prepare = (byte)(prepare<<2);
-            }
-            if(pos==4){
-                prepare = (byte)(prepare<<3);
-            }
-            if(pos==5){
-                prepare = (byte)(prepare<<4);
-            }
-            if(pos==6){
-                prepare = (byte)(prepare<<5);//1100 0000
-            }
-            if(pos==7){
-                prepare = (byte)(prepare<<6);//1100 0000
-            }
-            if(pos==0){//for pos 8
-                prepare = (byte)(prepare<<7);
-            }
-            //for pos 1
-            prepare = (byte)(prepare>>7);
-
-            return prepare==mask;
+        BitSet prepare = BitSet.valueOf(childsMap);
+        return prepare.get(key);
     }
 
     private byte[] addChild(byte[]childsMap, int key){
@@ -538,6 +444,14 @@ public class Trie {
         return result.array();
     }
 
+    private byte[] getBytesPart(byte[]src, int off, int len){
+        byte[] result= new byte[len];
+        for(int i=0; i < result.length; i++){
+            result[i]=src[off+i];
+        }
+        return result;
+    }
+
     public byte[] getHash(long pos) throws IOException {
         byte[] hash = new byte[20];
         trie.seek(pos);
@@ -556,14 +470,12 @@ public class Trie {
         byte[] hash;
         if(type==BRANCH || type==ROOT) {
             byte[] digest=key;
-            ByteBuffer buffer = ByteBuffer.allocate(8);
             for(int i = 0; i < childArray.length;) {
-                long pos = Longs.fromByteArray(buffer.put(childArray, i, 8).array());
+                long pos = Longs.fromByteArray(getBytesPart(childArray, i, 8));
                 if(pos!=0){
                     digest = Bytes.concat(digest, getHash(pos));
                 }
-                i = i + 8;
-                buffer.clear();
+                i = i + 8;;
             }
             hash = sha256hash160(digest);
         }else if(type==LEAF){
