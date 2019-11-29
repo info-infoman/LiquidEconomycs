@@ -82,6 +82,7 @@ public class Trie {
             fined.read(type,0,1);
             byte[] found=new byte[1];
             fined.read(found,0,1);
+            //если корень то если позиция нулевая(новая ветка в дереве) то добавляем новый Leaf иначе запишем позицию в карту ветвей
             if(type[0]==ROOT){
                 if(pos==0){
                     //todo find free space
@@ -95,7 +96,7 @@ public class Trie {
                     trie.write(lKey);
                     hash=calcHash(LEAF, lKey, age);
                     trie.write(hash);
-                    childsMap = addChild(childsMap, (key[19]&0xFF));
+                    childsMap = addChildInMap(childsMap, (key[19]&0xFF));
                     trie.write(childsMap);
                     trie.write(age);
                 }
@@ -109,52 +110,54 @@ public class Trie {
                 trie.seek(1);
                 trie.write(hash);
                 return 0L;
-
             }else{
+                // Иначе получаем позицию, ключ, карту дочерних узлов
                 byte[] selfPos= new byte[8];
                 fined.read(selfPos,0,8);
                 byte[] selfKeySize= new byte[1];
                 fined.read(selfKeySize,0,1);
                 byte[] selfKey= new byte[selfKeySize[0]];
                 fined.read(selfKey,0,selfKeySize[0]);
+                byte[] suffixKey = getBytesPart(key, selfKeySize[0], key.length - selfKeySize[0]);
+                byte[] preffixKey = getBytesPart(key, 0, selfKeySize[0]);
+                //todo найдем общий ключ между ключем узла и префиксом вносимого ключа
+                byte[] commonKey = getCommonKey(selfKey, preffixKey);
                 byte[] selfChildMap= new byte[32];
                 fined.read(selfChildMap,0,32);
-                byte[] selfChildsCount = new byte[4];
-                fined.read(selfChildsCount,0,4);
-                byte[] selfPartKeySize = new byte[1];
-                fined.read(selfPartKeySize,0,1);
-                byte[] selfPartKey = new byte[selfPartKeySize[0]];
-                fined.read(selfPartKey,0,selfPartKeySize[0]);
+                int selfChildsCount = getChildsCount(selfChildMap);
+                byte[] selfAgeFound = new byte[1];
+                byte[] selfAge = new byte[2];
+
 
                 boolean sizeChange = false;
 
                 if(type[0]==BRANCH){
-                    //load ChildArray
-                    int selfChildArraySize = Ints.fromByteArray(selfChildsCount)*8;
+                    //todo если это ветка то создаем и зачитываем туда дочерний массив с размером = число дочерей *8
+                    // переходим в позицию
+                    int selfChildArraySize = selfChildsCount*8;
                     byte[] selfChildArray= new byte[selfChildArraySize];
                     trie.seek(Longs.fromByteArray(selfPos)+2+(selfKeySize[0]&0xFF)+20+32);//go to childArray
                     trie.read(selfChildArray,0,selfChildArraySize);
-
-                    if(pos==0){//if not found
-                        //todo get commonKey for leaf key & end of parent key
-                        byte[] commonKey = getCommonKey(selfKey, selfPartKey);
-
-                        //todo find free space
+                    //todo если префикс вносимого ключа не = ключу листа или ненайден дочерний элемент то
+                    if(found[0]==NOTFOUND){
+                        //todo найдем свободное пространство и внесем новый лист
                         trie.seek(trie.length());
                         long posLeaf=trie.getFilePointer();
                         trie.write(LEAF);
-                        ByteBuffer bL = ByteBuffer.allocate((selfPartKey.length - commonKey.length));
-                        byte[] leafKey= bL.put(selfPartKey, commonKey.length, selfPartKey.length).array();
+                        //выделим буфер размером длинна вносимого ключа - длинна общего ключа - 1 байт(для дочери)
+                        ByteBuffer bL = ByteBuffer.allocate(key.length - commonKey.length-1);
+                        byte[] leafKey= bL.put(key, commonKey.length, key.length-1).array();
                         trie.writeByte(leafKey.length);
                         trie.write(leafKey);
                         hash=calcHash(LEAF, leafKey, age);
                         trie.write(hash);
-                        childsMap = addChild(childsMap, (selfPartKey[selfPartKey.length-1]&0xFF));
+                        childsMap = addChildInMap(childsMap, (key[key.length-1]&0xFF));
                         trie.write(childsMap);
                         trie.write(age);
 
-                        //todo create new branch from parent node(content selfChildArray from parent node and corp papent key)
-                        //todo find free space
+                        //todo найдем свободное пространство
+                        // создадим новую ветку из текущей
+                        // она будет содержать массив дочерей текущей ветви и иметь суффикс от текущего ключа за минусом общего
                         trie.seek(trie.length());
                         long posBranch=trie.getFilePointer();
                         trie.write(BRANCH);
@@ -167,16 +170,17 @@ public class Trie {
                         trie.write(selfChildMap);
                         trie.write(selfChildArray);
 
-                        //rebuild old Branch
-                        //todo clear old self pos && find free space
+                        //todo найдем свободное пространство
+                        // создадим новую ветку из текущей
+                        // она будет содержать массив дочерей состоящий из созданных ранее ветви и листа и иметь ключ равный общему префиксу для обоих дочерей
                         trie.seek(trie.length());
                         pos=trie.getFilePointer();
 
                         trie.write(BRANCH);
                         trie.writeByte(commonKey.length);
                         trie.write(commonKey);
-                        childsMap = addChild(new byte[256], (leafKey[0]&0xFF));
-                        childsMap = addChild(childsMap, (branchKey[0]&0xFF));
+                        childsMap = addChildInMap(new byte[256], (leafKey[0]&0xFF));
+                        childsMap = addChildInMap(childsMap, (branchKey[0]&0xFF));
                         byte [] childArray;
                         if ((leafKey[0]&0xFF)>(branchKey[0]&0xFF)){
                             childArray = Bytes.concat(Longs.toByteArray(posBranch), Longs.toByteArray(posLeaf));
@@ -189,7 +193,9 @@ public class Trie {
                         trie.write(childArray);
                         return recursiveInsert(key, age, fined, pos);
                     }else{
-                        int childPosInMap = getChildPos(selfChildMap, (key[0]&0xFF));
+                        //todo Если найден то ищем позицию в массиве дочерей, записываем туда позицию найденного(вдруг изменилась)
+                        // пересчитываем хеш и рекурсивно вносим позицию в вышестоящие узлы
+                        int childPosInMap = getChildPos(selfChildMap, (suffixKey[0]&0xFF));
                         trie.seek(Longs.fromByteArray(selfPos)+2+(selfKeySize[0]&0xFF)+20+32+(childPosInMap*8)-8);
                         trie.write(Longs.toByteArray(pos));
                         trie.seek(Longs.fromByteArray(selfPos)+2+(selfKeySize[0]&0xFF)+20+32);
@@ -200,30 +206,37 @@ public class Trie {
                         return recursiveInsert(key, age, fined, Longs.fromByteArray(selfPos));
                     }
                 }else{
-                    //load ChildArray
-                    int selfChildArraySize = Ints.fromByteArray(selfChildsCount)*2;
+                    //todo если это лист то зачитываем есть ли возрат
+                    // если есть то зачитываем его
+                    fined.read(selfAgeFound,0,1);
+                    if (selfAgeFound[0]==FOUND){
+                        fined.read(selfAge,0,2);
+                    }
+                    //зачитываем в массив selfAge дочерний массив с размером = число дочерей *2
+                    int selfChildArraySize = selfChildsCount*2;
                     byte[] selfChildArray= new byte[selfChildArraySize];
                     trie.seek(Longs.fromByteArray(selfPos)+2+(selfKeySize[0]&0xFF)+20+32);//go to childArray
                     trie.read(selfChildArray,0,selfChildArraySize);
-
-                    if(selfPartKey!=selfKey){
-                        byte[] commonKey = getCommonKey(selfKey, selfPartKey);
-                        //todo find free space
+                    //todo если префикс вносимого ключа не = ключу листа то
+                    if(found[0]==NOTFOUND){
+                        //todo найдем свободное пространство и создадим новый лист
                         trie.seek(trie.length());
                         long posLeaf=trie.getFilePointer();
                         trie.write(LEAF);
-                        ByteBuffer bL = ByteBuffer.allocate((selfPartKey.length - commonKey.length));
-                        byte[] leafKey= bL.put(selfPartKey, commonKey.length, selfPartKey.length).array();
+                        //выделим буфер размером длинна вносимого ключа - длинна общего ключа - 1 байт(для дочери)
+                        ByteBuffer bL = ByteBuffer.allocate(key.length - commonKey.length-1);
+                        byte[] leafKey= bL.put(key, commonKey.length, key.length-1).array();
                         trie.writeByte(leafKey.length);
                         trie.write(leafKey);
                         hash=calcHash(LEAF, leafKey, age);
                         trie.write(hash);
-                        childsMap = addChild(childsMap, (selfPartKey[selfPartKey.length-1]&0xFF));
+                        childsMap = addChildInMap(childsMap, (key[key.length-1]&0xFF));
                         trie.write(childsMap);
                         trie.write(age);
 
-                        //todo create new leaf from parent node(content selfChildArray from parent node and corp papent key)
-                        //todo find free space
+                        //todo найдем свободное пространство
+                        // создадим новый лист из текущего
+                        // он будет содержать массив дочерей текущего листа и иметь суффикс от ключа  текущего листа за минусом общего
                         trie.seek(trie.length());
                         long posOldLeaf=trie.getFilePointer();
                         trie.write(LEAF);
@@ -236,8 +249,9 @@ public class Trie {
                         trie.write(selfChildMap);
                         trie.write(selfChildArray);
 
-                        //rebuild old Leaf to branch
-                        //todo clear old self pos && find free space
+                        //todo найдем свободное пространство
+                        // создадим новую ветку для обоих листов
+                        // она будет содержать массив дочерей состоящий из созданных ранее листов и иметь ключ равный общему префиксу для обоих дочерей
                         trie.seek(trie.length());
                         pos=trie.getFilePointer();
 
@@ -245,8 +259,8 @@ public class Trie {
                         trie.writeByte(commonKey.length);
                         trie.write(commonKey);
                         //childsMap = BitSet.valueOf(new byte[256]);//get clear child map
-                        childsMap = addChild(new byte[256], (leafKey[0]&0xFF));
-                        childsMap = addChild(childsMap, (oldLeafKey[0]&0xFF));
+                        childsMap = addChildInMap(new byte[256], (leafKey[0]&0xFF));
+                        childsMap = addChildInMap(childsMap, (oldLeafKey[0]&0xFF));
                         byte [] childArray;
                         if (leafKey[0]>oldLeafKey[0]){
                             childArray = Bytes.concat(Longs.toByteArray(posOldLeaf), Longs.toByteArray(posLeaf));
@@ -259,7 +273,7 @@ public class Trie {
                         trie.write(childArray);
                         return recursiveInsert(key, age, fined, pos);
                     }else{
-                        if(found[0] == FOUND) {
+                        if(selfAgeFound[0]==FOUND) {
                             //todo insert suffix to childArray
                             int childPosInMap = getChildPos(selfChildMap, (key[0]&0xFF));
                             trie.seek(Longs.fromByteArray(selfPos) + 2 + (selfKeySize[0]&0xFF) + 20 + 32 + (childPosInMap * 2) - 2);
@@ -302,7 +316,7 @@ public class Trie {
                             trie.write(selfKey);
                             trie.write(new byte[20]);
                             //childsMap = BitSet.valueOf(new byte[256]);//get clear child map
-                            childsMap = addChild(new byte[256], (key[key.length-1]&0xFF));
+                            childsMap = addChildInMap(new byte[256], (key[key.length-1]&0xFF));
                             //childsMap.set((key[key.length-1]&0xFF), true);
                             trie.write(childsMap);
                             trie.write(childArray_1);
@@ -322,11 +336,11 @@ public class Trie {
         }
 
     }
-
+    //Извлекает общий для selfKey и key префикс
     private byte[] getCommonKey(byte[] selfKey, byte[] key) {
         for(int i = 1; i < selfKey.length; i++){
             byte[] sK = getBytesPart(key, 0, selfKey.length-i);
-            if(Arrays.equals(getBytesPart(key, 0, selfKey.length-i),getBytesPart(key, 0, key.length-i))){
+            if(Arrays.equals(sK,getBytesPart(key, 0, key.length-i))){
                 return sK;
             }
         }
@@ -335,9 +349,14 @@ public class Trie {
 
     //
     public byte[] search(byte[] key, byte[] pos) throws IOException {
+        //Если размер файла == 0  то вернем null
         if(trie.length()>0) {
+            //иначе переместимся на позицию pos
             trie.seek(Longs.fromByteArray(pos));
+            //прочитаем тип узла
             byte type = trie.readByte();
+            //если это корень то переместим курсор на позицию в массиве детей = первый байт ключа * 8 - 8
+            //если содержимое != 0 то  начинаем искать там и вернем то что нашли + корень, иначе вернем корень
             if (type == ROOT) {
                 trie.seek(trie.getFilePointer() + 20 + ((key[0]&0xFF) * 8)-8);
                 byte[] childPos = new byte[8];
@@ -350,6 +369,7 @@ public class Trie {
                 ByteBuffer rtBuffer = ByteBuffer.allocate(1);
                 return rtBuffer.put(ROOT).array();
             } else {
+                //прочитаем ключ, карту дочерей, число дочерей, суфикс вносимого ключа
                 byte keySize = trie.readByte();
                 byte[] keyNode = new byte[keySize];
                 trie.read(keyNode, 0, keySize);
@@ -357,39 +377,32 @@ public class Trie {
                 trie.seek(trie.getFilePointer() + 20); //skip hash
                 byte[] childsMap = new byte[32];
                 trie.read(childsMap, 0, 32);
-                int childsCount = getChildsCount(childsMap);
-
+                //Получим суффикс вносимого ключа(остаток от вносимого ключа)
                 byte[] suffixKey = getBytesPart(key, keyNode.length, key.length - keyNode.length);
-                //found
-                if (Arrays.equals(getBytesPart(key, 0, keyNode.length), keyNode) && checkChild(childsMap, (suffixKey[0]&0xFF))) {
-                    int childPosInMap = getChildPos(childsMap, (suffixKey[0]&0xFF));
-
+                //found Если вносимый ключ(его часть =  длинне ключа узла) = ключу узла и первый байт суффикса имеется в массиве дочерей то
+                if(Arrays.equals(getBytesPart(key, 0, keyNode.length), keyNode) && checkChild(childsMap, (suffixKey[0] & 0xFF))) {
                     if (type == BRANCH) {
+                        int childPosInMap = getChildPos(childsMap, (suffixKey[0] & 0xFF));
                         trie.seek(trie.getFilePointer() + (childPosInMap * 8) - 8);
                         byte[] childPos = new byte[8];
                         trie.read(childPos, 0, 8);
                         byte[] child = search(suffixKey, childPos);
-                        ByteBuffer rtBuffer = ByteBuffer.allocate(child.length + 10 + 1 + (keySize&0xFF) + 32 + 4);
-                        //    child/ type/found/self pos        /keySize/keyNode/childsMap                                                       /childsCount
-                        //ret ...00/00   /00   /0000000000000000/00     /00n    /0000000000000000000000000000000000000000000000000000000000000000/00000000
-                        return rtBuffer.put(child).put(BRANCH).put(FOUND).put(pos).put(keySize).put(keyNode).put(childsMap).put(Ints.toByteArray(childsCount)).array();
-                    } else {
-                        trie.seek(trie.getFilePointer() + (childPosInMap * 2) - 2);
-                        byte[] age = new byte[2];
-                        trie.read(age, 0, 2);
-                        //todo
-                        ByteBuffer rtBuffer = ByteBuffer.allocate(10 + 1 + (keySize&0xFF) + 32 + 4 + 2 + 1 + key.length);
-                        //    / type/found/self pos        /keySize/keyNode/childsMap                                                       /childsCount/age  /key.length/key
-                        //ret /00   /00   /0000000000000000/00     /00n    /0000000000000000000000000000000000000000000000000000000000000000/00000000   /0000/00         /00...
-                        return rtBuffer.put(LEAF).put(FOUND).put(pos).put(keySize).put(keyNode).put(childsMap).put(Ints.toByteArray(childsCount)).put(age).put((byte) key.length).put(key).array();
+                        ByteBuffer rtBuffer = ByteBuffer.allocate(child.length + 10 + 1 + (keySize & 0xFF) + 32);
+                        //Вернем детей, Тип, Признак что найден, Позицию узла, размер ключа узла, ключ узла, карту дочерей
+                        //ret ...00/00/00/0000000000000000/00/00n/0000000000000000000000000000000000000000000000000000000000000000
+                        return rtBuffer.put(child).put(BRANCH).put(FOUND).put(pos).put(keySize).put(keyNode).put(childsMap).array();
+                    }else{
+                        ByteBuffer rtBuffer = ByteBuffer.allocate(10 + 1 + (keySize&0xFF) + 32);
+                        //Вернем Тип, Признак что найден, Позицию узла, размер ключа узла, ключ узла, карту дочерей, возраст найден, текущий возраст/
+                        //ret /00/00/0000000000000000/00/00n/0000000000000000000000000000000000000000000000000000000000000000/0/0000/
+                        return rtBuffer.put(LEAF).put(FOUND).put(pos).put(keySize).put(keyNode).put(childsMap).array();
                     }
+                }else{//иначе вернем (лист)
+                    ByteBuffer rtBuffer = ByteBuffer.allocate(10 + 1+ (keySize&0xFF) + 32);
+                    //Вернем Тип, Признак что не найден, Позицию узла, размер ключа узла, ключ узла, карту дочерей
+                    //ret /00/00/0000000000000000/00/00n/0000000000000000000000000000000000000000000000000000000000000000/
+                    return rtBuffer.put(type).put(NOTFOUND).put(pos).put(keySize).put(keyNode).put(childsMap).array();
                 }
-                //todo
-                ByteBuffer rtBuffer = ByteBuffer.allocate(10 + 1+ (keySize&0xFF) + 32 + 4 + 1 + key.length);
-                //    /type/not found/self pos        /keySize/keyNode/childsMap                                                       /childsCount/key.length/key
-                //ret /00  /00       /0000000000000000/00     /00n    /0000000000000000000000000000000000000000000000000000000000000000/00000000   /00        /00...
-                return rtBuffer.put(type).put(NOTFOUND).put(pos).put(keySize).put(keyNode).put(childsMap).put(Ints.toByteArray(childsCount)).put((byte) key.length).put(key).array();
-
             }
         }else{
             return null;
@@ -414,7 +427,7 @@ public class Trie {
         return prepare.get(key);
     }
 
-    private byte[] addChild(byte[]childsMap, int key){
+    private byte[] addChildInMap(byte[]childsMap, int key){
         //byte[] result;
         ByteBuffer result = ByteBuffer.allocate(32);
         //byte[] oldLeafKey= boL.put(selfKey, commonKey.length, selfKey.length).array();
