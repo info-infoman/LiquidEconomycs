@@ -92,7 +92,7 @@ public class Trie {
                     //
                     trie.write(LEAF);
                     ByteBuffer buffer = ByteBuffer.allocate(19);
-                    byte[] lKey= buffer.put(key, 0, key.length-1).array();
+                    byte[] lKey= buffer.put(key, 0, buffer.limit()).array();
                     trie.writeByte((byte)19);
                     trie.write(lKey);
                     hash=calcHash(LEAF, lKey, age);
@@ -144,7 +144,7 @@ public class Trie {
                         trie.write(LEAF);
                         //выделим буфер размером длинна вносимого ключа - длинна общего ключа - 1 байт(для дочери)
                         ByteBuffer bL = ByteBuffer.allocate(key.length - commonKey.length-1);
-                        byte[] leafKey= bL.put(key, commonKey.length, key.length-1).array();
+                        byte[] leafKey= bL.put(key, commonKey.length, bL.limit()).array();
                         trie.writeByte(leafKey.length);
                         trie.write(leafKey);
                         hash=calcHash(LEAF, leafKey, age);
@@ -161,7 +161,7 @@ public class Trie {
                             long posBranch=trie.getFilePointer();
                             trie.write(BRANCH);
                             ByteBuffer bB = ByteBuffer.allocate((selfKey.length - commonKey.length));
-                            byte[] branchKey= bB.put(selfKey, commonKey.length, selfKey.length).array();
+                            byte[] branchKey= bB.put(selfKey, commonKey.length, bB.limit()).array();
                             trie.writeByte(branchKey.length);
                             trie.write(branchKey);
                             hash=calcHash(BRANCH, branchKey, selfChildArray);
@@ -250,7 +250,7 @@ public class Trie {
                             trie.write(LEAF);
                             //выделим буфер размером длинна вносимого ключа - длинна общего ключа - 1 байт(для дочери)
                             ByteBuffer bL = ByteBuffer.allocate(key.length - commonKey.length-1);
-                            byte[] leafKey= bL.put(key, commonKey.length, key.length-1).array();
+                            byte[] leafKey= bL.put(key, commonKey.length, bL.limit()).array();
                             trie.writeByte(leafKey.length);
                             trie.write(leafKey);
                             hash=calcHash(LEAF, leafKey, age);
@@ -266,7 +266,7 @@ public class Trie {
                             long posOldLeaf=trie.getFilePointer();
                             trie.write(LEAF);
                             ByteBuffer boL = ByteBuffer.allocate((selfKey.length - commonKey.length));
-                            byte[] oldLeafKey= boL.put(selfKey, commonKey.length, selfKey.length).array();
+                            byte[] oldLeafKey= boL.put(selfKey, commonKey.length, boL.limit()).array();
                             trie.writeByte(oldLeafKey.length);
                             trie.write(oldLeafKey);
                             hash=calcHash(LEAF, oldLeafKey, selfChildArray);
@@ -352,7 +352,7 @@ public class Trie {
     private byte[] getCommonKey(byte[] selfKey, byte[] key) {
         for(int i = 1; i < selfKey.length+1; i++){
             byte[] sK = getBytesPart(key, 0, selfKey.length-i);
-            if(Arrays.equals(sK,getBytesPart(key, 0, key.length-i))){
+            if(Arrays.equals(sK, getBytesPart(selfKey, 0, selfKey.length-i))){
                 return sK;
             }
         }
