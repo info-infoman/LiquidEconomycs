@@ -108,107 +108,117 @@ public class Trie {
         return null;
     }
 
-    public byte[] insert(int accumilator, byte[] key, byte[] age, long pos) throws IOException {
+    public byte[] insert(byte[] key, byte[] age, long pos) throws IOException {
 
         byte[] hash;
-        byte[] childsMap;
+        byte[] childsMap = new byte[32];
 
         if (pos==0L) {
-            accumilator = 1;
             if (trie.length() == 0) {
                 trie.setLength(0);
                 byte[] trieTmp = new byte[2068];
                 trie.write(trieTmp);
             }else{
                 byte[] sPos=search(key, pos);
-                byte[] lKey = getBytesPart(key, accumilator, key.length - accumilator);
+                byte[] lKey = getBytesPart(key, 1, key.length - 1);
                 if (sPos == null){//Create new LEAF witch age
                     trie.seek(trie.length());
                     pos=trie.getFilePointer();
-                    //
+
                     trie.writeByte((byte)lKey.length);
                     trie.write(lKey);
                     hash=calcHash(LEAF, lKey, age);
                     trie.write(hash);
-                    childsMap = addChildInMap(new byte[32], (lKey[lKey.length-1]&0xFF));
+                    childsMap = addChildInMap(new byte[32], (key[key.length-1]&0xFF));//add age
                     trie.write(childsMap);
                     trie.write(age);
-
-                    trie.seek(20+(((key[0]&0xFF)*8)-8));
-                    trie.write(Longs.toByteArray(pos));
-                    trie.seek(20);
-                    byte[] childArray= new byte[2048];
-                    trie.read(childArray,0,2048);
-                    hash=calcHash(ROOT, new byte[1], childArray);
-                    trie.seek(0);
-                    trie.write(hash);
-                    return hash;
-                }else{
-                    sPos = insert(accumilator, lKey, age, pos);
-                    trie.seek(20+(((key[0]&0xFF)*8)-8));
-                    trie.write(sPos);
-                    trie.seek(20);
-                    byte[] childArray= new byte[2048];
-                    trie.read(childArray,0,2048);
-                    hash=calcHash(ROOT, new byte[1], childArray);
-                    trie.seek(0);
-                    trie.write(hash);
-                    return hash;
+                }else{//insert in child & save in root
+                    pos = Longs.fromByteArray(insert(lKey, age, pos));
                 }
-            }
-        }else{
-            byte[] sPos=search(key, pos);
-            byte[] lKey = getBytesPart(key, accumilator, key.length - accumilator);
-            if (sPos == null){//Create new LEAF witch age
-                trie.seek(trie.length());
-                pos=trie.getFilePointer();
-                //
-                trie.writeByte((byte)lKey.length);
-                trie.write(lKey);
-                hash=calcHash(LEAF, lKey, age);
-                trie.write(hash);
-                childsMap = addChildInMap(new byte[32], (lKey[lKey.length-1]&0xFF));
-                trie.write(childsMap);
-                trie.write(age);
-                return Longs.toByteArray(pos);
-            }else{
-                sPos = insert(accumilator, lKey, age, pos);
+                //save in root
                 trie.seek(20+(((key[0]&0xFF)*8)-8));
-                trie.write(sPos);
+                trie.write(Longs.toByteArray(pos));
                 trie.seek(20);
                 byte[] childArray= new byte[2048];
                 trie.read(childArray,0,2048);
                 hash=calcHash(ROOT, new byte[1], childArray);
                 trie.seek(0);
                 trie.write(hash);
-                return Longs.toByteArray(pos);
+                return hash;
             }
-        }
+        }else {
+            byte[] sResult = search(key, pos);
+            if (sResult != null) {
+                if (sResult.length == 8) {//find child node
 
-        if (search(key, pos) == null){
-            //todo find free space
-            trie.seek(trie.length());
-            pos=trie.getFilePointer();
-            //
-            byte[] lKey = getBytesPart(key, accumilator, key.length - accumilator);
-            trie.writeByte((byte)lKey.length);
-            trie.write(lKey);
-            hash=calcHash(LEAF, lKey, age);
-            trie.write(hash);
-            childsMap = addChildInMap(new byte[32], (key[key.length-1]&0xFF));
-            trie.write(childsMap);
-            trie.write(age);
-            insert(accumilator, key, age, pos);
-        }else{
-            if(pos==0L) {//is root
+                    byte keyNodeSize = trie.readByte();
+                    byte[] keyNode = new byte[keyNodeSize];
+                    trie.read(keyNode, 0, keyNodeSize);
+                    trie.seek(trie.getFilePointer() + 20); //skip hash
+                    trie.read(childsMap, 0, 32);
+                    //Получим суффикс
+                    byte[] suffixKey = getBytesPart(key, keyNodeSize, key.length - keyNodeSize);
 
-            }else{
-                if(accumilator+key.length==20){
+                    int selfChildsCount = getChildsCount(childsMap);
+                    int selfChildArraySize = selfChildsCount * 8;
 
+                    int childPosInMap = getChildPos(childsMap, (suffixKey[0] & 0xFF));
+                    trie.seek(pos + 1 + keyNodeSize + 20 + 32 + (childPosInMap * 8) - 8);
+                    //insert to child
+                    trie.write(insert(suffixKey, age, pos));
+
+                    trie.seek(pos + 1 + keyNodeSize + 20 + 32);
+                    trie.read(childsMap, 0, selfChildArraySize);
+                    hash = calcHash(BRANCH, keyNode, childsMap);
+                    trie.seek(pos + 1 + keyNodeSize);
+                    trie.write(hash);
+                    return Longs.toByteArray(pos);
+
+                } else {
+                    return Longs.toByteArray(pos);//find age
+                }
+            } else {
+                trie.seek(pos);
+                //прочитаем ключ, карту детей, число детей, суфикс префикс
+                byte keyNodeSize = trie.readByte();
+                byte[] keyNode = new byte[keyNodeSize];
+                trie.read(keyNode, 0, keyNodeSize);
+                trie.seek(trie.getFilePointer() + 20); //skip hash
+                trie.read(childsMap, 0, 32);
+                //Получим префикс и суффикс искомого ключа
+                byte[] preffixKey = getBytesPart(key, 0, keyNodeSize);
+                byte[] suffixKey = getBytesPart(key, keyNodeSize, key.length - keyNodeSize);
+                int selfChildsCount = getChildsCount(childsMap);
+
+                if(!Arrays.equals(preffixKey, keyNode)){//create sub node
+
+                    byte[] commonKey = getCommonKey(keyNode, preffixKey);
+                    //todo...
+                }else{//jast add age in node
+
+                    int selfChildArraySize = selfChildsCount*2;
+                    byte[] selfChildArray= new byte[selfChildArraySize];
+                    trie.seek(pos+1+keyNodeSize+20+32);//go to childArray
+                    trie.read(selfChildArray,0,selfChildArraySize);
+
+                    int childPosInMap = getChildPos(childsMap, (suffixKey[0]&0xFF));
+                    trie.seek(pos+1+keyNodeSize+20+32+(childPosInMap*2)-2);
+                    trie.write(age);
+                    trie.seek(pos+1+keyNodeSize+20+32);
+                    trie.read(selfChildArray,0,selfChildArraySize);
+                    hash=calcHash(LEAF, keyNode, selfChildArray);
+                    trie.seek(pos+1+keyNodeSize);
+                    trie.write(hash);
+                    return Longs.toByteArray(pos);
                 }
 
+
+
             }
         }
+
+
+
 
         //ByteArrayInputStream fined = new ByteArrayInputStream(s);
         //long pos = recursiveInsert(key, age, fined, 0);
