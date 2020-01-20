@@ -89,7 +89,7 @@ public class TrieProcessor extends IntentService {
                 ////////////////////////////////////////////////////////////////
                 try {
                     mTrie = new Trie(nodeDir);
-                    broadcastActionMsg(master, cmd, mTrie.insert(key, value, 0L));
+                    broadcastActionMsg(master, cmd, mTrie.insert(0,key, value, 0L));
                 } catch (IOException e) {
                     e.printStackTrace();
                 }

@@ -117,7 +117,7 @@ public class Trie {
         return null;
     }
 
-    public byte[] insert(byte[] key, byte[] age, long pos) throws IOException {
+    public byte[] insert(int accumulator, byte[] key, byte[] age, long pos) throws IOException {
 
         byte[] hash;
         byte[] childsMap = new byte[32];
@@ -127,7 +127,7 @@ public class Trie {
                 trie.setLength(0);
                 byte[] trieTmp = new byte[2068];
                 trie.write(trieTmp);
-                return insert(key, age, pos);
+                return insert(0,key, age, pos);
             }else{
                 byte[] sPos=search(key, pos);
                 byte[] lKey = getBytesPart(key, 0, key.length - 1);
@@ -143,7 +143,7 @@ public class Trie {
                     trie.write(childsMap);
                     trie.write(age);
                 }else{//insert in child & save in root
-                    pos = Longs.fromByteArray(insert(lKey, age, Longs.fromByteArray(sPos)));
+                    pos = Longs.fromByteArray(insert(1,lKey, age, Longs.fromByteArray(sPos)));
                 }
                 //save in root
                 trie.seek(20+(((key[0]&0xFF)*8)-8));
@@ -176,7 +176,7 @@ public class Trie {
                     int childPosInMap = getChildPos(childsMap, (suffixKey[0] & 0xFF));
                     trie.seek(pos + 1 + keyNodeSize + 20 + 32 + (childPosInMap * 8) - 8);
                     //insert to child
-                    trie.write(insert(suffixKey, age, pos));
+                    trie.write(insert(accumulator+keyNodeSize, suffixKey, age, pos));
 
                     trie.seek(pos + 1 + keyNodeSize + 20 + 32);
                     trie.read(childsMap, 0, selfChildArraySize);
@@ -189,9 +189,11 @@ public class Trie {
                     return Longs.toByteArray(pos);//find age
                 }
             } else {
+
                 trie.seek(pos);
                 //прочитаем ключ, карту детей, число детей, суфикс префикс
                 byte keyNodeSize = trie.readByte();
+                boolean isLeaf = accumulator + keyNodeSize = 19;
                 byte[] keyNode = new byte[keyNodeSize];
                 trie.read(keyNode, 0, keyNodeSize);
                 trie.seek(trie.getFilePointer() + 20); //skip hash
@@ -200,7 +202,7 @@ public class Trie {
                 byte[] preffixKey = getBytesPart(key, 0, keyNodeSize);
                 byte[] suffixKey = getBytesPart(key, keyNodeSize, key.length - keyNodeSize);
                 int selfChildsCount = getChildsCount(childsMap);
-                int selfChildArraySize = selfChildsCount*2;
+                int selfChildArraySize = selfChildsCount*(isLeaf ? 2 : 8);
 
                 byte[] selfChildArray= new byte[selfChildArraySize];
                 trie.seek(pos+1+keyNodeSize+20+32);//go to childArray
