@@ -269,7 +269,7 @@ public class Trie {
                     if(!isLeaf){
                         //todo найдем свободное пространство и создадим новый лист
                         //выделим буфер размером длинна вносимого ключа - длинна общего ключа - 1 байт(для дочери)
-                        byte[] leafKey = getBytesPart(key, commonKey.length, keyNode.length - commonKey.length);
+                        byte[] leafKey = getBytesPart(key, keyNode.length, (key.length-1) - keyNode.length);
                         trie.writeByte((byte)leafKey.length);
                         trie.write(leafKey);
                         hash=calcHash(LEAF, leafKey, age);
