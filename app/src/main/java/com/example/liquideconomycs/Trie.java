@@ -36,36 +36,18 @@ public class Trie {
     ///hash sha256hash160(20)/child point array(1-256*8)
     ///00*20                 /0000000000000000 total 2069 byte
     //NODE(content child NODE BRANCH or LEAF)
-    //key size(1 byte)/key(1-18 byte)/hash sha256hash160(20 byte)/childsMap(32 byte)  /childPointArray(1-256*8 byte)
-    //00              /00*18         /00*20                      /00*32               /00*8
+    //key size(1 byte)/key(1-17 byte)/hash sha256hash160(20 byte)/childsMap(32 byte)  /childPointArray(1-256*8 byte)
+    //00              /00*17         /00*20                      /00*32               /00*8
     // max 2120 byte (min ‭153183(nodes) = ~309Mb)
     //
     //LEAF(content account age)
-    ///key size(1 byte)/key(1-19 byte)/hash sha256hash160(20 byte)/childsMap(32 byte)  /dataArray(1-256*2 byte)
-    //00               /00*19         /00*20                      /00*32               /00*2
+    ///key size(1 byte)/key(1-18 byte)/hash sha256hash160(20 byte)/childsMap(32 byte)  /dataArray(1-256*2 byte)
+    //00               /00*18         /00*20                      /00*32               /00*2
     // max 585 byte (min 39062500(leafs) = ~21GB)
     //
     //total 22GB(ideal trie for 10 000 000 000 accounts)
     //
-    //todo var 2
-    //ROOT(content child NODE)
-    ///hash sha256hash160(20)/child point array(1-256*8)
-    ///00*20                 /0000000000000000 total 2069 byte
-    //NODE(content child NODE BRANCH or LEAF)
-    //key size(1 byte)/key(1-18 byte)/hash sha256hash160(20 byte)/childsCount(2 byte)  /(childPrefix & childPoint)Array(1-256*9 byte)
-    //00              /00*18         /00*20                      /00*2                 /00*9
-    // max 2345 byte (min ‭153183(nodes) =~342Mb)
-    //
-    //LEAF(content account age)
-    ///key size(1 byte)/key(1-19 byte)/hash sha256hash160(20 byte)/childsCount(2 byte)  /(childPrefix & dataPoint)Array(1-256*3 byte)
-    //00               /00*19         /00*20                      /00*2                 /00*3
-    // max 810 byte (min 39062500(leafs) =29GB)
-    //
-    //total 30GB(ideal trie for 10 000 000 000 accounts)
-    //
-    //we are save all change: 1st in a free space pointers at , 2st in apped bytes in files trie.dat
-    //free space pointers register it is special buffer  for story free pointers in trie.dat
-    //deserialize = /size(2 bytes)/point(8 bytes)/ for trie.dat. For 10 000 000 pointers *10 bytes = ~ 95Mb
+
 
     //return pos or age or null if not found
     private byte[] search(byte[] key, long pos) throws IOException {
@@ -130,7 +112,8 @@ public class Trie {
                 return insert(0,key, age, pos);
             }else{
                 byte[] sPos=search(key, pos);
-                byte[] lKey = getBytesPart(key, 0, key.length - 1);
+                byte[] lKey = getBytesPart(key, 1, key.length - 2);
+
                 if (sPos == null){//Create new LEAF witch age
                     trie.seek(trie.length());
                     pos=trie.getFilePointer();
@@ -140,6 +123,7 @@ public class Trie {
                     hash=calcHash(LEAF, lKey, age);
                     trie.write(hash);
                     childsMap = addChildInMap(new byte[32], (key[key.length-1]&0xFF));//add age
+
                     trie.write(childsMap);
                     trie.write(age);
                 }else{//insert in child & save in root
@@ -225,6 +209,7 @@ public class Trie {
                     hash=calcHash(LEAF, leafKey, age);
                     trie.seek(posLeaf+1+leafKey.length);
                     trie.write(hash);
+
                     trie.write(addChildInMap(new byte[32], (key[key.length-1]&0xFF)));
                     trie.write(age);
 
@@ -260,6 +245,7 @@ public class Trie {
                     trie.seek(pos+1+commonKey.length);
                     trie.write(hash);
                     trie.write(addChildInMap(addChildInMap(new byte[32], (leafKey[0]&0xFF)), (oldLeafKey[0]&0xFF)));
+
                     trie.write(childArray);
                     return Longs.toByteArray(pos);
 
@@ -276,20 +262,20 @@ public class Trie {
                         trie.seek(posLeaf+1+leafKey.length);
                         trie.write(hash);
                         trie.write(addChildInMap(new byte[32], (key[key.length-1]&0xFF)));
+
                         trie.write(age);
                     }
 
-                    //todo найдем свободное пространство
-                    trie.seek(trie.length());
-                    pos=trie.getFilePointer();
-
+                    //todo найдем свободное пространств
+                    pos = trie.getFilePointer();
                     trie.writeByte((byte)keyNode.length);
                     trie.write(keyNode);
                     //childsMap = BitSet.valueOf(new byte[256]);//get clear child map
                     childsMap = addChildInMap(childsMap, (suffixKey[0]&0xFF));
+
                     int chp=getChildPos(childsMap, (suffixKey[0]&0xFF));
                     byte[] before=getBytesPart(selfChildArray,0, (chp-1)*(isLeaf ? 2 : 8));
-                    byte [] childArray = Bytes.concat(before, (isLeaf ? age : Longs.toByteArray(posLeaf)), getBytesPart(selfChildArray, before.length, selfChildArray.length));
+                    byte [] childArray = Bytes.concat(before, (isLeaf ? age : Longs.toByteArray(posLeaf)), getBytesPart(selfChildArray, before.length, selfChildArray.length-before.length));
                     // пересчитываем хеш и рекурсивно вносим позицию в вышестоящие узлы
                     hash=calcHash((isLeaf ? LEAF : BRANCH), keyNode, childArray);
                     trie.seek(pos+1+keyNode.length);
@@ -365,6 +351,9 @@ public class Trie {
             if(end){
                 break;
             }
+        }
+        if(BitSet.valueOf(result.array()).isEmpty()){
+            byte[] test = new byte[2];
         }
         return result.array();
     }
