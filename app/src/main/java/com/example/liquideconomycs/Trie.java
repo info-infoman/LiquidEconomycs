@@ -160,7 +160,7 @@ public class Trie {
                     int childPosInMap = getChildPos(childsMap, (suffixKey[0] & 0xFF));
                     trie.seek(pos + 1 + keyNodeSize + 20 + 32 + (childPosInMap * 8) - 8);
                     //insert to child
-                    trie.write(insert(accumulator+keyNodeSize, suffixKey, age, pos));
+                    trie.write(insert(accumulator+keyNodeSize+1,  getBytesPart(suffixKey, 1, suffixKey.length-1), age, Longs.fromByteArray(sResult)));
 
                     trie.seek(pos + 1 + keyNodeSize + 20 + 32);
                     trie.read(childsMap, 0, selfChildArraySize);
