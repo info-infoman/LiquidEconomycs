@@ -162,14 +162,14 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
             //TrieProcessor.startActionInsert(this,"Main",myPubKey, Shorts.toByteArray(index.shortValue()), nodeDir);
 
-            for(int i=0;i<10512;i++){
+            for(int i=0;i<512;i++){
                 ECKey myECKey=new ECKey();
                 myPrivKey = myECKey.getPrivKeyBytes();
                 myPubKey = myECKey.getPubKeyHash();
                 myManifest = "";
 
                 short age = 2;
-                TrieProcessor.startActionInsert(this,"Main",myPubKey, Shorts.toByteArray(age), nodeDir);
+                TrieProcessor.startActionInsert(this,"Main",myPubKey, Shorts.toByteArray(age));
             }
             //TrieProcessor.startActionGetHash(this,"Main",0L);
             //

@@ -3,6 +3,7 @@ package com.example.liquideconomycs;
 import android.app.IntentService;
 import android.content.Intent;
 import android.content.Context;
+import android.database.sqlite.SQLiteDatabase;
 
 import org.apache.http.message.BasicNameValuePair;
 
@@ -12,12 +13,13 @@ import java.util.List;
 
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
-public class TrieProcessor extends IntentService {
-    private Trie      mTrie;
+public class TrieProcessor<dbHelper> extends IntentService {
+    private Trie      mTrie = new Trie(getApplicationContext().getFilesDir().getAbsolutePath()+"/trie");
+    DBHelper          dbHelper = new DBHelper(this);
+    SQLiteDatabase    db = dbHelper.getWritableDatabase();
 
     public static final String EXTRA_MASTER = "com.example.liquideconomycs.TrieProcessor.extra.MASTER";
     public static final String EXTRA_CMD = "com.example.liquideconomycs.TrieProcessor.extra.CMD";
-    private static final String EXTRA_nodeDir = "com.example.liquideconomycs.TrieProcessor.extra.nodeDir";
     //input fnc
     private static final String ACTION_GetHash = "com.example.liquideconomycs.TrieProcessor.action.GetHash";
     private static final String ACTION_Insert = "com.example.liquideconomycs.TrieProcessor.action.Insert";
@@ -27,37 +29,34 @@ public class TrieProcessor extends IntentService {
     private static final String EXTRA_KEY = "com.example.liquideconomycs.TrieProcessor.extra.KEY";
     private static final String EXTRA_VALUE = "com.example.liquideconomycs.TrieProcessor.extra.VALUE";
 
-
     public static final String BROADCAST_ACTION_ANSWER = "com.example.liquideconomycs.TrieProcessor.broadcast_action.ANSWER";
     public static final String EXTRA_ANSWER = "com.example.liquideconomycs.TrieProcessor.extra.ANSWER";
 
 
     // called by activity to communicate to service
-    public static void startActionGetHash(Context context, String master, long pos, String nodeDir) {
+    public static void startActionGetHash(Context context, String master, long pos) {
         Intent intent = new Intent(context, TrieProcessor.class);
         intent.setAction(ACTION_GetHash);
 
-        intent.putExtra(EXTRA_nodeDir, nodeDir);
         intent.putExtra(EXTRA_MASTER, master);
         intent.putExtra(EXTRA_POS, pos);
         context.startService(intent);
     }
 
     // called by activity to communicate to service
-    public static void startActionInsert(Context context, String master, byte[] key, byte[] value, String nodeDir) {
+    public static void startActionInsert(Context context, String master, byte[] key, byte[] value) {
 
         Intent intent = new Intent(context, TrieProcessor.class);
 
         intent.setAction(ACTION_Insert);
 
-        intent.putExtra(EXTRA_nodeDir, nodeDir);
         intent.putExtra(EXTRA_MASTER, master);
         intent.putExtra(EXTRA_KEY, key);
         intent.putExtra(EXTRA_VALUE, value);
         context.startService(intent);
     }
 
-    public TrieProcessor() {
+    public TrieProcessor() throws FileNotFoundException {
         super("TrieProcessor");
     }
 
@@ -69,10 +68,9 @@ public class TrieProcessor extends IntentService {
                 final String master = intent.getStringExtra(EXTRA_MASTER);
                 final String cmd = "GetHash";
                 final long pos = intent.getLongExtra(EXTRA_POS,0L);
-                final String nodeDir = intent.getStringExtra(EXTRA_nodeDir);
                 ////////////////////////////////////////////////////////////////
                 try {
-                    mTrie = new Trie(nodeDir);
+                    //mTrie = new Trie(nodeDir);
                     broadcastActionMsg(master, cmd, mTrie.getHash(pos));
                 } catch (IOException e) {
                     e.printStackTrace();
@@ -85,11 +83,10 @@ public class TrieProcessor extends IntentService {
                 final String cmd = "Insert";
                 final byte[] key = intent.getByteArrayExtra(EXTRA_KEY);
                 final byte[] value = intent.getByteArrayExtra(EXTRA_VALUE);
-                final String nodeDir = intent.getStringExtra(EXTRA_nodeDir);
                 ////////////////////////////////////////////////////////////////
                 try {
-                    mTrie = new Trie(nodeDir);
-                    broadcastActionMsg(master, cmd, mTrie.insert(0,key, value, 0L));
+                    //mTrie = new Trie(nodeDir);
+                    broadcastActionMsg(master, cmd, mTrie.insert(db, key, value, 0L));
                 } catch (IOException e) {
                     e.printStackTrace();
                 }

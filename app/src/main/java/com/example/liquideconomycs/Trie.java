@@ -1,5 +1,6 @@
 package com.example.liquideconomycs;
 
+import android.database.sqlite.SQLiteDatabase;
 import android.util.Log;
 
 import com.google.common.primitives.Bytes;
@@ -37,14 +38,14 @@ public class Trie {
     //ROOT(content child NODE)
     ///hash sha256hash160(20)/child point array(1-256*8)
     ///00*20                 /0000000000000000 total 2069 byte
-    //NODE(content child NODE BRANCH or LEAF)
-    //key size(1 byte)/key(1-17 byte)/hash sha256hash160(20 byte)/childsMap(32 byte)  /childPointArray(1-256*8 byte)
-    //00              /00*17         /00*20                      /00*32               /00*8
+    //BRANCH(content child BRANCH or LEAF)
+    //type(1 byte)/key size(1 byte)/key(0-17 byte)/hash sha256hash160(20 byte)/childsMap(32 byte)  /childPointArray(1-256*8 byte)
+    //00          /00              /00*17         /00*20                      /00*32               /00*8
     // max 2120 byte (min ‭153183(nodes) = ~309Mb)
     //
     //LEAF(content account age)
-    ///key size(1 byte)/key(1-18 byte)/hash sha256hash160(20 byte)/childsMap(32 byte)  /dataArray(1-256*2 byte)
-    //00               /00*18         /00*20                      /00*32               /00*2
+    //type(1 byte)/key size(1 byte)/key(0-18 byte)/hash sha256hash160(20 byte)/childsMap(32 byte)  /dataArray(1-256*2 byte)
+    //00          /00               /00*18         /00*20                      /00*32               /00*2
     // max 585 byte (min 39062500(leafs) = ~21GB)
     //
     //total 22GB(ideal trie for 10 000 000 000 accounts)
@@ -58,7 +59,7 @@ public class Trie {
             //если это корень то переместим курсор на позицию в массиве детей = первый байт ключа * 8 - 8
             //если содержимое != 0 то  начинаем искать там и вернем то что нашли + корень, иначе вернем корень
             if (pos == 0L) {
-                trie.seek(20 + ((key[0]&0xFF) * 8)-8);
+                trie.seek(20 + getKeyPos((key[0]&0xFF), BRANCH));
                 byte[] childPos = new byte[8];
                 trie.read(childPos, 0, 8);
                 if (Longs.fromByteArray(childPos) != 0) {
@@ -88,13 +89,13 @@ public class Trie {
                     byte[] result;
                     if(type==BRANCH) {//ret pos
                         childPosInMap = getChildPos(childsMap, (suffixKey[0] & 0xFF));
-                        trie.seek(trie.getFilePointer() + (childPosInMap * 8) - 8);
+                        trie.seek(trie.getFilePointer() + getKeyPos(childPosInMap, type));
                         result = new byte[8];
                         trie.read(result, 0, 8);
 
                     }else {                  //ret age
                         childPosInMap = getChildPos(childsMap, (suffixKey[0] & 0xFF));
-                        trie.seek(trie.getFilePointer() + (childPosInMap * 2) - 2);
+                        trie.seek(trie.getFilePointer() + getKeyPos(childPosInMap, type));
                         result = new byte[2];
                         trie.read(result, 0, 2);
                     }
@@ -105,7 +106,7 @@ public class Trie {
         return null;
     }
 
-    public byte[] insert(int accumulator, byte[] key, byte[] age, long pos) throws IOException {
+    public byte[] insert(SQLiteDatabase DB, byte[] key, byte[] age, long pos) throws IOException {
 
         byte[] hash;
         byte[] childsMap = new byte[32];
@@ -115,7 +116,7 @@ public class Trie {
                 trie.setLength(0);
                 byte[] trieTmp = new byte[2068];
                 trie.write(trieTmp);
-                return insert(0,key, age, pos);
+                return insert(DB, key, age, pos);
             }else{
                 byte[] sPos=search(key, pos);
                 byte[] lKey;
@@ -140,10 +141,10 @@ public class Trie {
                     }catch (Exception e) {
                         Log.d("TRIE", String.valueOf(sPos));
                     }
-                    pos = Longs.fromByteArray(insert(1,lKey, age, Longs.fromByteArray(sPos)));
+                    pos = Longs.fromByteArray(insert(DB, lKey, age, Longs.fromByteArray(sPos)));
                 }
                 //save in root
-                trie.seek(20+(((key[0]&0xFF)*8)-8));
+                trie.seek(20+getKeyPos((key[0]&0xFF), BRANCH));
                 trie.write(Longs.toByteArray(pos));
                 trie.seek(20);
                 byte[] childArray= new byte[2048];
@@ -171,9 +172,9 @@ public class Trie {
                     int selfChildArraySize = selfChildsCount * 8;
 
                     int childPosInMap = getChildPos(childsMap, (suffixKey[0] & 0xFF));
-                    trie.seek(pos + 2 + keyNodeSize + 20 + 32 + (childPosInMap * 8) - 8);
+                    trie.seek(pos + 2 + keyNodeSize + 20 + 32 + getKeyPos(childPosInMap, type));
                     //insert to child
-                    trie.write(insert(accumulator+keyNodeSize+1,  getBytesPart(suffixKey, 1, suffixKey.length-1), age, Longs.fromByteArray(sResult)));
+                    trie.write(insert(DB, getBytesPart(suffixKey, 1, suffixKey.length-1), age, Longs.fromByteArray(sResult)));
 
                     trie.seek(pos + 2 + keyNodeSize + 20 + 32);
                     byte[] childArray = new byte[selfChildArraySize];
@@ -192,8 +193,6 @@ public class Trie {
                 //прочитаем ключ, карту детей, число детей, суфикс префикс
                 byte type = trie.readByte();
                 byte keyNodeSize = trie.readByte();
-                boolean isLeaf = false;
-                if(accumulator + keyNodeSize==19) isLeaf = true;
 
                 byte[] keyNode = new byte[keyNodeSize];
                 trie.read(keyNode, 0, keyNodeSize);
@@ -224,7 +223,7 @@ public class Trie {
                     trie.write(leafKey);
                     byte[] childsMapNew=addChildInMap(new byte[32], (key[key.length-1]&0xFF));
                     hash=calcHash(LEAF, leafKey, childsMapNew);
-                    trie.seek(posLeaf+1+leafKey.length);
+                    trie.seek(posLeaf+2+leafKey.length);
                     trie.write(hash);
                     trie.write(childsMapNew);
                     trie.write(age);
@@ -297,7 +296,7 @@ public class Trie {
                     byte [] childArray = Bytes.concat(before, (type==LEAF ? age : Longs.toByteArray(posLeaf)), getBytesPart(selfChildArray, before.length, selfChildArray.length-before.length));
                     // пересчитываем хеш и рекурсивно вносим позицию в вышестоящие узлы
                     hash=calcHash((type==LEAF ? LEAF : BRANCH), keyNode, (type==LEAF ? childsMap : childArray));
-                    trie.seek(pos+1+keyNode.length);
+                    trie.seek(pos+2+keyNode.length);
                     trie.write(hash);
                     trie.write(childsMap);
                     trie.write(childArray);
@@ -317,6 +316,14 @@ public class Trie {
             }
         }
         return null;
+    }
+
+    private int getKeyPos(int key, byte type){
+        if(type==BRANCH){
+            return (key==0?0:(key * 8) - 8);
+        }else{
+            return (key==0?0:(key * 2) - 2);
+        }
     }
 
     private int getChildPos(byte[]childsMap, int key){
@@ -411,7 +418,7 @@ public class Trie {
                 if(pos!=0){
                     digest = Bytes.concat(digest, getHash(pos));
                 }
-                i = i + 8;;
+                i = i + 8;
             }
             hash = sha256hash160(digest);
         }else if(type==LEAF){
