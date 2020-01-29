@@ -14,9 +14,10 @@ import java.util.List;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 public class TrieProcessor<dbHelper> extends IntentService {
-    private Trie      mTrie = new Trie(getApplicationContext().getFilesDir().getAbsolutePath()+"/trie");
+
     DBHelper          dbHelper = new DBHelper(this);
     SQLiteDatabase    db = dbHelper.getWritableDatabase();
+    private Trie      mTrie = new Trie(getApplicationContext().getFilesDir().getAbsolutePath()+"/trie", db);
 
     public static final String EXTRA_MASTER = "com.example.liquideconomycs.TrieProcessor.extra.MASTER";
     public static final String EXTRA_CMD = "com.example.liquideconomycs.TrieProcessor.extra.CMD";
@@ -86,7 +87,7 @@ public class TrieProcessor<dbHelper> extends IntentService {
                 ////////////////////////////////////////////////////////////////
                 try {
                     //mTrie = new Trie(nodeDir);
-                    broadcastActionMsg(master, cmd, mTrie.insert(db, key, value, 0L));
+                    broadcastActionMsg(master, cmd, mTrie.insert(key, value, 0L));
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
