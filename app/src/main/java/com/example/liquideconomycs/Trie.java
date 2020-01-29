@@ -273,7 +273,7 @@ public class Trie {
                     byte[] before=getBytesPart(selfChildArray,0, (chp-1)*(type==LEAF ? 2 : 8));
                     byte [] childArray = Bytes.concat(before, (type==LEAF ? age : Longs.toByteArray(posLeaf)), getBytesPart(selfChildArray, before.length, selfChildArray.length-before.length));
                     // пересчитываем хеш и рекурсивно вносим позицию в вышестоящие узлы
-                    hash=calcHash((type==LEAF ? LEAF : BRANCH), keyNode, (type==LEAF ? childsMap : childArray));
+                    hash=calcHash(type, keyNode, (type==LEAF ? childsMap : childArray));
 
                     return Longs.toByteArray(addRecord(typeAndKeySize, keyNode, hash, childsMap, childArray));
 
@@ -306,9 +306,10 @@ public class Trie {
         Cursor query = db.rawQuery("SELECT * FROM freeSpace where space="+record.length, null);
         long pos;
         if (query.moveToFirst()) {
-            pos = query.getLong(1);
-            db.delete("freeSpace",  "pos = ?", new String[] { String.valueOf(pos) });
+            int posColIndex = query.getColumnIndex("pos");
+            pos = query.getLong(posColIndex);
             query.close();
+            db.delete("freeSpace",  "pos = ?", new String[] { String.valueOf(pos) });
             trie.seek(pos);
         }else{
             trie.seek(trie.length());
