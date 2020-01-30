@@ -22,6 +22,7 @@ import static org.bitcoinj.core.Utils.sha256hash160;
 public class Trie {
     private RandomAccessFile trie, freeSpace;
     private SQLiteDatabase db;
+    private ContentValues cv;
     private byte[] hashSize = new byte[20];
     private static byte[] rootPos = Longs.toByteArray(0L);
     private static byte ROOT = 1; //
@@ -32,8 +33,8 @@ public class Trie {
     Trie(String nodeDir, SQLiteDatabase dataBase) throws FileNotFoundException {
         trie = new RandomAccessFile(nodeDir+ "/trie.dat", "rw");
         freeSpace = new RandomAccessFile(nodeDir+ "/freeSpace.dat", "rw");
-        db = dataBase;
-        ContentValues cv = new ContentValues();
+        this.db = dataBase;
+        cv = new ContentValues();
     }
 
     //we need save 10 000 000 000+ account for all people
@@ -129,7 +130,6 @@ public class Trie {
 
                 if (sPos == null){//Create new LEAF witch age
                     lKey = getBytesPart(key, 1, key.length - 2);
-                    typeAndKeySize = new byte[2];
                     typeAndKeySize[0] = LEAF;
                     typeAndKeySize[1] = (byte)lKey.length;
                     childsMap = addChildInMap(new byte[32], (key[key.length-1]&0xFF));//add age
@@ -207,6 +207,12 @@ public class Trie {
                 byte[] selfChildArray= new byte[selfChildArraySize];
                 trie.seek(pos+2+keyNodeSize+20+32);//go to childArray
                 trie.read(selfChildArray,0,selfChildArraySize);
+
+                //insert free space in db
+                cv.put("pos", pos);
+                cv.put("space", 2+keyNodeSize+20+32+selfChildArraySize);
+                db.insert("freeSpace", null, cv);
+                cv.clear();
 
                 if(!Arrays.equals(preffixKey, keyNode)){//create sub node
                     //todo найдем свободное пространство и создадим новый лист
@@ -302,7 +308,15 @@ public class Trie {
     }
 
     private long addRecord(byte[] typeAndKeySize, byte[] key, byte[] hash, byte[] childsMap, byte[] childArray) throws IOException {
-        byte[] record = Bytes.concat(typeAndKeySize, key, hash, childsMap, childArray);
+        byte[] record;
+        if(typeAndKeySize[1]==0){
+            try{record = Bytes.concat(typeAndKeySize, hash, childsMap, childArray);} catch (Exception e) {
+                e.printStackTrace();
+            }
+            record = Bytes.concat(typeAndKeySize, hash, childsMap, childArray);
+        }else{
+            record = Bytes.concat(typeAndKeySize, key, hash, childsMap, childArray);
+        }
         Cursor query = db.rawQuery("SELECT * FROM freeSpace where space="+record.length, null);
         long pos;
         if (query.moveToFirst()) {
@@ -312,6 +326,7 @@ public class Trie {
             db.delete("freeSpace",  "pos = ?", new String[] { String.valueOf(pos) });
             trie.seek(pos);
         }else{
+            query.close();
             trie.seek(trie.length());
             pos = trie.getFilePointer();
         }
@@ -404,8 +419,9 @@ public class Trie {
 
     private byte[] calcHash(byte type, byte[] key, byte[] childArray) throws IOException {
         byte[] hash;
+        byte[] digest;
+        digest=key;
         if(type==BRANCH || type==ROOT) {
-            byte[] digest=key;
             for(int i = 0; i < childArray.length;) {
                 long pos = Longs.fromByteArray(getBytesPart(childArray, i, 8));
                 if(pos!=0){
@@ -415,7 +431,7 @@ public class Trie {
             }
             hash = sha256hash160(digest);
         }else if(type==LEAF){
-            byte[] digest=Bytes.concat(key, childArray);
+            digest=Bytes.concat(digest, childArray);
             hash = sha256hash160(digest);
         }else{
             hash = null;

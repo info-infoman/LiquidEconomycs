@@ -1,6 +1,7 @@
 package com.example.liquideconomycs;
 
 import android.app.IntentService;
+import android.content.ContentValues;
 import android.content.Intent;
 import android.content.Context;
 import android.database.sqlite.SQLiteDatabase;
@@ -13,12 +14,11 @@ import java.util.List;
 
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
-public class TrieProcessor<dbHelper> extends IntentService {
+public class TrieProcessor extends IntentService {
 
-    DBHelper          dbHelper = new DBHelper(this);
-    SQLiteDatabase    db = dbHelper.getWritableDatabase();
-    private Trie      mTrie = new Trie(getApplicationContext().getFilesDir().getAbsolutePath()+"/trie", db);
-
+    DBHelper dbHelper;
+    SQLiteDatabase db;
+    Trie      mTrie;
     public static final String EXTRA_MASTER = "com.example.liquideconomycs.TrieProcessor.extra.MASTER";
     public static final String EXTRA_CMD = "com.example.liquideconomycs.TrieProcessor.extra.CMD";
     //input fnc
@@ -63,6 +63,18 @@ public class TrieProcessor<dbHelper> extends IntentService {
 
     @Override
     protected void onHandleIntent(Intent intent) {
+        if(dbHelper==null) {
+            Context context = getApplicationContext();
+            dbHelper = new DBHelper(context);
+            db = dbHelper.getWritableDatabase();
+            try {
+                mTrie = new Trie(getApplicationContext().getFilesDir().getAbsolutePath()+"/trie", db);
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+            }
+        }
+
+
         if (intent != null) {
             final String action = intent.getAction();
             if (ACTION_GetHash.equals(action)) {

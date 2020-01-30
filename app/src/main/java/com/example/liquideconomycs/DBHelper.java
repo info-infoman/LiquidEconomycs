@@ -23,6 +23,10 @@ public class DBHelper extends SQLiteOpenHelper {
                     + "pubKey BLOB,"
                     + "privKey BLOB,"
                     + "manifest text" + ");");
+            db.execSQL("create table freeSpace ("
+                    + "id integer primary key autoincrement,"
+                    + "pos LONG,"
+                    + "space int" + ");");
             db.execSQL("create table sync ("
                     + "id integer primary key autoincrement,"
                     + "user_id integer,"

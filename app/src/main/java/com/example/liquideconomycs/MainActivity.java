@@ -64,7 +64,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     private CheckBox            enableDecodingCheckBox;
     private PointsOverlayView   pointsOverlayView;
     public  boolean             synchronizes;
-    DBHelper                    dbHelper;
     private byte[]              myPubKey;
     private byte[]              myPrivKey;
     private String              myManifest;
@@ -124,7 +123,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
             //init db
             ContentValues cv = new ContentValues();
-            // подключаемся к БД
+            /* подключаемся к БД
             dbHelper = new DBHelper(this);
             SQLiteDatabase db = dbHelper.getWritableDatabase();
             Cursor c = db.query("users",
@@ -159,10 +158,10 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 cv.clear();
                 //ECKey myECKey1= new ECKey().fromPrivate(myPrivateKey);
             }
-
+            */
             //TrieProcessor.startActionInsert(this,"Main",myPubKey, Shorts.toByteArray(index.shortValue()), nodeDir);
 
-            for(int i=0;i<512;i++){
+            for(int i=0;i<10512;i++){
                 ECKey myECKey=new ECKey();
                 myPrivKey = myECKey.getPrivKeyBytes();
                 myPubKey = myECKey.getPubKeyHash();
