@@ -131,7 +131,7 @@ public class Trie {
                 if (sPos == null){//Create new LEAF witch age
                     lKey = getBytesPart(key, 1, key.length - 2);
                     typeAndKeySize[0] = LEAF;
-                    typeAndKeySize[1] = (byte)lKey.length;
+                    typeAndKeySize[1] = (lKey==null ? (byte)0 : (byte)lKey.length);
                     childsMap = addChildInMap(new byte[32], (key[key.length-1]&0xFF));//add age
                     hash=calcHash(typeAndKeySize[0], lKey, childsMap);
                     pos = addRecord(typeAndKeySize, lKey, hash, childsMap, age);
@@ -208,11 +208,7 @@ public class Trie {
                 trie.seek(pos+2+keyNodeSize+20+32);//go to childArray
                 trie.read(selfChildArray,0,selfChildArraySize);
 
-                //insert free space in db
-                cv.put("pos", pos);
-                cv.put("space", 2+keyNodeSize+20+32+selfChildArraySize);
-                db.insert("freeSpace", null, cv);
-                cv.clear();
+                byte[] retPos;
 
                 if(!Arrays.equals(preffixKey, keyNode)){//create sub node
                     //todo найдем свободное пространство и создадим новый лист
@@ -220,7 +216,7 @@ public class Trie {
                     byte[] leafKey = getBytesPart(key, commonKey.length, keyNode.length - commonKey.length);
 
                     typeAndKeySize[0] = LEAF;
-                    typeAndKeySize[1] = (byte)leafKey.length;
+                    typeAndKeySize[1] = (leafKey==null ? (byte)0 : (byte)leafKey.length);
                     byte[] childsMapNew=addChildInMap(new byte[32], (key[key.length-1]&0xFF));
                     hash=calcHash(typeAndKeySize[0], leafKey, childsMapNew);
                     childsMap = addChildInMap(new byte[32], (key[key.length-1]&0xFF));//add age
@@ -234,7 +230,7 @@ public class Trie {
 
                     byte[] oldLeafKey = getBytesPart(keyNode, commonKey.length, keyNode.length - commonKey.length);
                     typeAndKeySize[0] = type;
-                    typeAndKeySize[1] = (byte)oldLeafKey.length;
+                    typeAndKeySize[1] = (oldLeafKey==null ? (byte)0 : (byte)oldLeafKey.length);
                     hash=calcHash(typeAndKeySize[0], oldLeafKey, (type==LEAF ? childsMap : selfChildArray));
 
                     long posOldLeaf = addRecord(typeAndKeySize, oldLeafKey, hash, childsMap, selfChildArray);
@@ -243,7 +239,7 @@ public class Trie {
                     // создадим новую ветку для обоих листов
                     // она будет содержать массив дочерей состоящий из созданных ранее листов и иметь ключ равный общему префиксу для обоих дочерей
                     typeAndKeySize[0] = BRANCH;
-                    typeAndKeySize[1] = (byte)commonKey.length;
+                    typeAndKeySize[1] = (commonKey==null ? (byte)0 : (byte)commonKey.length);
                     byte [] childArray;
                     if (leafKey[0]>oldLeafKey[0]){
                         childArray = Bytes.concat(Longs.toByteArray(posOldLeaf), Longs.toByteArray(posLeaf));
@@ -252,7 +248,8 @@ public class Trie {
                     }
                     // пересчитываем хеш и рекурсивно вносим позицию в вышестоящие узлы
                     hash=calcHash(typeAndKeySize[0], commonKey, childArray);
-                    return Longs.toByteArray(addRecord(typeAndKeySize, commonKey, hash, addChildInMap(addChildInMap(new byte[32], (leafKey[0]&0xFF)), (oldLeafKey[0]&0xFF)), childArray));
+
+                    retPos = Longs.toByteArray(addRecord(typeAndKeySize, commonKey, hash, addChildInMap(addChildInMap(new byte[32], (leafKey[0]&0xFF)), (oldLeafKey[0]&0xFF)), childArray));
 
                 }else{//if isLeaf add age in node, else create leaf witch suffix key and add pos in node(branch)
                     trie.seek(trie.length());
@@ -262,7 +259,7 @@ public class Trie {
                         //выделим буфер размером длинна вносимого ключа - длинна общего ключа - 1 байт(для дочери)
                         byte[] leafKey = getBytesPart(key, keyNode.length, (key.length-1) - keyNode.length);
                         typeAndKeySize[0] = LEAF;
-                        typeAndKeySize[1] = (byte)leafKey.length;
+                        typeAndKeySize[1] = (leafKey==null ? (byte)0 : (byte)leafKey.length);
 
                         byte[] childsMapNew=addChildInMap(new byte[32], (key[key.length-1]&0xFF));
                         hash=calcHash(typeAndKeySize[0], leafKey, childsMapNew);
@@ -272,7 +269,7 @@ public class Trie {
 
                     //todo найдем свободное пространств
                     typeAndKeySize[0] = type;
-                    typeAndKeySize[1] = (byte)keyNode.length;
+                    typeAndKeySize[1] = (keyNode==null ? (byte)0 : (byte)keyNode.length);
 
                     childsMap = addChildInMap(childsMap, (suffixKey[0]&0xFF));
                     int chp=getChildPos(childsMap, (suffixKey[0]&0xFF));
@@ -281,9 +278,17 @@ public class Trie {
                     // пересчитываем хеш и рекурсивно вносим позицию в вышестоящие узлы
                     hash=calcHash(type, keyNode, (type==LEAF ? childsMap : childArray));
 
-                    return Longs.toByteArray(addRecord(typeAndKeySize, keyNode, hash, childsMap, childArray));
+                    retPos = Longs.toByteArray(addRecord(typeAndKeySize, keyNode, hash, childsMap, childArray));
 
                 }
+
+                //insert free space in db
+                cv.put("pos", pos);
+                cv.put("space", 2+keyNodeSize+20+32+selfChildArraySize);
+                db.insert("freeSpace", null, cv);
+                cv.clear();
+
+                return retPos;
             }
         }
     }
