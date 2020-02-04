@@ -239,18 +239,22 @@ public class Trie {
 
                 }else{//if isLeaf add age in node, else create leaf witch suffix key and add pos in node(branch)
                     long posLeaf=0L;
+                    byte[] leafKey;
+                    int insByte = 0;
                     if(type!=LEAF){
                         typeAndKeySize[0] = LEAF;
-                        byte[] leafKey = getBytesPart(suffixKey, 1 , suffixKey.length - 1);
+                        leafKey = getBytesPart(suffixKey, 1 , suffixKey.length - 1);
+                        insByte = (suffixKey[0]&0xFF);
                         typeAndKeySize[1] = (byte)leafKey.length;
                         childsMapNew=addChildInMap(new byte[32], (key[key.length-1]&0xFF));
                         hash=calcHash(LEAF, leafKey, childsMapNew);
                         posLeaf = addRecord(typeAndKeySize, leafKey, hash, childsMapNew, age);
+                    }else{
+                        insByte = (key[key.length-1]&0xFF);
                     }
 
                     typeAndKeySize[0] = type;
                     typeAndKeySize[1] = (byte)keyNode.length;
-                    int insByte = (type==LEAF ? (key[key.length-1]&0xFF) : (suffixKey[0]&0xFF));
                     childsMap = addChildInMap(childsMap, insByte);
                     int chp=getChildPos(childsMap, insByte);
                     byte[] before=getBytesPart(selfChildArray,0, (chp-1)*(type==LEAF ? 2 : 8));
@@ -365,17 +369,6 @@ public class Trie {
                         break;
                     }
                 }
-                /*for(int c=0;c<256;c++){
-                    p[0]=(byte)c;
-                    BitSet prepare2 = BitSet.valueOf(p);
-                    if(prepare1.equals(prepare2)){
-                        result.put(p);
-                        result.put(childsMap,result.position(),32-(i+1));//end
-                        end=true;
-                        break;
-                    }
-                }
-                */
             }
             if(end){
                 break;
