@@ -74,7 +74,7 @@ public class Trie {
                 byte keyNodeSize = trie.readByte();
                 byte[] keyNode = new byte[keyNodeSize];
                 trie.read(keyNode, 0, keyNodeSize);
-                trie.seek(trie.getFilePointer() + 20); //skip hash
+                trie.seek(pos + 2 + keyNodeSize + 20); //skip hash
                 byte[] childsMap = new byte[32];
                 trie.read(childsMap, 0, 32);
                 //Получим префикс и суффикс искомого ключа
@@ -90,13 +90,19 @@ public class Trie {
                     byte[] result;
                     if(type==BRANCH) {//ret pos
                         childPosInMap = getChildPos(childsMap, (suffixKey[0] & 0xFF));
-                        trie.seek(trie.getFilePointer() + getKeyPos(childPosInMap, type));
+                        if(childPosInMap==0){
+                            Log.d("TRIE", String.valueOf((suffixKey[0] & 0xFF)));
+                        }
+                        trie.seek(pos + 2 + keyNodeSize + 32 + ((childPosInMap * 8) - 8));
                         result = new byte[8];
                         trie.read(result, 0, 8);
 
                     }else {                  //ret age
                         childPosInMap = getChildPos(childsMap, (suffixKey[0] & 0xFF));
-                        trie.seek(trie.getFilePointer() + getKeyPos(childPosInMap, type));
+                        if(childPosInMap==0){
+                            Log.d("TRIE", String.valueOf((suffixKey[0] & 0xFF)));
+                        }
+                        trie.seek(pos + 2 + keyNodeSize + 32 + ((childPosInMap * 2) - 2));
                         result = new byte[2];
                         trie.read(result, 0, 2);
                     }
@@ -149,11 +155,11 @@ public class Trie {
             byte[] sResult = search(key, pos);
             if (sResult != null) {
                 if (sResult.length == 8) {//BRANCH
-                    trie.seek(pos+1);
+                    trie.seek(pos + 1);
                     byte keyNodeSize = trie.readByte();
                     byte[] keyNode = new byte[keyNodeSize];
                     trie.read(keyNode, 0, keyNodeSize);
-                    trie.seek(trie.getFilePointer() + 20); //skip hash
+                    trie.seek(pos + 2 + keyNodeSize + 20); //skip hash
                     trie.read(childsMap, 0, 32);
                     //Получим суффикс
                     byte[] suffixKey = getBytesPart(key, keyNodeSize, key.length - keyNodeSize);
@@ -162,7 +168,10 @@ public class Trie {
                     int selfChildArraySize = selfChildsCount * 8;
 
                     int childPosInMap = getChildPos(childsMap, (suffixKey[0] & 0xFF));
-                    trie.seek(pos + 2 + keyNodeSize + 20 + 32 + getKeyPos(childPosInMap, BRANCH));
+                    if(childPosInMap==0){
+                        Log.d("TRIE", String.valueOf((suffixKey[0] & 0xFF)));
+                    }
+                    trie.seek(pos + 2 + keyNodeSize + 20 + 32 + ((childPosInMap * 8) - 8));
                     //insert to child
                     trie.write(insert(getBytesPart(suffixKey, 1, suffixKey.length-1), age, Longs.fromByteArray(sResult)));
 
@@ -257,7 +266,10 @@ public class Trie {
                     typeAndKeySize[1] = (byte)keyNode.length;
                     childsMap = addChildInMap(childsMap, insByte);
                     int chp=getChildPos(childsMap, insByte);
-                    byte[] before=getBytesPart(selfChildArray,0, (chp-1)*(type==LEAF ? 2 : 8));
+                    if(chp==0){
+                        Log.d("TRIE", String.valueOf((suffixKey[0] & 0xFF)));
+                    }
+                    byte[] before=(chp == 0 ? new byte[0] : getBytesPart(selfChildArray,0,  (chp-1)*(type==LEAF ? 2 : 8)));
                     childArray = Bytes.concat(before, (type==LEAF ? age : Longs.toByteArray(posLeaf)), getBytesPart(selfChildArray, before.length, selfChildArray.length-before.length));
                     // пересчитываем хеш и рекурсивно вносим позицию в вышестоящие узлы
                     hash=calcHash(type, keyNode, (type==LEAF ? childsMap : childArray));
@@ -332,9 +344,9 @@ public class Trie {
     }
 
     private int getChildPos(byte[]childsMap, int key){
-        int result=1;
+        int result=0;
         BitSet prepare = BitSet.valueOf(childsMap);
-        for(int i = 0; i < key;i++){
+        for(int i = 0; i < key+1;i++){
             if(prepare.get(i)) result=result+1;
         }
         return result;
