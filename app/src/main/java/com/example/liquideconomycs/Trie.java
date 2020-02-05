@@ -172,8 +172,10 @@ public class Trie {
                         Log.d("TRIE", String.valueOf((suffixKey[0] & 0xFF)));
                     }
                     trie.seek(pos + 2 + keyNodeSize + 20 + 32 + ((childPosInMap * 8) - 8));
+                    byte[] chPos=new byte[8]
+                    trie.read(chPos, 0, 8);
                     //insert to child
-                    trie.write(insert(getBytesPart(suffixKey, 1, suffixKey.length-1), age, Longs.fromByteArray(sResult)));
+                    trie.write(insert(getBytesPart(suffixKey, 1, suffixKey.length-1), age, Longs.fromByteArray(chPos)));
 
                     trie.seek(pos + 2 + keyNodeSize + 20 + 32);
                     byte[] childArray = new byte[selfChildArraySize];
