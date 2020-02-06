@@ -27,7 +27,7 @@ public class Trie {
     private static byte BRANCH = 2;
     private static byte LEAF = 3;
     Trie(String nodeDir, SQLiteDatabase dataBase) throws FileNotFoundException {
-        trie = new RandomAccessFile(nodeDir+ "/trie.dat", "rws");
+        trie = new RandomAccessFile(nodeDir+ "/trie.dat", "rw");
         this.db = dataBase;
         cv = new ContentValues();
     }
@@ -50,68 +50,7 @@ public class Trie {
     // max 585 byte (min 39062500(leafs) = ~21GB)
     //
     //total 22GB(ideal trie for 10 000 000 000 accounts)
-    //
 
-
-    //return pos or age or null if not found
-    private byte[] search(byte[] key, long pos) throws IOException {
-        //Если размер файла == 0  то вернем null
-        if(trie.length()>0) {
-            //если это корень то переместим курсор на позицию в массиве детей = первый байт ключа * 8 - 8
-            //если содержимое != 0 то  начинаем искать там и вернем то что нашли + корень, иначе вернем корень
-            if (pos == 0L) {
-                trie.seek(20 + getKeyPos((key[0]&0xFF), BRANCH));
-                byte[] childPos = new byte[8];
-                trie.read(childPos, 0, 8);
-                if (Longs.fromByteArray(childPos) != 0) {
-                    return childPos;
-                }
-            } else {
-                //иначе переместимся на позицию pos
-                trie.seek(pos);
-                //прочитаем ключ, карту дочерей, число дочерей, суфикс вносимого ключа
-                byte type = trie.readByte();
-                byte keyNodeSize = trie.readByte();
-                byte[] keyNode = new byte[keyNodeSize];
-                trie.read(keyNode, 0, keyNodeSize);
-                trie.seek(pos + 2 + keyNodeSize + 20); //skip hash
-                byte[] childsMap = new byte[32];
-                trie.read(childsMap, 0, 32);
-                //Получим префикс и суффикс искомого ключа
-                if(key.length<=keyNodeSize){
-                    Log.d("TRIE", String.valueOf(keyNodeSize));
-                }
-                byte[] preffixKey = getBytesPart(key, 0, keyNodeSize);
-                byte[] suffixKey = getBytesPart(key, keyNodeSize, key.length - keyNodeSize);
-
-                //found Если искомый ключ(его часть =  длинне ключа узла) = ключу узла и первый байт суффикса имеется в массиве дочерей то
-                if(Arrays.equals(preffixKey, keyNode) && checkChild(childsMap, (suffixKey[0] & 0xFF))) {
-                    int childPosInMap = 0;
-                    byte[] result;
-                    if(type==BRANCH) {//ret pos
-                        childPosInMap = getChildPos(childsMap, (suffixKey[0] & 0xFF));
-                        if(childPosInMap==0){
-                            Log.d("TRIE", String.valueOf((suffixKey[0] & 0xFF)));
-                        }
-                        trie.seek(pos + 2 + keyNodeSize + 20 + 32 + ((childPosInMap * 8) - 8));
-                        result = new byte[8];
-                        trie.read(result, 0, 8);
-
-                    }else {                  //ret age
-                        childPosInMap = getChildPos(childsMap, (suffixKey[0] & 0xFF));
-                        if(childPosInMap==0){
-                            Log.d("TRIE", String.valueOf((suffixKey[0] & 0xFF)));
-                        }
-                        trie.seek(pos + 2 + keyNodeSize + 20 + 32 + ((childPosInMap * 2) - 2));
-                        result = new byte[2];
-                        trie.read(result, 0, 2);
-                    }
-                    return result;
-                }
-            }
-        }
-        return null;
-    }
 
     public byte[] insert(byte[] key, byte[] age, long pos) throws IOException {
 
@@ -134,7 +73,7 @@ public class Trie {
                     typeAndKeySize[0] = LEAF;
                     typeAndKeySize[1] = (lKey==null ? (byte)0 : (byte)lKey.length);
                     childsMap = addChildInMap(new byte[32], (key[key.length-1]&0xFF));//add age
-                    hash=calcHash(typeAndKeySize[0], lKey, childsMap);
+                    hash=calcHash(typeAndKeySize[0], childsMap);
                     pos = addRecord(typeAndKeySize, lKey, hash, childsMap, age);
                 }else{//insert in child & save in root
                     lKey = getBytesPart(key, 1, key.length - 1);
@@ -146,7 +85,7 @@ public class Trie {
                 trie.seek(20);
                 byte[] childArray= new byte[2048];
                 trie.read(childArray,0,2048);
-                hash=calcHash(ROOT, new byte[1], childArray);
+                hash=calcHash(ROOT, childArray);
                 trie.seek(0);
                 trie.write(hash);
                 return hash;
@@ -154,40 +93,44 @@ public class Trie {
         }else {
             byte[] sResult = search(key, pos);
             if (sResult != null) {
-                if (sResult.length == 8) {//BRANCH
-                    trie.seek(pos + 1);
-                    byte keyNodeSize = trie.readByte();
-                    byte[] keyNode = new byte[keyNodeSize];
-                    trie.read(keyNode, 0, keyNodeSize);
-                    trie.seek(pos + 2 + keyNodeSize + 20); //skip hash
-                    trie.read(childsMap, 0, 32);
-                    //Получим суффикс
-                    byte[] suffixKey = getBytesPart(key, keyNodeSize, key.length - keyNodeSize);
+                trie.seek(pos);
+                byte type = trie.readByte();
+                byte keyNodeSize = trie.readByte();
+                byte[] keyNode = new byte[keyNodeSize];
+                trie.read(keyNode, 0, keyNodeSize);
+                trie.seek(pos + 2 + keyNodeSize + 20); //skip hash
+                trie.read(childsMap, 0, 32);
+                //Получим суффикс
+                byte[] suffixKey = getBytesPart(key, keyNodeSize, key.length - keyNodeSize);
 
-                    int selfChildsCount = getChildsCount(childsMap);
-                    int selfChildArraySize = selfChildsCount * 8;
+                int selfChildsCount = getChildsCount(childsMap);
+                int selfChildArraySize = selfChildsCount * (type==LEAF ? 2 : 8);
 
-                    int childPosInMap = getChildPos(childsMap, (suffixKey[0] & 0xFF));
-                    if(childPosInMap==0){
-                        Log.d("TRIE", String.valueOf((suffixKey[0] & 0xFF)));
-                    }
-                    trie.seek(pos + 2 + keyNodeSize + 20 + 32 + ((childPosInMap * 8) - 8));
+                int childPosInMap = getChildPos(childsMap, (suffixKey[0] & 0xFF));
+                if(childPosInMap==0){
+                    Log.d("TRIE", String.valueOf((suffixKey[0] & 0xFF)));
+                }
+                long posToWrite = pos + 2 + keyNodeSize + 20 + 32 + (type==LEAF ? ((childPosInMap * 2) - 2) : ((childPosInMap * 8) - 8));
+                trie.seek(posToWrite);
+
+                if(type==LEAF){
+                    trie.write(age);
+                }else{
                     byte[] chPos=new byte[8];
                     trie.read(chPos, 0, 8);
                     //insert to child
-                    trie.write(insert(getBytesPart(suffixKey, 1, suffixKey.length-1), age, Longs.fromByteArray(chPos)));
-
-                    trie.seek(pos + 2 + keyNodeSize + 20 + 32);
-                    byte[] childArray = new byte[selfChildArraySize];
-                    trie.read(childArray, 0, selfChildArraySize);
-                    hash = calcHash(BRANCH, keyNode, childArray);
-                    trie.seek(pos + 2 + keyNodeSize);
-                    trie.write(hash);
-                    return Longs.toByteArray(pos);
-
-                } else {
-                    return Longs.toByteArray(pos);//LEAF
+                    chPos = insert(getBytesPart(suffixKey, 1, suffixKey.length-1), age, Longs.fromByteArray(chPos));
+                    trie.seek(posToWrite);
+                    trie.write(chPos);
                 }
+
+                trie.seek(pos + 2 + keyNodeSize + 20 + 32);
+                byte[] childArray = new byte[selfChildArraySize];
+                trie.read(childArray, 0, selfChildArraySize);
+                hash = calcHash(type, (type==LEAF ? childsMap : childArray));
+                trie.seek(pos + 2 + keyNodeSize);
+                trie.write(hash);
+                return Longs.toByteArray(pos);
             } else {
 
                 trie.seek(pos);
@@ -213,6 +156,12 @@ public class Trie {
                 trie.seek(pos+2+keyNodeSize+20+32);//go to childArray
                 trie.read(selfChildArray,0,selfChildArraySize);
 
+                //insert free space in db
+                cv.put("pos", pos);
+                cv.put("space", 2+keyNodeSize+20+32+selfChildArraySize);
+                db.insert("freeSpace", null, cv);
+                cv.clear();
+
                 byte[] retPos;
                 byte[] childsMapNew;
                 byte[] childArray;
@@ -225,7 +174,7 @@ public class Trie {
                     typeAndKeySize[0] = LEAF;
                     typeAndKeySize[1] = (byte)leafKey_.length;
                     childsMapNew=addChildInMap(new byte[32], (key[key.length-1]&0xFF));
-                    hash=calcHash(typeAndKeySize[0], leafKey_, childsMapNew);
+                    hash=calcHash(typeAndKeySize[0], childsMapNew);
                     long posLeaf = addRecord(typeAndKeySize, leafKey_, hash, childsMapNew, age);
 
                     //COPY OLD NODE WITCH CORP(keyNode - common) KEY
@@ -233,7 +182,7 @@ public class Trie {
                     byte[] oldLeafKey_ = getBytesPart(oldLeafKey, 1 , oldLeafKey.length - 1);
                     typeAndKeySize[0] = type;
                     typeAndKeySize[1] = (byte)oldLeafKey_.length;
-                    hash=calcHash(type, oldLeafKey_, (type==LEAF ? childsMap : selfChildArray));
+                    hash=calcHash(type, (type==LEAF ? childsMap : selfChildArray));
                     long posOldLeaf = addRecord(typeAndKeySize, oldLeafKey_, hash, childsMap, selfChildArray);
 
                     //CREATE NEW BRANCH WITCH COMMON KEY AND CONTENT = NEW LEAF POSITION + OLD NODE POSITION
@@ -244,7 +193,7 @@ public class Trie {
                     }else{
                         childArray = Bytes.concat(Longs.toByteArray(posLeaf), Longs.toByteArray(posOldLeaf));
                     }
-                    hash=calcHash(BRANCH, commonKey, childArray);
+                    hash=calcHash(BRANCH, childArray);
 
                     retPos = Longs.toByteArray(addRecord(typeAndKeySize, commonKey, hash, addChildInMap(addChildInMap(new byte[32], (leafKey[0]&0xFF)), (oldLeafKey[0]&0xFF)), childArray));
 
@@ -258,7 +207,7 @@ public class Trie {
                         insByte = (suffixKey[0]&0xFF);
                         typeAndKeySize[1] = (byte)leafKey.length;
                         childsMapNew=addChildInMap(new byte[32], (key[key.length-1]&0xFF));
-                        hash=calcHash(LEAF, leafKey, childsMapNew);
+                        hash=calcHash(LEAF, childsMapNew);
                         posLeaf = addRecord(typeAndKeySize, leafKey, hash, childsMapNew, age);
                     }else{
                         insByte = (key[key.length-1]&0xFF);
@@ -268,30 +217,93 @@ public class Trie {
                     typeAndKeySize[1] = (byte)keyNode.length;
                     childsMap = addChildInMap(childsMap, insByte);
                     int chp=getChildPos(childsMap, insByte);
-                    if(chp==0){
-                        Log.d("TRIE", String.valueOf((suffixKey[0] & 0xFF)));
-                    }
                     byte[] before=(chp == 0 ? new byte[0] : getBytesPart(selfChildArray,0,  (chp-1)*(type==LEAF ? 2 : 8)));
                     childArray = Bytes.concat(before, (type==LEAF ? age : Longs.toByteArray(posLeaf)), getBytesPart(selfChildArray, before.length, selfChildArray.length-before.length));
                     // пересчитываем хеш и рекурсивно вносим позицию в вышестоящие узлы
-                    hash=calcHash(type, keyNode, (type==LEAF ? childsMap : childArray));
+                    hash=calcHash(type, (type==LEAF ? childsMap : childArray));
 
                     retPos = Longs.toByteArray(addRecord(typeAndKeySize, keyNode, hash, childsMap, childArray));
 
                 }
-
-                //insert free space in db
-                cv.put("pos", pos);
-                cv.put("space", 2+keyNodeSize+20+32+selfChildArraySize);
-                db.insert("freeSpace", null, cv);
-                cv.clear();
-
                 return retPos;
             }
         }
     }
 
-    //Извлекает общий для selfKey и key префикс
+    private long addRecord(byte[] typeAndKeySize, byte[] key, byte[] hash, byte[] childsMap, byte[] childArray) throws IOException {
+        byte[] record;
+        if(typeAndKeySize[1]==0){
+            record = Bytes.concat(typeAndKeySize, hash, childsMap, childArray);
+        }else{
+            record = Bytes.concat(typeAndKeySize, key, hash, childsMap, childArray);
+        }
+        Cursor query = db.rawQuery("SELECT * FROM freeSpace where space="+record.length, null);
+        trie.seek(trie.length());
+        long pos = trie.getFilePointer();
+        if (query.moveToFirst()) {
+            int posColIndex = query.getColumnIndex("pos");
+            pos = query.getLong(posColIndex);
+            db.delete("freeSpace",  "pos = ?", new String[] { String.valueOf(pos) });
+            trie.seek(pos);
+        }
+        query.close();
+
+        trie.write(record);
+        return pos;
+    }
+
+    //return pos or age or null - if not found
+    private byte[] search(byte[] key, long pos) throws IOException {
+        //Если размер файла == 0  то вернем null
+        if(trie.length()>0) {
+            //если это корень то переместим курсор на позицию в массиве детей = первый байт ключа * 8 - 8
+            //если содержимое != 0 то  начинаем искать там и вернем то что нашли + корень, иначе вернем корень
+            if (pos == 0L) {
+                trie.seek(20 + getKeyPos((key[0]&0xFF), BRANCH));
+                byte[] childPos = new byte[8];
+                trie.read(childPos, 0, 8);
+                if (Longs.fromByteArray(childPos) != 0) {
+                    return childPos;
+                }
+            } else {
+                //иначе переместимся на позицию pos
+                trie.seek(pos);
+                //прочитаем ключ, карту дочерей, число дочерей, суфикс вносимого ключа
+                byte type = trie.readByte();
+                byte keyNodeSize = trie.readByte();
+                byte[] keyNode = new byte[keyNodeSize];
+                trie.read(keyNode, 0, keyNodeSize);
+                trie.seek(pos + 2 + keyNodeSize + 20); //skip hash
+                byte[] childsMap = new byte[32];
+                trie.read(childsMap, 0, 32);
+                //Получим префикс и суффикс искомого ключа
+
+                byte[] preffixKey = getBytesPart(key, 0, keyNodeSize);
+                byte[] suffixKey = getBytesPart(key, keyNodeSize, key.length - keyNodeSize);
+
+                //found Если искомый ключ(его часть =  длинне ключа узла) = ключу узла и первый байт суффикса имеется в массиве дочерей то
+                if(Arrays.equals(preffixKey, keyNode) && checkChild(childsMap, (suffixKey[0] & 0xFF))) {
+                    int childPosInMap = 0;
+                    byte[] result;
+                    if(type==BRANCH) {//ret pos
+                        childPosInMap = getChildPos(childsMap, (suffixKey[0] & 0xFF));
+                        trie.seek(pos + 2 + keyNodeSize + 20 + 32 + ((childPosInMap * 8) - 8));
+                        result = new byte[8];
+                        trie.read(result, 0, 8);
+
+                    }else {                  //ret age
+                        childPosInMap = getChildPos(childsMap, (suffixKey[0] & 0xFF));
+                        trie.seek(pos + 2 + keyNodeSize + 20 + 32 + ((childPosInMap * 2) - 2));
+                        result = new byte[2];
+                        trie.read(result, 0, 2);
+                    }
+                    return result;
+                }
+            }
+        }
+        return null;
+    }
+
     private byte[] getCommonKey(byte[] selfKey, byte[] key) {
         for(int i = 1; i < selfKey.length+1; i++){
             byte[] sK = getBytesPart(key, 0, selfKey.length-i);
@@ -308,41 +320,6 @@ public class Trie {
         }else{
             return (key==0?0:(key * 2) - 2);
         }
-    }
-
-    private long addRecord(byte[] typeAndKeySize, byte[] key, byte[] hash, byte[] childsMap, byte[] childArray) throws IOException {
-        if(getChildsCount(childsMap)==0){
-            Log.d("TRIE", String.valueOf(childsMap));
-        }
-        byte[] record;
-        if(typeAndKeySize[1]==0){
-            record = Bytes.concat(typeAndKeySize, hash, childsMap, childArray);
-        }else{
-            record = Bytes.concat(typeAndKeySize, key, hash, childsMap, childArray);
-        }
-        Cursor query = db.rawQuery("SELECT * FROM freeSpace where space="+record.length, null);
-        long pos;
-        if (query.moveToFirst()) {
-            int posColIndex = query.getColumnIndex("pos");
-            pos = query.getLong(posColIndex);
-            int spaceColIndex = query.getColumnIndex("space");
-            int space = query.getInt(spaceColIndex);
-            if(space > record.length){
-                Log.d("TRIE", String.valueOf(space));
-            }
-            if(space < record.length){
-                Log.d("TRIE", String.valueOf(space));
-            }
-            query.close();
-            db.delete("freeSpace",  "pos = ?", new String[] { String.valueOf(pos) });
-            trie.seek(pos);
-        }else{
-            query.close();
-            trie.seek(trie.length());
-            pos = trie.getFilePointer();
-        }
-        trie.write(record);
-        return pos;
     }
 
     private int getChildPos(byte[]childsMap, int key){
@@ -412,10 +389,9 @@ public class Trie {
 
     }
 
-    private byte[] calcHash(byte type, byte[] key, byte[] childArray) throws IOException {
+    private byte[] calcHash(byte type, byte[] childArray) throws IOException {
         byte[] hash;
-        byte[] digest;
-        digest=key;
+        byte[] digest = new byte[0];
         if(type==BRANCH || type==ROOT) {
             for(int i = 0; i < childArray.length;) {
                 long pos = Longs.fromByteArray(getBytesPart(childArray, i, 8));
