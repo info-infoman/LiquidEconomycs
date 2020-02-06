@@ -24,6 +24,7 @@ public class TrieProcessor extends IntentService {
     //input fnc
     private static final String ACTION_GetHash = "com.example.liquideconomycs.TrieProcessor.action.GetHash";
     private static final String ACTION_Insert = "com.example.liquideconomycs.TrieProcessor.action.Insert";
+    private static final String ACTION_Delete = "com.example.liquideconomycs.TrieProcessor.action.Delete";
 
     //input params
     private static final String EXTRA_POS = "com.example.liquideconomycs.TrieProcessor.extra.POS";
@@ -100,6 +101,20 @@ public class TrieProcessor extends IntentService {
                 try {
                     //mTrie = new Trie(nodeDir);
                     broadcastActionMsg(master, cmd, mTrie.insert(key, value, 0L));
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                ////////////////////////////////////////////////////////////////
+            }
+
+            if (ACTION_Delete.equals(action)) {
+                final String master = intent.getStringExtra(EXTRA_MASTER);
+                final String cmd = "Delete";
+                final byte[] key = intent.getByteArrayExtra(EXTRA_KEY);
+                ////////////////////////////////////////////////////////////////
+                try {
+                    //mTrie = new Trie(nodeDir);
+                    broadcastActionMsg(master, cmd, mTrie.delete(key, 0L));
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
