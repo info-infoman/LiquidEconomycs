@@ -51,6 +51,85 @@ public class Trie {
     //
     //total 22GB(ideal trie for 10 000 000 000 accounts)
 
+    public byte[] find(byte[] key, long pos) throws IOException {
+        byte[] s=search(key, pos);
+
+        if (s.length==8){
+            return find(getBytesPart(key, 1, key.length - 1), pos);
+        }else if(s.length==2){
+            return s;
+        }else{
+            return null;
+        }
+    }
+
+    //return null if not change(not found) or hash if root
+    public byte[] delete(byte[] key, long pos) throws IOException {
+        byte[] hash;
+        byte[] childsMap = new byte[32];
+        byte[] typeAndKeySize = new byte[2];
+        byte[] s=search(key, pos);
+        if (s != null) {
+            if(pos==0L) {
+                byte[] dKey = getBytesPart(key, 1, key.length - 1);
+                byte[] posBytes = delete(dKey, Longs.fromByteArray(s));
+                if (posBytes != null) {
+                    trie.seek(20 + getKeyPos((key[0] & 0xFF), BRANCH));
+                    trie.write(posBytes);
+                    trie.seek(20);
+                    byte[] childArray = new byte[2048];
+                    trie.read(childArray, 0, 2048);
+                    hash = calcHash(ROOT, childArray);
+                    trie.seek(0);
+                    trie.write(hash);
+                    return hash;
+                }
+            }else{
+                trie.seek(pos);
+                byte type = trie.readByte();
+                byte keyNodeSize = trie.readByte();
+                byte[] keyNode = new byte[keyNodeSize];
+                trie.read(keyNode, 0, keyNodeSize);
+                trie.seek(pos + 2 + keyNodeSize + 20); //skip hash
+                trie.read(childsMap, 0, 32);
+                byte[] suffixKey = getBytesPart(key, keyNodeSize, key.length - keyNodeSize);
+
+                int selfChildsCount = getChildsCount(childsMap);
+                int selfChildArraySize = selfChildsCount * (type==LEAF ? 2 : 8);
+
+                int childPosInMap = getChildPos(childsMap, (suffixKey[0] & 0xFF));
+                if(childPosInMap==0){
+                    Log.d("TRIE", String.valueOf((suffixKey[0] & 0xFF)));
+                }
+                long posToDelete = pos + 2 + keyNodeSize + 20 + 32 + (type==LEAF ? ((childPosInMap * 2) - 2) : ((childPosInMap * 8) - 8));
+                trie.seek(posToDelete);
+
+                if(type==LEAF){
+                    //todo change leaf or delete if empty
+                     childsMap = changeChildInMap(childsMap, (suffixKey[0] & 0xFF), false);
+
+                    trie.write(age);
+                }else{
+                    //todo if not null change branch or delete if empty
+                    byte[] chPos=new byte[8];
+                    trie.read(chPos, 0, 8);
+                    //insert to child
+                    chPos = insert(getBytesPart(suffixKey, 1, suffixKey.length-1), age, Longs.fromByteArray(chPos));
+                    trie.seek(posToWrite);
+                    trie.write(chPos);
+                }
+
+                trie.seek(pos + 2 + keyNodeSize + 20 + 32);
+                byte[] childArray = new byte[selfChildArraySize];
+                trie.read(childArray, 0, selfChildArraySize);
+                hash = calcHash(type, (type==LEAF ? childsMap : childArray));
+                trie.seek(pos + 2 + keyNodeSize);
+                trie.write(hash);
+                return Longs.toByteArray(pos);
+            }
+        }
+        return null;
+    }
 
     public byte[] insert(byte[] key, byte[] age, long pos) throws IOException {
 
@@ -72,7 +151,7 @@ public class Trie {
                     lKey = getBytesPart(key, 1, key.length - 2);
                     typeAndKeySize[0] = LEAF;
                     typeAndKeySize[1] = (lKey==null ? (byte)0 : (byte)lKey.length);
-                    childsMap = addChildInMap(new byte[32], (key[key.length-1]&0xFF));//add age
+                    childsMap = changeChildInMap(new byte[32], (key[key.length-1]&0xFF), true);//add age
                     hash=calcHash(typeAndKeySize[0], childsMap);
                     pos = addRecord(typeAndKeySize, lKey, hash, childsMap, age);
                 }else{//insert in child & save in root
@@ -173,7 +252,7 @@ public class Trie {
                     byte[] leafKey_ = getBytesPart(leafKey, 1 , leafKey.length - 1);
                     typeAndKeySize[0] = LEAF;
                     typeAndKeySize[1] = (byte)leafKey_.length;
-                    childsMapNew=addChildInMap(new byte[32], (key[key.length-1]&0xFF));
+                    childsMapNew = changeChildInMap(new byte[32], (key[key.length-1]&0xFF),true);
                     hash=calcHash(typeAndKeySize[0], childsMapNew);
                     long posLeaf = addRecord(typeAndKeySize, leafKey_, hash, childsMapNew, age);
 
@@ -195,7 +274,7 @@ public class Trie {
                     }
                     hash=calcHash(BRANCH, childArray);
 
-                    retPos = Longs.toByteArray(addRecord(typeAndKeySize, commonKey, hash, addChildInMap(addChildInMap(new byte[32], (leafKey[0]&0xFF)), (oldLeafKey[0]&0xFF)), childArray));
+                    retPos = Longs.toByteArray(addRecord(typeAndKeySize, commonKey, hash, changeChildInMap(changeChildInMap(new byte[32], (leafKey[0]&0xFF),true), (oldLeafKey[0]&0xFF),true), childArray));
 
                 }else{//if isLeaf add age in node, else create leaf witch suffix key and add pos in node(branch)
                     long posLeaf=0L;
@@ -206,7 +285,7 @@ public class Trie {
                         leafKey = getBytesPart(suffixKey, 1 , suffixKey.length - 1);
                         insByte = (suffixKey[0]&0xFF);
                         typeAndKeySize[1] = (byte)leafKey.length;
-                        childsMapNew=addChildInMap(new byte[32], (key[key.length-1]&0xFF));
+                        childsMapNew = changeChildInMap(new byte[32], (key[key.length-1]&0xFF),true);
                         hash=calcHash(LEAF, childsMapNew);
                         posLeaf = addRecord(typeAndKeySize, leafKey, hash, childsMapNew, age);
                     }else{
@@ -215,7 +294,7 @@ public class Trie {
 
                     typeAndKeySize[0] = type;
                     typeAndKeySize[1] = (byte)keyNode.length;
-                    childsMap = addChildInMap(childsMap, insByte);
+                    childsMap = changeChildInMap(childsMap, insByte,true);
                     int chp=getChildPos(childsMap, insByte);
                     byte[] before=(chp == 0 ? new byte[0] : getBytesPart(selfChildArray,0,  (chp-1)*(type==LEAF ? 2 : 8)));
                     childArray = Bytes.concat(before, (type==LEAF ? age : Longs.toByteArray(posLeaf)), getBytesPart(selfChildArray, before.length, selfChildArray.length-before.length));
@@ -338,6 +417,12 @@ public class Trie {
     private boolean checkChild(byte[]childsMap, int key){
         BitSet prepare = BitSet.valueOf(childsMap);
         return prepare.get(key);
+    }
+
+    private byte[] changeChildInMap(byte[]childsMap, int key, boolean operation){
+        BitSet prepare = BitSet.valueOf(childsMap);
+        prepare.set(key, operation);
+        return prepare.toByteArray();
     }
 
     private byte[] addChildInMap(byte[]childsMap, int key){
