@@ -23,9 +23,11 @@
             </intent-filter>
         </activity>
 
-        <service
-            android:name=".TrieProcessor"
-            android:exported="false" />
+        <service android:name=".Core"
+            android:process=".trie"
+            android:enabled="true"
+            android:exported="true"
+            />
     </application>
 
 </manifest>

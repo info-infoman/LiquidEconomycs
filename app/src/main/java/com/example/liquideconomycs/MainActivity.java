@@ -10,8 +10,6 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
-import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
 import android.graphics.PointF;
 import android.os.Bundle;
 import android.view.View;
@@ -25,7 +23,6 @@ import com.dlazaro66.qrcodereaderview.QRCodeReaderView.OnQRCodeReadListener;
 import com.google.android.material.snackbar.Snackbar;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -38,17 +35,11 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
-import com.google.common.primitives.Bytes;
-import com.google.common.primitives.Ints;
-import com.google.common.primitives.Longs;
 import com.google.common.primitives.Shorts;
 
 import org.bitcoinj.core.ECKey;
 
-import static com.example.liquideconomycs.TrieProcessor.EXTRA_MASTER;
-import static com.example.liquideconomycs.TrieProcessor.EXTRA_CMD;
-import static com.example.liquideconomycs.TrieProcessor.EXTRA_ANSWER;
-
+import static com.example.liquideconomycs.Core.*;
 
 
 public class MainActivity extends AppCompatActivity implements ActivityCompat.OnRequestPermissionsResultCallback, OnQRCodeReadListener {
@@ -63,7 +54,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     private CheckBox            flashlightCheckBox;
     private CheckBox            enableDecodingCheckBox;
     private PointsOverlayView   pointsOverlayView;
-    public  boolean             synchronizes;
     private byte[]              myPubKey;
     private byte[]              myPrivKey;
     private String              myManifest;
@@ -72,18 +62,13 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     private final BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            if (intent.getAction().equals(TrieProcessor.BROADCAST_ACTION_ANSWER)) {
+            if (intent.getAction().equals(BROADCAST_ACTION_ANSWER)) {
                 final String master = intent.getStringExtra(EXTRA_MASTER);
                 final String cmd = intent.getStringExtra(EXTRA_CMD);
                 final byte[] answer = intent.getByteArrayExtra(EXTRA_ANSWER);
                 if(master=="Main"){
 
                 }
-                //resultTextView.setText(param);
-            }
-
-            if (intent.getAction().equals(Sync.BROADCAST_ACTION_END)) {
-                synchronizes=false;
                 //resultTextView.setText(param);
             }
         }
@@ -114,12 +99,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         /////////////////////////////////////////////////////////////////////////////
         if (nodeDirReference.exists()) {
             IntentFilter filter = new IntentFilter();
-            filter.addAction(TrieProcessor.BROADCAST_ACTION_ANSWER);
-            filter.addAction(Sync.BROADCAST_ACTION_END);
+            filter.addAction(BROADCAST_ACTION_ANSWER);
             LocalBroadcastManager bm = LocalBroadcastManager.getInstance(this);
             bm.registerReceiver(mBroadcastReceiver, filter);
-
-            synchronizes = isSyncRunning();
 
             //init db
             ContentValues cv = new ContentValues();
@@ -159,18 +141,11 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 //ECKey myECKey1= new ECKey().fromPrivate(myPrivateKey);
             }
             */
-            //TrieProcessor.startActionInsert(this,"Main",myPubKey, Shorts.toByteArray(index.shortValue()), nodeDir);
+            //Core.startActionInsert(this,"Main",myPubKey, Shorts.toByteArray(index.shortValue()), nodeDir);
 
-            for(int i=0;i<10512;i++){
-                ECKey myECKey=new ECKey();
-                myPrivKey = myECKey.getPrivKeyBytes();
-                myPubKey = myECKey.getPubKeyHash();
-                myManifest = "";
+            startActionTest(this, "Main");
 
-                short age = 2;
-                TrieProcessor.startActionInsert(this,"Main",myPubKey, Shorts.toByteArray(age));
-            }
-            //TrieProcessor.startActionGetHash(this,"Main",0L);
+            //startActionGetHash(this,"Main",0L);
             //
             //Sync.startActionSync(String signalServer, byte[] pubKey);
         }
@@ -351,23 +326,5 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         while ((read = in.read(buffer)) != -1) {
             out.write(buffer, 0, read);
         }
-    }
-
-    private boolean isSyncRunning() {
-        ActivityManager activityManager = (ActivityManager)getSystemService(ACTIVITY_SERVICE);
-        List<ActivityManager.RunningServiceInfo> serviceList = activityManager.getRunningServices(Integer.MAX_VALUE);
-
-        if (serviceList.size() <= 0) {
-            return false;
-        }
-        for (int i = 0; i < serviceList.size(); i++) {
-            ActivityManager.RunningServiceInfo serviceInfo = serviceList.get(i);
-            ComponentName serviceName = serviceInfo.service;
-            if (serviceName.getClassName().equals(Sync.class.getName())) {
-                return true;
-            }
-        }
-
-        return false;
     }
 }

@@ -1,55 +1,249 @@
 package com.example.liquideconomycs;
 
+import android.app.IntentService;
+import android.app.Notification;
 import android.content.ContentValues;
+import android.content.Intent;
+import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.util.Log;
 
 import com.google.common.primitives.Bytes;
 import com.google.common.primitives.Longs;
+import com.google.common.primitives.Shorts;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.nio.ByteBuffer;
+import java.net.URI;
 import java.util.Arrays;
 import java.util.BitSet;
+import java.util.List;
+
+import org.apache.http.message.BasicNameValuePair;
+import org.bitcoinj.core.ECKey;
+
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import static org.bitcoinj.core.Utils.sha256hash160;
 
-public class Trie {
-    private RandomAccessFile trie;
-    private SQLiteDatabase db;
-    private ContentValues cv;
+public class Core extends IntentService {
+
+    RandomAccessFile trie;
+    SQLiteDatabase db;
+    DBHelper dbHelper;
+    ContentValues cv;
     private static byte ROOT = 1; //
     private static byte BRANCH = 2;
     private static byte LEAF = 3;
-    Trie(String nodeDir, SQLiteDatabase dataBase) throws FileNotFoundException {
-        trie = new RandomAccessFile(nodeDir+ "/trie.dat", "rw");
-        this.db = dataBase;
-        cv = new ContentValues();
+
+    public static final String EXTRA_MASTER = "com.example.liquideconomycs.Core.extra.MASTER";
+    public static final String EXTRA_CMD = "com.example.liquideconomycs.Core.extra.CMD";
+    //input fnc
+    private static final String ACTION_GetHash = "com.example.liquideconomycs.Core.action.GetHash";
+    private static final String ACTION_Insert = "com.example.liquideconomycs.Core.action.Insert";
+    private static final String ACTION_Delete = "com.example.liquideconomycs.Core.action.Delete";
+    private static final String ACTION_Find = "com.example.liquideconomycs.Core.action.Find";
+    private static final String ACTION_Sync = "com.example.liquideconomycs.Core.action.Sync";
+
+    private static final String ACTION_Test = "com.example.liquideconomycs.Core.action.Test";
+
+    //input params
+    private static final String EXTRA_POS = "com.example.liquideconomycs.Core.extra.POS";
+    private static final String EXTRA_KEY = "com.example.liquideconomycs.Core.extra.KEY";
+    private static final String EXTRA_VALUE = "com.example.liquideconomycs.Core.extra.VALUE";
+    private static final String EXTRA_SIGNAL_SERVER = "com.example.liquideconomycs.Core.extra.SIGNAL_SERVER";
+
+    public static final String BROADCAST_ACTION_ANSWER = "com.example.liquideconomycs.Core.broadcast_action.ANSWER";
+    public static final String EXTRA_ANSWER = "com.example.liquideconomycs.Core.extra.ANSWER";
+
+
+    public static void startActionTest(Context context, String master){
+        Intent intent = new Intent(context, Core.class);
+        intent.setAction(ACTION_Test);
+        intent.putExtra(EXTRA_MASTER, master);
+        context.startService(intent);
     }
 
-    //we need save 10 000 000 000+ account for all people
-    // and we need have sync func like "all for all" between two people(personal accounts trie), who met by change
+    // called by activity to communicate to service
+    public static void startActionGetHash(Context context, String master, long pos) {
+        Intent intent = new Intent(context, Core.class);
+        intent.setAction(ACTION_GetHash);
+        intent.putExtra(EXTRA_MASTER, master);
+        intent.putExtra(EXTRA_POS, pos);
+        context.startService(intent);
+    }
 
-    //todo var 1:
-    //ROOT(content child NODE)
-    ///hash sha256hash160(20)/child point array(1-256*8)
-    ///00*20                 /0000000000000000 total 2069 byte
-    //BRANCH(content child BRANCH or LEAF)
-    //type(1 byte)/key size(1 byte)/key(0-17 byte)/hash sha256hash160(20 byte)/childsMap(32 byte)  /childPointArray(1-256*8 byte)
-    //00          /00              /00*17         /00*20                      /00*32               /00*8
-    // max 2120 byte (min ‭153183(nodes) = ~309Mb)
-    //
-    //LEAF(content account age)
-    //type(1 byte)/key size(1 byte)/key(0-18 byte)/hash sha256hash160(20 byte)/childsMap(32 byte)  /dataArray(1-256*2 byte)
-    //00          /00               /00*18         /00*20                      /00*32               /00*2
-    // max 585 byte (min 39062500(leafs) = ~21GB)
-    //
-    //total 22GB(ideal trie for 10 000 000 000 accounts)
+    // called by activity to communicate to service
+    public static void startActionInsert(Context context, String master, byte[] key, byte[] value) {
+        Intent intent = new Intent(context, Core.class);
+        intent.setAction(ACTION_Insert);
+        intent.putExtra(EXTRA_MASTER, master);
+        intent.putExtra(EXTRA_KEY, key);
+        intent.putExtra(EXTRA_VALUE, value);
+        context.startService(intent);
+    }
 
-    public byte[] find(byte[] key, long pos) throws IOException {
+    public static void startActionSync(Context context, String signalServer, byte[] Key) {
+        Intent intent = new Intent(context, Core.class);
+        intent.setAction(ACTION_Sync);
+        intent.putExtra(EXTRA_SIGNAL_SERVER, signalServer);
+        intent.putExtra(EXTRA_KEY, Key);
+        context.startService(intent);
+    }
+
+    public Core() throws FileNotFoundException {
+        super("Core");
+    }
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        Context context = getApplicationContext();
+        dbHelper        = new DBHelper(context);
+        cv              = new ContentValues();
+        db              = dbHelper.getWritableDatabase();
+        try {
+            trie = new RandomAccessFile(context.getFilesDir().getAbsolutePath()+ "/trie"+"/trie.dat", "rw");
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+        Log.i("Trie", "Service: Trie is create");
+    }
+
+    @Override
+    protected void onHandleIntent(Intent intent) {
+        if (intent != null) {
+            final String action = intent.getAction();
+            if (ACTION_Test.equals(action)) {
+                final String master = intent.getStringExtra(EXTRA_MASTER);
+                final String cmd = "Test";
+                ////////////////////////////////////////////////////////////////
+                //mTrie = new Trie(nodeDir);
+
+                Notification.Builder builder = new Notification.Builder(getBaseContext())
+                        .setTicker("Test") // use something from something from R.string
+                        .setContentTitle("title") // use something from something from
+                        .setContentText("text") // use something from something from
+                        .setProgress(0, 0, true); // display indeterminate progress
+
+                startForeground(9999, builder.build());
+
+                for(int i=0;i<10512;i++){
+                    ECKey myECKey=new ECKey();
+                    byte[] myPrivKey = myECKey.getPrivKeyBytes();
+                    byte[] myPubKey = myECKey.getPubKeyHash();
+
+                    short age = 2;
+                    try {
+                        insert(myPubKey, Shorts.toByteArray(age), 0L);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+
+                stopForeground(true);
+
+                broadcastActionMsg(master, cmd, new byte[0]);
+                ////////////////////////////////////////////////////////////////
+            }
+
+            if (ACTION_GetHash.equals(action)) {
+                final String master = intent.getStringExtra(EXTRA_MASTER);
+                final String cmd = "GetHash";
+                final long pos = intent.getLongExtra(EXTRA_POS,0L);
+                ////////////////////////////////////////////////////////////////
+                try {
+                    //mTrie = new Trie(nodeDir);
+                    broadcastActionMsg(master, cmd, getHash(pos));
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                ////////////////////////////////////////////////////////////////
+            }
+
+            if (ACTION_Insert.equals(action)) {
+                final String master = intent.getStringExtra(EXTRA_MASTER);
+                final String cmd = "Insert";
+                final byte[] key = intent.getByteArrayExtra(EXTRA_KEY);
+                final byte[] value = intent.getByteArrayExtra(EXTRA_VALUE);
+                ////////////////////////////////////////////////////////////////
+                try {
+                    //mTrie = new Trie(nodeDir);
+                    broadcastActionMsg(master, cmd, insert(key, value, 0L));
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                ////////////////////////////////////////////////////////////////
+            }
+
+            if (ACTION_Delete.equals(action)) {
+                final String master = intent.getStringExtra(EXTRA_MASTER);
+                final String cmd = "Delete";
+                final byte[] key = intent.getByteArrayExtra(EXTRA_KEY);
+                ////////////////////////////////////////////////////////////////
+                try {
+                    //mTrie = new Trie(nodeDir);
+                    broadcastActionMsg(master, cmd, delete(key, 0L));
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                ////////////////////////////////////////////////////////////////
+            }
+
+            if (ACTION_Find.equals(action)) {
+                final String master = intent.getStringExtra(EXTRA_MASTER);
+                final String cmd = "Find";
+                final byte[] key = intent.getByteArrayExtra(EXTRA_KEY);
+                ////////////////////////////////////////////////////////////////
+                try {
+                    //mTrie = new Trie(nodeDir);
+                    broadcastActionMsg(master, cmd, find(key, 0L));
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                ////////////////////////////////////////////////////////////////
+            }
+
+            if (ACTION_Sync.equals(action)) {
+                final String signalServer = intent.getStringExtra(EXTRA_SIGNAL_SERVER);
+                final byte[] key = intent.getByteArrayExtra(EXTRA_KEY);
+                final String master = intent.getStringExtra(EXTRA_MASTER);
+                final String cmd = "Sync";
+                ////////////////////////////////////////////////////////////////
+                Notification.Builder builder = new Notification.Builder(getBaseContext())
+                        .setTicker("Sync") // use something from something from R.string
+                        .setContentTitle("liquid economycs") // use something from something from
+                        .setContentText("Sync liquid base") // use something from something from
+                        .setProgress(0, 0, true); // display indeterminate progress
+
+                startForeground(9991, builder.build());
+
+                //todo sync processor
+
+                stopForeground(true);
+
+                broadcastActionMsg(master, cmd, new byte[0]);
+                ////////////////////////////////////////////////////////////////
+            }
+        }
+
+
+    }
+
+    // called to send data to Activity
+    public void broadcastActionMsg(String master, String cmd, byte[] answer) {
+        Intent intent = new Intent(BROADCAST_ACTION_ANSWER);
+        intent.putExtra(EXTRA_MASTER, master);
+        intent.putExtra(EXTRA_CMD, cmd);
+        intent.putExtra(EXTRA_ANSWER, answer);
+        LocalBroadcastManager bm = LocalBroadcastManager.getInstance(this);
+        bm.sendBroadcast(intent);
+    }
+
+    /////////////////TRIE//////////////////////////////////////////////////////////////////////////////
+    private byte[] find(byte[] key, long pos) throws IOException {
         byte[] s=search(key, pos);
 
         if (s.length==8){
@@ -62,7 +256,7 @@ public class Trie {
     }
 
     //return null if not change(not found) or pos in file if change or hash if root
-    public byte[] delete(byte[] key, long pos) throws IOException {
+    private byte[] delete(byte[] key, long pos) throws IOException {
         byte[] hash;
         byte[] childsMap = new byte[32];
         byte[] typeAndKeySize = new byte[2];
@@ -179,7 +373,7 @@ public class Trie {
         return null;
     }
 
-    public byte[] insert(byte[] key, byte[] age, long pos) throws IOException {
+    private byte[] insert(byte[] key, byte[] age, long pos) throws IOException {
         Log.d("TRIE", String.valueOf(1));
         byte[] hash;
         byte[] childsMap = new byte[32];
@@ -477,7 +671,7 @@ public class Trie {
     }
 
     private byte[] changeChildInMap(byte[]childsMap, int key, boolean operation){
-       for(int i=0; i < 32; i++){
+        for(int i=0; i < 32; i++){
             if(key>(i*8)-1 && key<(i*8)+9){
                 byte[] p = new byte[1];
                 p[0]=childsMap[i];
@@ -499,7 +693,7 @@ public class Trie {
         return result;
     }
 
-    public byte[] getHash(long pos) throws IOException {
+    private byte[] getHash(long pos) throws IOException {
 
         byte[] hash = new byte[20];
         if (pos == 0L) {
@@ -535,4 +729,42 @@ public class Trie {
         return hash;
     }
 
+
+    //////////////SYNC/////////////////////////////////////////////////////////////////////////////////////
+    private void sync(String hostPort){
+        //socket
+        List<BasicNameValuePair> mExtraHeaders = Arrays.asList(new BasicNameValuePair("Cookie", "session=abcd"));
+        WebSocketClient mClient = new WebSocketClient(new WebSocketClient.Listener() {
+
+            private static final String TAG = "WebSocketClient";
+
+            @Override
+            public void onConnect() {
+                Log.d(TAG, "Connected!");
+                //wsOnConnected();
+            }
+
+            @Override
+            public void onMessage(String message) {
+                Log.d(TAG, String.format("Got string message! %s", message));
+            }
+
+            @Override
+            public void onMessage(byte[] data) {
+                Log.d(TAG, String.format("Got binary message! %s", data.toString()));
+            }
+
+            @Override
+            public void onDisconnect(int code, String reason) {
+                Log.d(TAG, String.format("Disconnected! Code: %d Reason: %s", code, reason));
+            }
+
+            @Override
+            public void onError(Exception error) {
+                Log.e(TAG, "Error!", error);
+            }
+
+        }, mExtraHeaders);
+        mClient.connect(URI.create(hostPort));
+    }
 }
