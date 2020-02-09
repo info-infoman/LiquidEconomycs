@@ -40,6 +40,7 @@ public class Core extends IntentService {
 
     public static final String EXTRA_MASTER = "com.example.liquideconomycs.Core.extra.MASTER";
     public static final String EXTRA_CMD = "com.example.liquideconomycs.Core.extra.CMD";
+
     //input fnc
     private static final String ACTION_GetHash = "com.example.liquideconomycs.Core.action.GetHash";
     private static final String ACTION_Insert = "com.example.liquideconomycs.Core.action.Insert";
@@ -731,7 +732,8 @@ public class Core extends IntentService {
 
 
     //////////////SYNC/////////////////////////////////////////////////////////////////////////////////////
-    private void sync(String hostPort){
+    private void sync(String hostPort, boolean master, byte key){
+
         //socket
         List<BasicNameValuePair> mExtraHeaders = Arrays.asList(new BasicNameValuePair("Cookie", "session=abcd"));
         WebSocketClient mClient = new WebSocketClient(new WebSocketClient.Listener() {
