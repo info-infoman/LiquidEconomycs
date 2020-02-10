@@ -2,10 +2,14 @@ package com.example.liquideconomycs;
 
 import com.google.common.primitives.Ints;
 
-public class Protocol {
+public class Utils {
 
     public static byte getHashs = 0;
     public static byte Hashs = 1;
+
+    public static byte ROOT = 1; //
+    public static byte BRANCH = 2;
+    public static byte LEAF = 3;
 
     public static byte[]  getMsgType(byte[] msg) {
         return getBytesPart(msg, 0, 1);

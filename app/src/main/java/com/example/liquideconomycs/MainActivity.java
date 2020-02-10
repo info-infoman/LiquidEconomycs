@@ -39,7 +39,7 @@ import com.google.common.primitives.Shorts;
 
 import org.bitcoinj.core.ECKey;
 
-import static com.example.liquideconomycs.Core.*;
+import static com.example.liquideconomycs.Sync.*;
 
 
 public class MainActivity extends AppCompatActivity implements ActivityCompat.OnRequestPermissionsResultCallback, OnQRCodeReadListener {
@@ -143,8 +143,20 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             */
             //Core.startActionInsert(this,"Main",myPubKey, Shorts.toByteArray(index.shortValue()), nodeDir);
 
-            startActionTest(this, "Main");
+            //startActionTest(this, "Main");
+            for(int i=0;i<10512;i++){
+                ECKey myECKey=new ECKey();
+                byte[] myPrivKey = myECKey.getPrivKeyBytes();
+                byte[] myPubKey = myECKey.getPubKeyHash();
 
+                short age = 2;
+                Core app = ((Core) getApplicationContext());
+                try {
+                    app.trieInsert(myPubKey, Shorts.toByteArray(age), 0L);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
             //startActionGetHash(this,"Main",0L);
             //
             //Sync.startActionSync(String signalServer, byte[] pubKey);

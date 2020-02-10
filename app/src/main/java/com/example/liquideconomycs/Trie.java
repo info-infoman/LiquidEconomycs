@@ -14,15 +14,12 @@ import java.io.RandomAccessFile;
 import java.util.Arrays;
 import java.util.BitSet;
 
-import static com.example.liquideconomycs.Protocol.*;
+import static com.example.liquideconomycs.Utils.*;
 import static org.bitcoinj.core.Utils.sha256hash160;
 
 public class Trie {
     RandomAccessFile trie;
     ContentValues cv;
-    private static byte ROOT = 1; //
-    private static byte BRANCH = 2;
-    private static byte LEAF = 3;
     SQLiteDatabase db;
 
     public Trie(SQLiteDatabase db, String file) throws FileNotFoundException {
