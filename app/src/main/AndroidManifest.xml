@@ -24,7 +24,7 @@
         </activity>
 
         <service android:name=".Core"
-            android:process=".trie"
+            android:process=".liquideconomycs_core"
             android:enabled="true"
             android:exported="true"
             />
