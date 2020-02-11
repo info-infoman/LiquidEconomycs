@@ -12,6 +12,7 @@ import java.util.Arrays;
 import java.util.List;
 import org.apache.http.message.BasicNameValuePair;
 
+import androidx.core.util.Pair;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 public class Sync extends IntentService {
@@ -28,7 +29,7 @@ public class Sync extends IntentService {
     public static final String BROADCAST_ACTION_ANSWER = "com.example.liquideconomycs.Sync.broadcast_action.ANSWER";
     public static final String EXTRA_ANSWER = "com.example.liquideconomycs.Sync.extra.ANSWER";
 
-
+    public WebSocketClient mClient;
 
     public static void startActionSync(Context context, String signalServer, boolean slave) {
         Intent intent = new Intent(context, Sync.class);
@@ -46,6 +47,7 @@ public class Sync extends IntentService {
     public void onCreate() {
         super.onCreate();
         Context context = getApplicationContext();
+        mClient = null;
         Log.i("Trie", "Service: Sync is create");
     }
 
@@ -59,6 +61,8 @@ public class Sync extends IntentService {
                 final String master = intent.getStringExtra(EXTRA_MASTER);
                 final boolean slave = intent.getBooleanExtra(EXTRA_Slave,false);
                 final String cmd = "Sync";
+                Core app = (Core) getApplicationContext();
+                final Pair myKey = app.getMyKey();
 
                 ////////////////////////////////////////////////////////////////
                 Notification.Builder builder = new Notification.Builder(getBaseContext())
@@ -70,9 +74,8 @@ public class Sync extends IntentService {
                 startForeground(9991, builder.build());
 
                 //todo sync processor
-
                 List<BasicNameValuePair> mExtraHeaders = Arrays.asList(new BasicNameValuePair("Cookie", "session=abcd"));
-                WebSocketClient mClient = new WebSocketClient(new WebSocketClient.Listener() {
+                mClient = new WebSocketClient(new WebSocketClient.Listener() {
 
                     private static final String TAG = "WebSocketClient";
 
@@ -99,14 +102,10 @@ public class Sync extends IntentService {
 
                         //slave - if not owner server - who give work
                         //
-                        if(slave && msgType== Utils.getHashs){
-                            //todo formed Hashs answer
-                            Hashs(Payload, slave);
-                        }else if(!slave && msgType== Utils.Hashs){
-                            //todo formed getHashs ask
-                            getHashs(Payload, slave);
-                        }else{
-                            this.disconnect();//must close room on a server
+                        if((slave && msgType != Utils.getHashs) || (!slave && msgType != Utils.hashs)){
+                            disconnect();
+                        }else {
+                            getAnswer(msgType, Payload, slave);
                         }
 
                     }
@@ -121,17 +120,9 @@ public class Sync extends IntentService {
                         Log.e(TAG, "Error!", error);
                     }
 
-                    private void Hashs(byte[] payload, boolean slave) {
-                        mClient.send(payload);
-                    }
-
-                    private void getHashs(byte[] payload, boolean slave) {
-                        mClient.send(payload);
-                    }
-
                 }, mExtraHeaders);
-                mClient.connect(URI.create(signalServer+(slave ? "/?myKey="+String.valueOf(myKey) : "/?slave="+String.valueOf(pubKey))));
 
+                mClient.connect(URI.create(signalServer+(slave ? "/?myKey="+String.valueOf(myKey.first) : "/?slave="+String.valueOf(pubKey))));
 
                 stopForeground(true);
 
@@ -139,6 +130,14 @@ public class Sync extends IntentService {
                 ////////////////////////////////////////////////////////////////
             }
         }
+    }
+
+    private void disconnect() {
+        mClient.disconnect();
+    }
+
+    private void getAnswer(byte type, byte[] payload, boolean slave) {
+        mClient.send(payload);
     }
 
     // called to send data to Activity

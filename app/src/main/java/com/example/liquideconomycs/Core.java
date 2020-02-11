@@ -17,7 +17,6 @@ public class Core extends Application {
     private Pair myKey;
 
 
-
     @Override
     public void onCreate() {
         super.onCreate();
@@ -68,4 +67,5 @@ public class Core extends Application {
         //return myKey;
     }
     ///////////////////////////////////////////////////////////////////////////////////////////////
+
 }
