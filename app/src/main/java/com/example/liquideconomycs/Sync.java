@@ -6,6 +6,10 @@ import android.content.Intent;
 import android.content.Context;
 import android.util.Log;
 
+import com.google.common.primitives.Bytes;
+import com.google.common.primitives.Ints;
+import com.google.common.primitives.Longs;
+
 import java.io.FileNotFoundException;
 import java.net.URI;
 import java.util.Arrays;
@@ -14,6 +18,8 @@ import org.apache.http.message.BasicNameValuePair;
 
 import androidx.core.util.Pair;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
+
+import static com.example.liquideconomycs.Utils.*;
 
 public class Sync extends IntentService {
 
@@ -30,6 +36,7 @@ public class Sync extends IntentService {
     public static final String EXTRA_ANSWER = "com.example.liquideconomycs.Sync.extra.ANSWER";
 
     public WebSocketClient mClient;
+    public Core app;
 
     public static void startActionSync(Context context, String signalServer, boolean slave) {
         Intent intent = new Intent(context, Sync.class);
@@ -46,8 +53,9 @@ public class Sync extends IntentService {
     @Override
     public void onCreate() {
         super.onCreate();
-        Context context = getApplicationContext();
+        //Context context = getApplicationContext();
         mClient = null;
+        app = (Core) getApplicationContext();
         Log.i("Trie", "Service: Sync is create");
     }
 
@@ -61,7 +69,6 @@ public class Sync extends IntentService {
                 final String master = intent.getStringExtra(EXTRA_MASTER);
                 final boolean slave = intent.getBooleanExtra(EXTRA_Slave,false);
                 final String cmd = "Sync";
-                Core app = (Core) getApplicationContext();
                 final Pair myKey = app.getMyKey();
 
                 ////////////////////////////////////////////////////////////////
@@ -93,11 +100,11 @@ public class Sync extends IntentService {
                     @Override
                     public void onMessage(byte[] data) {
                         Log.d(TAG, String.format("Got binary message! %s", data.toString()));
-                        byte msgType    = Utils.getMsgType(data)[0];
-                        int length      = Utils.getLength(data);
-                        int sigLength   = Utils.getSigLength(data);
-                        byte[] sig      = Utils.getSig(data, sigLength);
-                        byte[] Payload  = Utils.getPayload(data, sigLength, length);
+                        byte msgType    = Utils.getBytesPart(data,0,1)[0];
+                        int length      = Ints.fromByteArray(Utils.getBytesPart(data,1,4));
+                        int sigLength   = Ints.fromByteArray(Utils.getBytesPart(data,5,4));
+                        byte[] sig      = Utils.getBytesPart(data,9, sigLength);
+                        byte[] Payload  = Utils.getBytesPart(data, sigLength, length);
                         //todo check sig
 
                         //slave - if not owner server - who give work
@@ -105,7 +112,7 @@ public class Sync extends IntentService {
                         if((slave && msgType != Utils.getHashs) || (!slave && msgType != Utils.hashs)){
                             disconnect();
                         }else {
-                            getAnswer(msgType, Payload, slave);
+                            getAnswer(msgType, Payload);
                         }
 
                     }
@@ -136,8 +143,29 @@ public class Sync extends IntentService {
         mClient.disconnect();
     }
 
-    private void getAnswer(byte type, byte[] payload, boolean slave) {
-        mClient.send(payload);
+    private void getAnswer(byte type, byte[] payload) {
+        byte[] answer = new byte[0];
+        if(type == Utils.getHashs){
+            for(int i=0;i < payload.length/8;i++){
+                answer = Bytes.concat(answer, app.trieGetNodeWitchChildsHashs(Longs.fromByteArray(Utils.getBytesPart(payload,i*8, 8))));
+            }
+        }else{
+            //todo analise and construct map
+            for(int i = 0; i < payload.length;) {
+                byte nodeType           = Utils.getBytesPart(payload, i, 1)[0];
+                byte keySize            = Utils.getBytesPart(payload, i + 1, 1)[0];
+                byte[] key              = Utils.getBytesPart(payload, i + 2, keySize);
+                byte[] childsMap        = Utils.getBytesPart(payload, i + 2 + keySize, 32);
+                int childsCountInMap    = Utils.getChildsCountInMap(childsMap);
+                int len                 = childsCountInMap * (nodeType==Utils.LEAF ? 2 : 8);
+                byte[] childsArray      = Utils.getBytesPart(payload, i + 2 + keySize + 32, len);
+                i                       = i + 2 + keySize + 32 + len;
+
+            }
+        }
+        //todo add head msg
+
+        mClient.send(answer);
     }
 
     // called to send data to Activity

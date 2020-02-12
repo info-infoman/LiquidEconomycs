@@ -22,7 +22,6 @@ public class DBHelper extends SQLiteOpenHelper {
                     + "id integer primary key autoincrement,"
                     + "pubKey BLOB,"
                     + "privKey BLOB,"
-                    + "my BOOLEAN,"
                     + "manifest text" + ");");
             db.execSQL("create table freeSpace ("
                     + "id integer primary key autoincrement,"
