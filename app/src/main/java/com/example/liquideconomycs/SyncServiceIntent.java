@@ -6,9 +6,7 @@ import android.content.Intent;
 import android.content.Context;
 import android.util.Log;
 
-import com.google.common.primitives.Bytes;
 import com.google.common.primitives.Ints;
-import com.google.common.primitives.Longs;
 
 import java.io.FileNotFoundException;
 import java.net.URI;
@@ -19,44 +17,42 @@ import org.apache.http.message.BasicNameValuePair;
 import androidx.core.util.Pair;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
-import static com.example.liquideconomycs.Utils.*;
+import static com.example.liquideconomycs.TrieServiceIntent.*;
 
-public class Sync extends IntentService {
+public class SyncServiceIntent extends IntentService {
 
-    public static final String EXTRA_MASTER = "com.example.liquideconomycs.Sync.extra.MASTER";
-    public static final String EXTRA_CMD = "com.example.liquideconomycs.Sync.extra.CMD";
+    public static final String EXTRA_MASTER = "com.example.liquideconomycs.SyncServiceIntent.extra.MASTER";
+    public static final String EXTRA_CMD = "com.example.liquideconomycs.SyncServiceIntent.extra.CMD";
 
-    private static final String ACTION_Start = "com.example.liquideconomycs.Sync.action.Start";
+    private static final String ACTION_Start = "com.example.liquideconomycs.SyncServiceIntent.action.Start";
 
-    private static final String EXTRA_SIGNAL_SERVER = "com.example.liquideconomycs.Sync.extra.SIGNAL_SERVER";
-    private static final String EXTRA_Slave = "com.example.liquideconomycs.Sync.extra.SLAVE";
-    private static final String EXTRA_KEY = "com.example.liquideconomycs.Sync.extra.KEY";
+    private static final String EXTRA_SIGNAL_SERVER = "com.example.liquideconomycs.SyncServiceIntent.extra.SIGNAL_SERVER";
+    private static final String EXTRA_Slave = "com.example.liquideconomycs.SyncServiceIntent.extra.SLAVE";
+    private static final String EXTRA_KEY = "com.example.liquideconomycs.SyncServiceIntent.extra.KEY";
 
-    public static final String BROADCAST_ACTION_ANSWER = "com.example.liquideconomycs.Sync.broadcast_action.ANSWER";
-    public static final String EXTRA_ANSWER = "com.example.liquideconomycs.Sync.extra.ANSWER";
+    public static final String BROADCAST_ACTION_ANSWER = "com.example.liquideconomycs.SyncServiceIntent.broadcast_action.ANSWER";
+    public static final String EXTRA_ANSWER = "com.example.liquideconomycs.SyncServiceIntent.extra.ANSWER";
 
-    public WebSocketClient mClient;
     public Core app;
 
     public static void startActionSync(Context context, String signalServer, boolean slave) {
-        Intent intent = new Intent(context, Sync.class);
+        Intent intent = new Intent(context, SyncServiceIntent.class);
         intent.setAction(ACTION_Start);
         intent.putExtra(EXTRA_SIGNAL_SERVER, signalServer);
         intent.putExtra(EXTRA_Slave, slave);
         context.startService(intent);
     }
 
-    public Sync() throws FileNotFoundException {
-        super("Sync");
+    public SyncServiceIntent() throws FileNotFoundException {
+        super("SyncServiceIntent");
     }
 
     @Override
     public void onCreate() {
         super.onCreate();
-        //Context context = getApplicationContext();
-        mClient = null;
+        Context context = getApplicationContext();
         app = (Core) getApplicationContext();
-        Log.i("Trie", "Service: Sync is create");
+        Log.i("liquideconomycs", "Service: SyncServiceIntent is create");
     }
 
     @Override
@@ -68,12 +64,12 @@ public class Sync extends IntentService {
                 final byte[] pubKey = intent.getByteArrayExtra(EXTRA_KEY);
                 final String master = intent.getStringExtra(EXTRA_MASTER);
                 final boolean slave = intent.getBooleanExtra(EXTRA_Slave,false);
-                final String cmd = "Sync";
+                final String cmd = "SyncServiceIntent";
                 final Pair myKey = app.getMyKey();
 
                 ////////////////////////////////////////////////////////////////
                 Notification.Builder builder = new Notification.Builder(getBaseContext())
-                        .setTicker("Sync") // use something from something from R.string
+                        .setTicker("SyncServiceIntent") // use something from something from R.string
                         .setContentTitle("liquid economycs") // use something from something from
                         .setContentText("Sync liquid base") // use something from something from
                         .setProgress(0, 0, true); // display indeterminate progress
@@ -82,7 +78,7 @@ public class Sync extends IntentService {
 
                 //todo sync processor
                 List<BasicNameValuePair> mExtraHeaders = Arrays.asList(new BasicNameValuePair("Cookie", "session=abcd"));
-                mClient = new WebSocketClient(new WebSocketClient.Listener() {
+                app.mClient = new WebSocketClient(new WebSocketClient.Listener() {
 
                     private static final String TAG = "WebSocketClient";
 
@@ -104,7 +100,7 @@ public class Sync extends IntentService {
                         int length      = Ints.fromByteArray(Utils.getBytesPart(data,1,4));
                         int sigLength   = Ints.fromByteArray(Utils.getBytesPart(data,5,4));
                         byte[] sig      = Utils.getBytesPart(data,9, sigLength);
-                        byte[] Payload  = Utils.getBytesPart(data, sigLength, length);
+                        byte[] payload  = Utils.getBytesPart(data, sigLength, length);
                         //todo check sig
 
                         //slave - if not owner server - who give work
@@ -112,7 +108,7 @@ public class Sync extends IntentService {
                         if((slave && msgType != Utils.getHashs) || (!slave && msgType != Utils.hashs)){
                             disconnect();
                         }else {
-                            getAnswer(msgType, Payload);
+                            startActionGetAnswer(getApplicationContext(), "SyncServiceIntent", msgType, payload);
                         }
 
                     }
@@ -129,7 +125,7 @@ public class Sync extends IntentService {
 
                 }, mExtraHeaders);
 
-                mClient.connect(URI.create(signalServer+(slave ? "/?myKey="+String.valueOf(myKey.first) : "/?slave="+String.valueOf(pubKey))));
+                app.mClient.connect(URI.create(signalServer+(slave ? "/?myKey="+String.valueOf(myKey.first) : "/?slave="+String.valueOf(pubKey))));
 
                 stopForeground(true);
 
@@ -140,32 +136,7 @@ public class Sync extends IntentService {
     }
 
     private void disconnect() {
-        mClient.disconnect();
-    }
-
-    private void getAnswer(byte type, byte[] payload) {
-        byte[] answer = new byte[0];
-        if(type == Utils.getHashs){
-            for(int i=0;i < payload.length/8;i++){
-                answer = Bytes.concat(answer, app.trieGetNodeWitchChildsHashs(Longs.fromByteArray(Utils.getBytesPart(payload,i*8, 8))));
-            }
-        }else{
-            //todo analise and construct map
-            for(int i = 0; i < payload.length;) {
-                byte nodeType           = Utils.getBytesPart(payload, i, 1)[0];
-                byte keySize            = Utils.getBytesPart(payload, i + 1, 1)[0];
-                byte[] key              = Utils.getBytesPart(payload, i + 2, keySize);
-                byte[] childsMap        = Utils.getBytesPart(payload, i + 2 + keySize, 32);
-                int childsCountInMap    = Utils.getChildsCountInMap(childsMap);
-                int len                 = childsCountInMap * (nodeType==Utils.LEAF ? 2 : 8);
-                byte[] childsArray      = Utils.getBytesPart(payload, i + 2 + keySize + 32, len);
-                i                       = i + 2 + keySize + 32 + len;
-
-            }
-        }
-        //todo add head msg
-
-        mClient.send(answer);
+        app.mClient.disconnect();
     }
 
     // called to send data to Activity

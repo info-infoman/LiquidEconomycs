@@ -1,9 +1,7 @@
 package com.example.liquideconomycs;
 
 import android.Manifest;
-import android.app.ActivityManager;
 import android.content.BroadcastReceiver;
-import android.content.ComponentName;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
@@ -27,7 +25,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import androidx.annotation.NonNull;
@@ -39,7 +36,8 @@ import com.google.common.primitives.Shorts;
 
 import org.bitcoinj.core.ECKey;
 
-import static com.example.liquideconomycs.Sync.*;
+import static com.example.liquideconomycs.SyncServiceIntent.*;
+import static com.example.liquideconomycs.TrieServiceIntent.startActionInsert;
 
 
 public class MainActivity extends AppCompatActivity implements ActivityCompat.OnRequestPermissionsResultCallback, OnQRCodeReadListener {
@@ -150,16 +148,12 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 byte[] myPubKey = myECKey.getPubKeyHash();
 
                 short age = 2;
-                Core app = ((Core) getApplicationContext());
-                try {
-                    app.trieInsert(myPubKey, Shorts.toByteArray(age), 0L);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+                startActionInsert(getApplicationContext(), "Main", myPubKey, Shorts.toByteArray(age));
+
             }
             //startActionGetHash(this,"Main",0L);
             //
-            //Sync.startActionSync(String signalServer, byte[] pubKey);
+            //SyncServiceIntent.startActionSync(String signalServer, byte[] pubKey);
         }
 
 

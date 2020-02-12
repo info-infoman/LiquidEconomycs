@@ -1,6 +1,7 @@
 package com.example.liquideconomycs;
 
 import android.app.Application;
+import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
@@ -11,16 +12,18 @@ import com.google.common.primitives.Longs;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.util.ArrayList;
 
 import androidx.core.util.Pair;
 
 public class Core extends Application {
-    private SQLiteDatabase db;
     private DBHelper dbHelper;
-    private Trie trie;
+    private SQLiteDatabase db;
+    private ContentValues cv;
     private Pair myKey;
-
+    public RandomAccessFile trie;
+    public WebSocketClient mClient;
 
     @Override
     public void onCreate() {
@@ -28,9 +31,11 @@ public class Core extends Application {
         Context context = getApplicationContext();
         dbHelper        = new DBHelper(context);
         db              = dbHelper.getWritableDatabase();
+        cv              = new ContentValues();
+        mClient         = null;
 
         try {
-            trie = new Trie(db,context.getFilesDir().getAbsolutePath()+ "/trie"+"/trie.dat");
+            trie = new RandomAccessFile(context.getFilesDir().getAbsolutePath()+ "/trie"+"/trie.dat", "rw");
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
@@ -41,30 +46,23 @@ public class Core extends Application {
     }
 
     /////////TRIE//////////////////////////////////////////////////////////////////////////////////
-    //simple
-    public byte[] trieGetHash(long pos) throws IOException {
-        return trie.getHash(pos);
+    public Cursor getFreeSpace(int recordlength) {
+        return db.rawQuery("SELECT * FROM freeSpace where space="+recordlength, null);
     }
 
-    public byte[] trieFind(byte[] key, long pos) throws IOException {
-        return trie.find(key, pos);
+    public void deleteFreeSpace(long pos) {
+        db.delete("freeSpace",  "pos = ?", new String[] { String.valueOf(pos) });
     }
 
-    public byte[] trieDelete(byte[] key, long pos) throws IOException {
-        return trie.delete(key, pos);
-    }
-
-    public byte[] trieInsert(byte[] key, byte[] age, long pos) throws IOException {
-        return trie.insert(key, age, pos);
-    }
-
-    //sync
-    public byte[] trieGetNodeWitchChildsHashs(long pos) {
-        return trie.getNodeWitchChildsHashs(pos);
+    public void addPosInFreeSpaceMap(long pos, int keyNodeSize, int selfChildArraySize){
+        cv.put("pos", pos);
+        cv.put("space", 2+keyNodeSize+20+32+selfChildArraySize);
+        db.insert("freeSpace", null, cv);
+        cv.clear();
     }
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
-    /////////MY///////////////////////////////////////////////////////////////////////////////////
+    /////////MyKey/////////////////////////////////////////////////////////////////////////////////
     public Pair getMyKey() {
         return myKey;
     }
