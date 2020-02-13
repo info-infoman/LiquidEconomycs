@@ -6,7 +6,9 @@ import android.content.Intent;
 import android.content.Context;
 import android.util.Log;
 
+import com.google.common.primitives.Bytes;
 import com.google.common.primitives.Ints;
+import com.google.common.primitives.Longs;
 
 import java.io.FileNotFoundException;
 import java.net.URI;
@@ -21,19 +23,12 @@ import static com.example.liquideconomycs.TrieServiceIntent.*;
 
 public class SyncServiceIntent extends IntentService {
 
-    public static final String EXTRA_MASTER = "com.example.liquideconomycs.SyncServiceIntent.extra.MASTER";
-    public static final String EXTRA_CMD = "com.example.liquideconomycs.SyncServiceIntent.extra.CMD";
-
     private static final String ACTION_Start = "com.example.liquideconomycs.SyncServiceIntent.action.Start";
-
     private static final String EXTRA_SIGNAL_SERVER = "com.example.liquideconomycs.SyncServiceIntent.extra.SIGNAL_SERVER";
     private static final String EXTRA_Slave = "com.example.liquideconomycs.SyncServiceIntent.extra.SLAVE";
     private static final String EXTRA_KEY = "com.example.liquideconomycs.SyncServiceIntent.extra.KEY";
-
-    public static final String BROADCAST_ACTION_ANSWER = "com.example.liquideconomycs.SyncServiceIntent.broadcast_action.ANSWER";
-    public static final String EXTRA_ANSWER = "com.example.liquideconomycs.SyncServiceIntent.extra.ANSWER";
-
-    public Core app;
+    private Core app;
+    private boolean isSync;
 
     public static void startActionSync(Context context, String signalServer, boolean slave) {
         Intent intent = new Intent(context, SyncServiceIntent.class);
@@ -41,6 +36,23 @@ public class SyncServiceIntent extends IntentService {
         intent.putExtra(EXTRA_SIGNAL_SERVER, signalServer);
         intent.putExtra(EXTRA_Slave, slave);
         context.startService(intent);
+    }
+
+    public void sendMsg(byte msgType, byte[] payload) {
+        if(app.mClient != null && app.mClient.isConnected()) {
+            byte[] type = new byte[1];
+            type[0] = msgType;
+            //todo sig
+            byte[] sig = payload;
+            app.mClient.send(Bytes.concat(type, Ints.toByteArray(sig.length), sig, payload));
+        }
+    }
+
+    public void disconnect() {
+        if(app.mClient != null && app.mClient.isConnected()) {
+            isSync = true;
+            app.mClient.disconnect();
+        }
     }
 
     public SyncServiceIntent() throws FileNotFoundException {
@@ -60,11 +72,10 @@ public class SyncServiceIntent extends IntentService {
         if (intent != null) {
             final String action = intent.getAction();
             if (ACTION_Start.equals(action)) {
+                isSync = false;
                 final String signalServer = intent.getStringExtra(EXTRA_SIGNAL_SERVER);
                 final byte[] pubKey = intent.getByteArrayExtra(EXTRA_KEY);
-                final String master = intent.getStringExtra(EXTRA_MASTER);
                 final boolean slave = intent.getBooleanExtra(EXTRA_Slave,false);
-                final String cmd = "SyncServiceIntent";
                 final Pair myKey = app.getMyKey();
 
                 ////////////////////////////////////////////////////////////////
@@ -85,7 +96,9 @@ public class SyncServiceIntent extends IntentService {
                     @Override
                     public void onConnect() {
                         Log.d(TAG, "Connected!");
-                        //wsOnConnected();
+                        if(!slave){
+                            sendMsg(Utils.getHashs, Longs.toByteArray(0L));
+                        }
                     }
 
                     @Override
@@ -127,25 +140,13 @@ public class SyncServiceIntent extends IntentService {
 
                 app.mClient.connect(URI.create(signalServer+(slave ? "/?myKey="+String.valueOf(myKey.first) : "/?slave="+String.valueOf(pubKey))));
 
+                while (!isSync){
+                }
+
                 stopForeground(true);
 
-                broadcastActionMsg(master, cmd, new byte[0]);
                 ////////////////////////////////////////////////////////////////
             }
         }
-    }
-
-    private void disconnect() {
-        app.mClient.disconnect();
-    }
-
-    // called to send data to Activity
-    public void broadcastActionMsg(String master, String cmd, byte[] answer) {
-        Intent intent = new Intent(BROADCAST_ACTION_ANSWER);
-        intent.putExtra(EXTRA_MASTER, master);
-        intent.putExtra(EXTRA_CMD, cmd);
-        intent.putExtra(EXTRA_ANSWER, answer);
-        LocalBroadcastManager bm = LocalBroadcastManager.getInstance(this);
-        bm.sendBroadcast(intent);
     }
 }

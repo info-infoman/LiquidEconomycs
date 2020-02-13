@@ -187,24 +187,37 @@ public class TrieServiceIntent extends IntentService {
         byte[] answer = new byte[0];
         if(msgType == Utils.getHashs){
             for(int i=0;i < payload.length/8;i++){
+                // todo return pos & type & map & array(pos+hash if it is BRANCH or age if it is LEAF)
                 answer = Bytes.concat(answer, getNodeWitchChildsHashs(Longs.fromByteArray(Utils.getBytesPart(payload,i*8, 8))));
             }
+            app.mClient.send(answer);
         }else{
-            //todo analise and construct map
             for(int i = 0; i < payload.length;) {
-                byte nodeType           = Utils.getBytesPart(payload, i, 1)[0];
-                byte keySize            = Utils.getBytesPart(payload, i + 1, 1)[0];
-                byte[] key              = Utils.getBytesPart(payload, i + 2, keySize);
-                byte[] childsMap        = Utils.getBytesPart(payload, i + 2 + keySize, 32);
-                int childsCountInMap    = Utils.getChildsCountInMap(childsMap);
-                int len                 = childsCountInMap * (nodeType==Utils.LEAF ? 2 : 8);
-                byte[] childsArray      = Utils.getBytesPart(payload, i + 2 + keySize + 32, len);
-                i                       = i + 2 + keySize + 32 + len;
+                long pos                = Longs.fromByteArray(Utils.getBytesPart(payload, i, 8));
+                byte[] prefix           = app.getPrefixByPos(pos);
+                byte[] selfNode         = getNodeByPrefix(prefix);
+                byte nodeType           = Utils.getBytesPart(payload, i+8, 1)[0];
+                byte keySize            = Utils.getBytesPart(payload, i+9, 1)[0];
+                byte[] key              = Utils.getBytesPart(payload, i+10, keySize);
 
+                byte[] childsMap        = Utils.getBytesPart(payload, i + 10+ keySize, 32);
+                int childsCountInMap    = Utils.getChildsCountInMap(childsMap);
+                int len                 = childsCountInMap * (nodeType==Utils.LEAF ? 2 : 28);
+                byte[] childsArray      = Utils.getBytesPart(payload, i + 10+ keySize + 32, len);
+                i                       = i + 10+ keySize + 32 + len;
+                //todo analise map & childsArray
+                // compare childs witch (prefix)trie & childsArray
+                // if child exist check hash else add child to tmp and send getHashs witch child pos
+                // if hash of child == self child, then continue, else add child to tmp and send getHashs witch child pos
+                for(int c = 0; c < 256; c++){
+                    //prefix+key+c
+                    if(pos==0L || )
+                }
+                app.mClient.send(answer);
             }
         }
 
-        app.mClient.send(answer);
+
     }
 
     // called to send data to Activity

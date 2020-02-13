@@ -60,6 +60,17 @@ public class Core extends Application {
         db.insert("freeSpace", null, cv);
         cv.clear();
     }
+
+    public byte[] getPrefixByPos(long pos) {
+        byte[] prefix = null;
+        Cursor query = db.rawQuery("SELECT * FROM sync where pos="+pos, null);
+        if (query.moveToFirst()) {
+            int pubKeyColIndex = query.getColumnIndex("pubKey");
+            prefix = query.getBlob(pubKeyColIndex);
+        }
+        query.close();
+        return prefix;
+    }
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
     /////////MyKey/////////////////////////////////////////////////////////////////////////////////
@@ -76,5 +87,4 @@ public class Core extends Application {
         }
     }
     ///////////////////////////////////////////////////////////////////////////////////////////////
-
 }
