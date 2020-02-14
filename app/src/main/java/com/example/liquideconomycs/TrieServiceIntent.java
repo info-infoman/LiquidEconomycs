@@ -182,21 +182,33 @@ public class TrieServiceIntent extends IntentService {
         }
     }
 
-    private void getAnswer(byte msgType, byte[] payload) {
+    private void getAnswer(byte msgType, byte[] payload) throws IOException {
         //todo
-        byte[] answer = new byte[0];
         if(msgType == Utils.getHashs){
+            byte[] answer = new byte[0];
             for(int i=0;i < payload.length/8;i++){
                 // todo return pos & type & map & array(pos+hash if it is BRANCH or age if it is LEAF)
                 answer = Bytes.concat(answer, getNodeWitchChildsHashs(Longs.fromByteArray(Utils.getBytesPart(payload,i*8, 8))));
             }
             app.mClient.send(answer);
         }else{
+            //нам прислали рание запрошенные узлы, необходимо их расшифровать
             for(int i = 0; i < payload.length;) {
                 long pos                = Longs.fromByteArray(Utils.getBytesPart(payload, i, 8));
+                //Получим полный префикс ключа в предидущем цикле перед запросом
                 byte[] prefix           = app.getPrefixByPos(pos);
-                byte[] selfNode         = getNodeByPrefix(prefix);
+                //получить позицию узла в дереве по префиксу
+                byte[] selfNodePos      = find(prefix, 0L);
+                //если найден то получитм карту и хеши\возраста к ней
+                byte[] selfNodeMap      = null;
+                byte[] selfNodeHashOrAge = null;
+                if(selfNodePos!=null){
+                    byte[] selfNodeMapAndHashOrAge  = getNodeMapAndHashsOrAges(selfNodePos);
+                    selfNodeMap                     = Utils.getBytesPart(selfNodeMapAndHashOrAge, 0, 32);
+                    selfNodeHashOrAge               = Utils.getBytesPart(selfNodeMapAndHashOrAge, 32, selfNodeMapAndHashOrAge.length-32);
+                }
                 byte nodeType           = Utils.getBytesPart(payload, i+8, 1)[0];
+                int offLen = (nodeType==BRANCH?20:2);
                 byte keySize            = Utils.getBytesPart(payload, i+9, 1)[0];
                 byte[] key              = Utils.getBytesPart(payload, i+10, keySize);
 
@@ -205,19 +217,79 @@ public class TrieServiceIntent extends IntentService {
                 int len                 = childsCountInMap * (nodeType==Utils.LEAF ? 2 : 28);
                 byte[] childsArray      = Utils.getBytesPart(payload, i + 10+ keySize + 32, len);
                 i                       = i + 10+ keySize + 32 + len;
-                //todo analise map & childsArray
-                // compare childs witch (prefix)trie & childsArray
-                // if child exist check hash else add child to tmp and send getHashs witch child pos
-                // if hash of child == self child, then continue, else add child to tmp and send getHashs witch child pos
-                for(int c = 0; c < 256; c++){
-                    //prefix+key+c
-                    if(pos==0L || )
+                //todo В цикле  от 0 - 255 мы должны
+                // 1) Если selfNodePos<>null и узел\возраст не найден в полученной карте, но есть в нашей, тогда внести
+                // список на удаление (параметры prefix + индекс цикла)
+                // 2) Если узел\возраст найден:
+                // 3) Если это тип BRANCH и (selfNodePos<>null и узел в карте имеет хеш не равный нашему или selfNodePos==null) то
+                // внести в базу (prefix + индекс позиции в карте) и позицию, добавить позицию в следующий запрос
+                // 4) Если это тип LEAF и (selfNodePos<>null и узел в карте имеет возраст не равный нашему или selfNodePos==null)
+                // то добавить в список на добавление(изменение) (prefix + индекс цикла) и возраст
+                byte[] ask = new byte[0];
+                for(int c = 0; c < 255; c++){
+                    byte[] c_ = new byte[1];
+                    c_[0] = (byte)c;
+                    if(selfNodePos!=null && !checkExistChildInMap(childsMap, c) && checkExistChildInMap(selfNodeMap, c)){
+                        //todo add to list delete
+                        app.addPrefixByPos(0L, Bytes.concat(prefix,c_), null, true);
+                    }
+                    if(checkExistChildInMap(childsMap, c)){
+                        if(nodeType==BRANCH){
+                            if(selfNodePos == null || !Arrays.equals(
+                                    Utils.getBytesPart(childsArray, (getChildPosInMap(childsMap, c) * 28) - offLen, offLen),
+                                    Utils.getBytesPart(selfNodeHashOrAge, (getChildPosInMap(selfNodeMap, c) * offLen) - offLen, offLen)
+                            )){
+                                //todo add to table sync add to list new ask
+                                long pos_ = Longs.fromByteArray(Utils.getBytesPart(childsArray, (getChildPosInMap(childsMap, c) * 28) - 28, 8));
+                                app.addPrefixByPos(pos_, Bytes.concat(prefix,c_), null, false);
+                                ask = Bytes.concat(ask,Longs.toByteArray(pos_));
+                            }
+                        }else{
+                            byte[] childAge=Utils.getBytesPart(childsArray, (getChildPosInMap(childsMap, c) * offLen) - offLen, offLen);
+                            if(selfNodePos == null || !Arrays.equals(
+                                    childAge,
+                                    Utils.getBytesPart(selfNodeHashOrAge, (getChildPosInMap(selfNodeMap, c) * offLen) - offLen, offLen)
+                            )){
+                                //todo add list add\update
+                                app.addPrefixByPos(0L, Bytes.concat(prefix,c_), childAge, false);
+                            }
+                        }
+                    }
                 }
-                app.mClient.send(answer);
+                app.mClient.send(ask);
             }
         }
 
 
+    }
+
+    private byte[] getNodeMapAndHashsOrAges(byte[] selfNodePos) throws IOException {
+
+        byte[] childsMap = new byte[32];
+        byte[] typeAndKeySize = new byte[2];
+        long pos = Longs.fromByteArray(selfNodePos);
+        app.trie.seek(pos);
+        app.trie.read(typeAndKeySize, 0,2);
+        byte[] keyNode = new byte[typeAndKeySize[1]];
+        app.trie.read(keyNode, 0, typeAndKeySize[1]);
+        app.trie.seek(pos + 2 + typeAndKeySize[1] + 20); //skip hash
+        app.trie.read(childsMap, 0, 32);
+        int selfChildsCount = getChildsCountInMap(childsMap);
+        int selfChildArraySize = selfChildsCount * (typeAndKeySize[0]==LEAF ? 2 : 8);
+        byte[] selfChildArray = new byte[selfChildArraySize];
+        app.trie.read(selfChildArray, 0, selfChildArraySize);
+        if(typeAndKeySize[0]==LEAF){
+            return Bytes.concat(childsMap, selfChildArray);
+        }else{
+            for(int i = 0; i < selfChildArray.length;) {
+                byte[] p = getBytesPart(selfChildArray, i, 8);
+                if(p.length > 0){
+                    childsMap = Bytes.concat(childsMap, getHash(Longs.fromByteArray(p)));
+                }
+                i = i + 8;
+            }
+            return childsMap;
+        }
     }
 
     // called to send data to Activity
@@ -230,12 +302,13 @@ public class TrieServiceIntent extends IntentService {
         bm.sendBroadcast(intent);
     }
 
+    //return null if not found or (pos or age) if found
     private byte[] find(byte[] key, long pos) throws IOException {
         byte[] s=search(key, pos);
 
-        if (s.length==8){
-            return find(getBytesPart(key, 1, key.length - 1), pos);
-        }else if(s.length==2){
+        if (s!=null && key.length>1){
+            return find(getBytesPart(key, 1, key.length - 1), Longs.fromByteArray(s));
+        }else if(s!=null){
             return s;
         }else{
             return null;
@@ -626,14 +699,17 @@ public class TrieServiceIntent extends IntentService {
 
     private byte[] calcHash(byte type, byte[] childArray) throws IOException {
         byte[] digest = new byte[0];
-        for(int i = 0; i < childArray.length;) {
-            byte[] pos = getBytesPart(childArray, i, (type==BRANCH || type==ROOT ? 8 : 2));
-            if(pos.length > 0){
-                digest = Bytes.concat(digest, (type==BRANCH || type==ROOT ? getHash(Longs.fromByteArray(pos)) : pos));
+        if(type==BRANCH || type==ROOT) {
+            for (int i = 0; i < childArray.length; ) {
+                byte[] pos = getBytesPart(childArray, i, 8);
+                if (pos.length > 0) {
+                    digest = Bytes.concat(digest, getHash(Longs.fromByteArray(pos)));
+                }
+                i = i + (type == BRANCH || type == ROOT ? 8 : 2);
             }
-            i = i + (type==BRANCH || type==ROOT? 8 : 2);
+            return sha256hash160(digest);
         }
-        return sha256hash160(digest);
+        return sha256hash160(childArray);
     }
 
     public byte[] getNodeWitchChildsHashs(long pos) {

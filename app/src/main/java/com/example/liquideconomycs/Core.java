@@ -71,6 +71,15 @@ public class Core extends Application {
         query.close();
         return prefix;
     }
+
+    public void addPrefixByPos(long pos, byte[] key, byte[] age, boolean del){
+        cv.put("pos", pos);
+        cv.put("pubKey", key);
+        cv.put("age", age);
+        cv.put("del", del);
+        db.insert("sync", null, cv);
+        cv.clear();
+    }
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
     /////////MyKey/////////////////////////////////////////////////////////////////////////////////
