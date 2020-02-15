@@ -1,20 +1,25 @@
 package com.example.liquideconomycs;
 
-import android.util.Pair;
+import android.database.Cursor;
 
 import com.google.common.primitives.Bytes;
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
+
+import org.bitcoinj.core.ECKey;
+import org.bitcoinj.core.Sha256Hash;
 
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Date;
 
+import androidx.core.util.Pair;
+import com.example.liquideconomycs.Core.*;
+
 import static org.bitcoinj.core.Utils.sha256hash160;
 
 public class Utils {
-
     public static byte getHashs = 0;
     public static byte hashs = 1;
 
@@ -96,7 +101,6 @@ public class Utils {
         }
         return childsMap;//result.array();
     }
-
 
 
 

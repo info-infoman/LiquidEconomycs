@@ -110,10 +110,9 @@ public class SyncServiceIntent extends IntentService {
                     public void onMessage(byte[] data) {
                         Log.d(TAG, String.format("Got binary message! %s", data.toString()));
                         byte msgType    = Utils.getBytesPart(data,0,1)[0];
-                        int length      = Ints.fromByteArray(Utils.getBytesPart(data,1,4));
-                        int sigLength   = Ints.fromByteArray(Utils.getBytesPart(data,5,4));
-                        byte[] sig      = Utils.getBytesPart(data,9, sigLength);
-                        byte[] payload  = Utils.getBytesPart(data, sigLength, length);
+                        int sigLength   = Ints.fromByteArray(Utils.getBytesPart(data,1,4));
+                        byte[] sig      = Utils.getBytesPart(data,5, sigLength);
+                        byte[] payload  = Utils.getBytesPart(data, 5+sigLength, data.length-5+sigLength);
                         //todo check sig
 
                         //slave - if not owner server - who give work
@@ -121,7 +120,7 @@ public class SyncServiceIntent extends IntentService {
                         if((slave && msgType != Utils.getHashs) || (!slave && msgType != Utils.hashs)){
                             disconnect();
                         }else {
-                            startActionGetAnswer(getApplicationContext(), "SyncServiceIntent", msgType, payload);
+                            startActionGenerateAnswer(getApplicationContext(), "SyncServiceIntent", msgType, payload);
                         }
 
                     }

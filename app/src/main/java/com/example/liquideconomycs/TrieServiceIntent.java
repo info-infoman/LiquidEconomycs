@@ -9,6 +9,7 @@ import android.database.sqlite.SQLiteDatabase;
 import android.util.Log;
 
 import com.google.common.primitives.Bytes;
+import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
 
 import java.io.FileNotFoundException;
@@ -42,7 +43,7 @@ public class TrieServiceIntent extends IntentService {
     private static final String ACTION_Insert = "com.example.liquideconomycs.TrieServiceIntent.action.Insert";
     private static final String ACTION_Find = "com.example.liquideconomycs.TrieServiceIntent.action.Find";
     private static final String ACTION_Delete = "com.example.liquideconomycs.TrieServiceIntent.action.Delete";
-    private static final String ACTION_GetAnswer = "com.example.liquideconomycs.TrieServiceIntent.action.GetAnswer";
+    private static final String ACTION_GenerateAnswer = "com.example.liquideconomycs.TrieServiceIntent.action.GetAnswer";
 
     //input params
     private static final String EXTRA_POS = "com.example.liquideconomycs.TrieServiceIntent.extra.POS";
@@ -104,9 +105,9 @@ public class TrieServiceIntent extends IntentService {
     }
 
     // called by activity to communicate to service
-    public static void startActionGetAnswer(Context context, String master, byte msgType, byte[] payload) {
+    public static void startActionGenerateAnswer(Context context, String master, byte msgType, byte[] payload) {
         Intent intent = new Intent(context, TrieServiceIntent.class);
-        intent.setAction(ACTION_GetAnswer);
+        intent.setAction(ACTION_GenerateAnswer);
         intent.putExtra(EXTRA_MSGTYPE, msgType);
         intent.putExtra(EXTRA_PAYLOAD, payload);
         context.startService(intent);
@@ -172,25 +173,38 @@ public class TrieServiceIntent extends IntentService {
                 ////////////////////////////////////////////////////////////////
             }
 
-            if (ACTION_GetAnswer.equals(action)) {
+            if (ACTION_GenerateAnswer.equals(action)) {
                 final byte msgType = intent.getByteExtra(EXTRA_MSGTYPE, Utils.getHashs);
                 final byte[] payload = intent.getByteArrayExtra(EXTRA_AGE);
                 ////////////////////////////////////////////////////////////////
-                getAnswer(msgType, payload);
+                try {
+                    byte[] answer = null;
+                    generateAnswer(msgType, payload);
+
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
                 ////////////////////////////////////////////////////////////////
             }
         }
     }
 
-    private void getAnswer(byte msgType, byte[] payload) throws IOException {
+    private void sendAnswer(byte msgType, byte[] payload) {
+        byte[] sig = app.getSigMsg(msgType, payload);
+        byte[] digest = new byte[1];
+        digest[0] = msgType;
+        app.mClient.send(Bytes.concat(digest, Ints.toByteArray(sig.length), sig, payload));
+    }
+
+    private void generateAnswer(byte msgType, byte[] payload) throws IOException {
         //todo
         if(msgType == Utils.getHashs){
             byte[] answer = new byte[0];
             for(int i=0;i < payload.length/8;i++){
                 // todo return pos & type & map & array(pos+hash if it is BRANCH or age if it is LEAF)
-                answer = Bytes.concat(answer, getNodeWitchChildsHashs(Longs.fromByteArray(Utils.getBytesPart(payload,i*8, 8))));
+                answer = Bytes.concat(answer, Utils.getBytesPart(payload,i*8, 8), getNodeMapAndHashsOrAges(Utils.getBytesPart(payload,i*8, 8)));
             }
-            app.mClient.send(answer);
+            sendAnswer(msgType, answer);
         }else{
             //нам прислали рание запрошенные узлы, необходимо их расшифровать
             for(int i = 0; i < payload.length;) {
@@ -204,19 +218,18 @@ public class TrieServiceIntent extends IntentService {
                 byte[] selfNodeHashOrAge = null;
                 if(selfNodePos!=null){
                     byte[] selfNodeMapAndHashOrAge  = getNodeMapAndHashsOrAges(selfNodePos);
-                    selfNodeMap                     = Utils.getBytesPart(selfNodeMapAndHashOrAge, 0, 32);
-                    selfNodeHashOrAge               = Utils.getBytesPart(selfNodeMapAndHashOrAge, 32, selfNodeMapAndHashOrAge.length-32);
+                    selfNodeMap                     = Utils.getBytesPart(selfNodeMapAndHashOrAge, 1, 32);
+                    selfNodeHashOrAge               = Utils.getBytesPart(selfNodeMapAndHashOrAge, 33, selfNodeMapAndHashOrAge.length-33);
+                }else{
+                    continue;
                 }
                 byte nodeType           = Utils.getBytesPart(payload, i+8, 1)[0];
-                int offLen = (nodeType==BRANCH?20:2);
-                byte keySize            = Utils.getBytesPart(payload, i+9, 1)[0];
-                byte[] key              = Utils.getBytesPart(payload, i+10, keySize);
-
-                byte[] childsMap        = Utils.getBytesPart(payload, i + 10+ keySize, 32);
+                int offLen              = (nodeType==BRANCH?20:2);
+                byte[] childsMap        = Utils.getBytesPart(payload, i + 9, 32);
                 int childsCountInMap    = Utils.getChildsCountInMap(childsMap);
                 int len                 = childsCountInMap * (nodeType==Utils.LEAF ? 2 : 28);
-                byte[] childsArray      = Utils.getBytesPart(payload, i + 10+ keySize + 32, len);
-                i                       = i + 10+ keySize + 32 + len;
+                byte[] childsArray      = Utils.getBytesPart(payload, i + 9 + 32, len);
+                i                       = i + 9 + 32 + len;
                 //todo В цикле  от 0 - 255 мы должны
                 // 1) Если selfNodePos<>null и узел\возраст не найден в полученной карте, но есть в нашей, тогда внести
                 // список на удаление (параметры prefix + индекс цикла)
@@ -225,7 +238,7 @@ public class TrieServiceIntent extends IntentService {
                 // внести в базу (prefix + индекс позиции в карте) и позицию, добавить позицию в следующий запрос
                 // 4) Если это тип LEAF и (selfNodePos<>null и узел в карте имеет возраст не равный нашему или selfNodePos==null)
                 // то добавить в список на добавление(изменение) (prefix + индекс цикла) и возраст
-                byte[] ask = new byte[0];
+                byte[] answer = new byte[0];
                 for(int c = 0; c < 255; c++){
                     byte[] c_ = new byte[1];
                     c_[0] = (byte)c;
@@ -242,7 +255,7 @@ public class TrieServiceIntent extends IntentService {
                                 //todo add to table sync add to list new ask
                                 long pos_ = Longs.fromByteArray(Utils.getBytesPart(childsArray, (getChildPosInMap(childsMap, c) * 28) - 28, 8));
                                 app.addPrefixByPos(pos_, Bytes.concat(prefix,c_), null, false);
-                                ask = Bytes.concat(ask,Longs.toByteArray(pos_));
+                                answer = Bytes.concat(answer, Longs.toByteArray(pos_));
                             }
                         }else{
                             byte[] childAge=Utils.getBytesPart(childsArray, (getChildPosInMap(childsMap, c) * offLen) - offLen, offLen);
@@ -256,7 +269,7 @@ public class TrieServiceIntent extends IntentService {
                         }
                     }
                 }
-                app.mClient.send(ask);
+                sendAnswer(msgType, answer);
             }
         }
 
@@ -278,13 +291,15 @@ public class TrieServiceIntent extends IntentService {
         int selfChildArraySize = selfChildsCount * (typeAndKeySize[0]==LEAF ? 2 : 8);
         byte[] selfChildArray = new byte[selfChildArraySize];
         app.trie.read(selfChildArray, 0, selfChildArraySize);
+        byte[] type = new byte[1];
+        type[0] = typeAndKeySize[0];
         if(typeAndKeySize[0]==LEAF){
-            return Bytes.concat(childsMap, selfChildArray);
+            return Bytes.concat(type, childsMap, selfChildArray);
         }else{
             for(int i = 0; i < selfChildArray.length;) {
                 byte[] p = getBytesPart(selfChildArray, i, 8);
                 if(p.length > 0){
-                    childsMap = Bytes.concat(childsMap, getHash(Longs.fromByteArray(p)));
+                    childsMap = Bytes.concat(type, childsMap, getHash(Longs.fromByteArray(p)));
                 }
                 i = i + 8;
             }

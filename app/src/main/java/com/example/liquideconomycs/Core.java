@@ -17,13 +17,17 @@ import java.util.ArrayList;
 
 import androidx.core.util.Pair;
 
+import org.bitcoinj.core.ECKey;
+import org.bitcoinj.core.Sha256Hash;
+
 public class Core extends Application {
     private DBHelper dbHelper;
     private SQLiteDatabase db;
     private ContentValues cv;
-    private Pair myKey;
     public RandomAccessFile trie;
     public WebSocketClient mClient;
+
+
 
     @Override
     public void onCreate() {
@@ -39,9 +43,6 @@ public class Core extends Application {
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
-
-        setMyKey();
-
         //MySingleton.initInstance();
     }
 
@@ -83,17 +84,26 @@ public class Core extends Application {
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
     /////////MyKey/////////////////////////////////////////////////////////////////////////////////
-    public Pair getMyKey() {
-        return myKey;
-    }
 
-    public void setMyKey() {
+    public Pair getMyKey() {
         Cursor query = db.rawQuery("SELECT * FROM users where privKey <> NULL", null);
         if (query.moveToFirst()) {
             int pubKeyColIndex = query.getColumnIndex("pubKey");
             int privKeyColIndex = query.getColumnIndex("privKey");
-            myKey = new Pair(query.getBlob(pubKeyColIndex),query.getBlob(privKeyColIndex));
+            return new Pair(query.getBlob(pubKeyColIndex),query.getBlob(privKeyColIndex));
         }
+        return null;
+    }
+
+    public byte[] getSigMsg(byte msgType, byte[] payload) {
+        //flip type
+        msgType = (msgType==Utils.getHashs?Utils.hashs:Utils.getHashs);
+        byte[] digest = new byte[1];
+        digest[0] = msgType;
+        digest = Sha256Hash.hash(Bytes.concat(digest, payload));
+        ECKey key = ECKey.fromPrivate((byte[]) getMyKey().second);
+        ECKey.ECDSASignature sig = key.sign(Sha256Hash.wrap(digest));
+        return sig.encodeToDER();
     }
     ///////////////////////////////////////////////////////////////////////////////////////////////
 }
