@@ -10,6 +10,7 @@ import com.google.common.primitives.Bytes;
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
 
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -20,11 +21,13 @@ import androidx.core.util.Pair;
 import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.Sha256Hash;
 
+import static com.example.liquideconomycs.Utils.copyAssetFolder;
+
 public class Core extends Application {
     private DBHelper dbHelper;
     private SQLiteDatabase db;
     private ContentValues cv;
-    private Pair myKey;
+    public Pair myKey;
     public RandomAccessFile trie;
     public WebSocketClient mClient;
 
@@ -39,13 +42,23 @@ public class Core extends Application {
         cv              = new ContentValues();
         mClient         = null;
 
-        try {
-            trie = new RandomAccessFile(context.getFilesDir().getAbsolutePath()+ "/trie"+"/trie.dat", "rw");
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
+        setMyKey();
+        ///////////init trie//////////////////////////////////////////////////////
+        String nodeDir=context.getFilesDir().getAbsolutePath()+"/trie";
+        File nodeDirReference=new File(nodeDir);
+        while (!nodeDirReference.exists()) {
+            copyAssetFolder(context.getAssets(), "trie", nodeDir);
+        }
+        /////////////////////////////////////////////////////////////////////////////
+        if (nodeDirReference.exists()) {
+            try {
+                trie = new RandomAccessFile(context.getFilesDir().getAbsolutePath() + "/trie" + "/trie.dat", "rw");
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+            }
         }
 
-        setMyKey();
+
 
         //MySingleton.initInstance();
     }
@@ -93,11 +106,12 @@ public class Core extends Application {
     }
 
     public void setMyKey() {
-        Cursor query = db.rawQuery("SELECT * FROM users where privKey <> NULL", null);
+        Cursor query = db.rawQuery("SELECT * FROM users where privKey IS NOT NULL", null);
         if (query.moveToFirst()) {
             int pubKeyColIndex = query.getColumnIndex("pubKey");
             int privKeyColIndex = query.getColumnIndex("privKey");
             myKey = new Pair(query.getBlob(pubKeyColIndex),query.getBlob(privKeyColIndex));
+            query.close();
         }else{
             ECKey myECKey=new ECKey();
             byte[] myPrivKey = myECKey.getPrivKeyBytes();
@@ -107,6 +121,7 @@ public class Core extends Application {
             cv.put("privKey", myPrivKey);
             db.insert("users", null, cv);
             cv.clear();
+            query.close();
             setMyKey();
         }
     }

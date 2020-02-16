@@ -62,7 +62,9 @@ public class TrieServiceIntent extends IntentService {
     @Override
     public void onCreate() {
         super.onCreate();
+        android.os.Debug.waitForDebugger();
         app = (Core) getApplicationContext();
+
     }
 
     // called by activity to communicate to service
@@ -190,10 +192,12 @@ public class TrieServiceIntent extends IntentService {
     }
 
     private void sendAnswer(byte msgType, byte[] payload) {
-        byte[] digest = new byte[1];
-        digest[0] = (msgType==Utils.getHashs?Utils.hashs:Utils.getHashs);
-        byte[] sig = Utils.sigMsg((byte[]) app.getMyKey().second, digest[0], payload);
-        app.mClient.send(Bytes.concat(digest, Ints.toByteArray(sig.length), sig, payload));
+        if(payload.length>0) {
+            byte[] digest = new byte[1];
+            digest[0] = (msgType == Utils.getHashs ? Utils.hashs : Utils.getHashs);
+            byte[] sig = Utils.sigMsg((byte[]) app.getMyKey().second, digest[0], payload);
+            app.mClient.send(Bytes.concat(digest, Ints.toByteArray(sig.length), sig, payload));
+        }
     }
 
     private void generateAnswer(byte msgType, byte[] payload) throws IOException {
@@ -218,18 +222,26 @@ public class TrieServiceIntent extends IntentService {
                 byte[] selfNodeHashOrAge = null;
                 if(selfNodePos!=null){
                     byte[] selfNodeMapAndHashOrAge  = getNodeMapAndHashsOrAges(selfNodePos);
-                    selfNodeMap                     = Utils.getBytesPart(selfNodeMapAndHashOrAge, 1, 32);
-                    selfNodeHashOrAge               = Utils.getBytesPart(selfNodeMapAndHashOrAge, 33, selfNodeMapAndHashOrAge.length-33);
+                    byte[] typeAndKeySize = Utils.getBytesPart(selfNodeMapAndHashOrAge, 0, 2);
+                    if(typeAndKeySize[1]>0){
+                        prefix              = Bytes.concat(prefix, Utils.getBytesPart(selfNodeMapAndHashOrAge, 2, typeAndKeySize[1])) ;
+                        selfNodeMap         = Utils.getBytesPart(selfNodeMapAndHashOrAge, 2 + typeAndKeySize[1], 32);
+                        selfNodeHashOrAge   = Utils.getBytesPart(selfNodeMapAndHashOrAge, 2 + typeAndKeySize[1] + 32 , selfNodeMapAndHashOrAge.length - (2 + typeAndKeySize[1] + 32));
+                    }else{
+                        selfNodeMap         = Utils.getBytesPart(selfNodeMapAndHashOrAge, 2 , 32);
+                        selfNodeHashOrAge   = Utils.getBytesPart(selfNodeMapAndHashOrAge, 2  + 32 , selfNodeMapAndHashOrAge.length - (2 + 32));
+                    }
                 }else{
                     continue;
                 }
                 byte nodeType           = Utils.getBytesPart(payload, i+8, 1)[0];
+                byte nodeKeySize        = Utils.getBytesPart(payload, i+8+1, 2)[0];
                 int offLen              = (nodeType==BRANCH?20:2);
-                byte[] childsMap        = Utils.getBytesPart(payload, i + 9, 32);
+                byte[] childsMap        = Utils.getBytesPart(payload, i + 10 + nodeKeySize, 32);
                 int childsCountInMap    = Utils.getChildsCountInMap(childsMap);
                 int len                 = childsCountInMap * (nodeType==Utils.LEAF ? 2 : 28);
-                byte[] childsArray      = Utils.getBytesPart(payload, i + 9 + 32, len);
-                i                       = i + 9 + 32 + len;
+                byte[] childsArray      = Utils.getBytesPart(payload, i + 10 + nodeKeySize + 32, len);
+                i                       = i + 10 + nodeKeySize + 32 + len;
                 //todo В цикле  от 0 - 255 мы должны
                 // 1) Если selfNodePos<>null и узел\возраст не найден в полученной карте, но есть в нашей, тогда внести
                 // список на удаление (параметры prefix + индекс цикла)
@@ -263,7 +275,7 @@ public class TrieServiceIntent extends IntentService {
                                     childAge,
                                     Utils.getBytesPart(selfNodeHashOrAge, (getChildPosInMap(selfNodeMap, c) * offLen) - offLen, offLen)
                             )){
-                                //todo add list add\update
+                                //todo add list add/update
                                 app.addPrefixByPos(0L, Bytes.concat(prefix,c_), childAge, false);
                             }
                         }
@@ -294,16 +306,22 @@ public class TrieServiceIntent extends IntentService {
         byte[] type = new byte[1];
         type[0] = typeAndKeySize[0];
         if(typeAndKeySize[0]==LEAF){
-            return Bytes.concat(type, childsMap, selfChildArray);
+            if(typeAndKeySize[1]>0)
+                return Bytes.concat(typeAndKeySize, keyNode, childsMap, selfChildArray);
+            else
+                return Bytes.concat(typeAndKeySize, childsMap, selfChildArray);
         }else{
             for(int i = 0; i < selfChildArray.length;) {
                 byte[] p = getBytesPart(selfChildArray, i, 8);
                 if(p.length > 0){
-                    childsMap = Bytes.concat(type, childsMap, getHash(Longs.fromByteArray(p)));
+                    childsMap = Bytes.concat(childsMap, getHash(Longs.fromByteArray(p)));
                 }
                 i = i + 8;
             }
-            return childsMap;
+            if(typeAndKeySize[1]>0)
+                return Bytes.concat(typeAndKeySize, keyNode, childsMap);
+            else
+                return Bytes.concat(typeAndKeySize, childsMap);
         }
     }
 
@@ -449,7 +467,6 @@ public class TrieServiceIntent extends IntentService {
     }
 
     private byte[] insert(byte[] key, byte[] age, long pos) throws IOException {
-        Log.d("app.trie", String.valueOf(1));
         byte[] hash;
         byte[] childsMap = new byte[32];
         byte[] typeAndKeySize = new byte[2];

@@ -1,5 +1,6 @@
 package com.example.liquideconomycs;
 
+import android.content.res.AssetManager;
 import android.database.Cursor;
 
 import com.google.common.primitives.Bytes;
@@ -10,7 +11,11 @@ import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.Sha256Hash;
 import org.bitcoinj.core.SignatureDecodeException;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Date;
@@ -121,5 +126,56 @@ public class Utils {
         return publicKey.verify(digest,sig);
     }
 
+    public static boolean copyAssetFolder(AssetManager assetManager, String fromAssetPath, String toPath) {
+        try {
+            String[] files = assetManager.list(fromAssetPath);
+            boolean res = true;
+
+            if (files.length==0) {
+                //If it's a file, it won't have any assets "inside" it.
+                res &= copyAsset(assetManager,
+                        fromAssetPath,
+                        toPath);
+            } else {
+                new File(toPath).mkdirs();
+                for (String file : files)
+                    res &= copyAssetFolder(assetManager,
+                            fromAssetPath + "/" + file,
+                            toPath + "/" + file);
+            }
+            return res;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    public static boolean copyAsset(AssetManager assetManager, String fromAssetPath, String toPath) {
+        InputStream in = null;
+        OutputStream out = null;
+        try {
+            in = assetManager.open(fromAssetPath);
+            new File(toPath).createNewFile();
+            out = new FileOutputStream(toPath);
+            copyFile(in, out);
+            in.close();
+            in = null;
+            out.flush();
+            out.close();
+            out = null;
+            return true;
+        } catch(Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    public static void copyFile(InputStream in, OutputStream out) throws IOException {
+        byte[] buffer = new byte[1024];
+        int read;
+        while ((read = in.read(buffer)) != -1) {
+            out.write(buffer, 0, read);
+        }
+    }
 
 }

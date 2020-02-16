@@ -15,8 +15,23 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
-
-
+        <activity android:name=".SettingsActivity"
+            android:label="@string/title_activity_settings"
+            android:parentActivityName=".MainActivity"
+            android:theme="@style/AppTheme.NoActionBar">
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value="com.example.liquideconomycs.MainActivity" />
+        </activity>
+        <activity
+            android:name=".ScanerActivity"
+            android:label="@string/title_activity_scaner"
+            android:parentActivityName=".MainActivity"
+            android:theme="@style/AppTheme.NoActionBar">
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value="com.example.liquideconomycs.MainActivity" />
+        </activity>
         <activity android:name=".MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -34,7 +49,7 @@
             android:name=".TrieServiceIntent"
             android:enabled="true"
             android:exported="true"
-            android:process=".liquideconomycs_trieServiceIntent"></service>
+            android:process=".liquideconomycs_trieServiceIntent" />
     </application>
 
 </manifest>
