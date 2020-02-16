@@ -15,6 +15,7 @@ import java.net.URI;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.http.message.BasicNameValuePair;
+import org.bitcoinj.core.SignatureDecodeException;
 
 import androidx.core.util.Pair;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
@@ -114,6 +115,12 @@ public class SyncServiceIntent extends IntentService {
                         byte[] sig      = Utils.getBytesPart(data,5, sigLength);
                         byte[] payload  = Utils.getBytesPart(data, 5+sigLength, data.length-5+sigLength);
                         //todo check sig
+                        try {
+                            if(!Utils.chekSigMsg(pubKey, sig, msgType, payload))
+                                disconnect();
+                        } catch (SignatureDecodeException e) {
+                                disconnect();
+                        }
 
                         //slave - if not owner server - who give work
                         //

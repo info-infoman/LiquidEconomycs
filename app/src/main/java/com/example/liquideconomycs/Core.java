@@ -24,6 +24,7 @@ public class Core extends Application {
     private DBHelper dbHelper;
     private SQLiteDatabase db;
     private ContentValues cv;
+    private Pair myKey;
     public RandomAccessFile trie;
     public WebSocketClient mClient;
 
@@ -43,6 +44,9 @@ public class Core extends Application {
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
+
+        setMyKey();
+
         //MySingleton.initInstance();
     }
 
@@ -84,26 +88,27 @@ public class Core extends Application {
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
     /////////MyKey/////////////////////////////////////////////////////////////////////////////////
-
     public Pair getMyKey() {
+        return myKey;
+    }
+
+    public void setMyKey() {
         Cursor query = db.rawQuery("SELECT * FROM users where privKey <> NULL", null);
         if (query.moveToFirst()) {
             int pubKeyColIndex = query.getColumnIndex("pubKey");
             int privKeyColIndex = query.getColumnIndex("privKey");
-            return new Pair(query.getBlob(pubKeyColIndex),query.getBlob(privKeyColIndex));
+            myKey = new Pair(query.getBlob(pubKeyColIndex),query.getBlob(privKeyColIndex));
+        }else{
+            ECKey myECKey=new ECKey();
+            byte[] myPrivKey = myECKey.getPrivKeyBytes();
+            byte[] myPubKey = myECKey.getPubKeyHash();
+            //todo ask manifest
+            cv.put("pubKey", myPubKey);
+            cv.put("privKey", myPrivKey);
+            db.insert("users", null, cv);
+            cv.clear();
+            setMyKey();
         }
-        return null;
-    }
-
-    public byte[] getSigMsg(byte msgType, byte[] payload) {
-        //flip type
-        msgType = (msgType==Utils.getHashs?Utils.hashs:Utils.getHashs);
-        byte[] digest = new byte[1];
-        digest[0] = msgType;
-        digest = Sha256Hash.hash(Bytes.concat(digest, payload));
-        ECKey key = ECKey.fromPrivate((byte[]) getMyKey().second);
-        ECKey.ECDSASignature sig = key.sign(Sha256Hash.wrap(digest));
-        return sig.encodeToDER();
     }
     ///////////////////////////////////////////////////////////////////////////////////////////////
 }

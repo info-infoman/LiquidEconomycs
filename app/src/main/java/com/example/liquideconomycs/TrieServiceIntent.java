@@ -190,9 +190,9 @@ public class TrieServiceIntent extends IntentService {
     }
 
     private void sendAnswer(byte msgType, byte[] payload) {
-        byte[] sig = app.getSigMsg(msgType, payload);
         byte[] digest = new byte[1];
-        digest[0] = msgType;
+        digest[0] = (msgType==Utils.getHashs?Utils.hashs:Utils.getHashs);
+        byte[] sig = Utils.sigMsg((byte[]) app.getMyKey().second, digest[0], payload);
         app.mClient.send(Bytes.concat(digest, Ints.toByteArray(sig.length), sig, payload));
     }
 
@@ -725,9 +725,5 @@ public class TrieServiceIntent extends IntentService {
             return sha256hash160(digest);
         }
         return sha256hash160(childArray);
-    }
-
-    public byte[] getNodeWitchChildsHashs(long pos) {
-        return null;
     }
 }

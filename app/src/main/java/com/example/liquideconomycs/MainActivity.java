@@ -37,6 +37,10 @@ import com.google.common.primitives.Shorts;
 import org.bitcoinj.core.ECKey;
 
 import static com.example.liquideconomycs.SyncServiceIntent.*;
+import static com.example.liquideconomycs.TrieServiceIntent.BROADCAST_ACTION_ANSWER;
+import static com.example.liquideconomycs.TrieServiceIntent.EXTRA_ANSWER;
+import static com.example.liquideconomycs.TrieServiceIntent.EXTRA_CMD;
+import static com.example.liquideconomycs.TrieServiceIntent.EXTRA_MASTER;
 import static com.example.liquideconomycs.TrieServiceIntent.startActionInsert;
 
 
@@ -52,9 +56,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     private CheckBox            flashlightCheckBox;
     private CheckBox            enableDecodingCheckBox;
     private PointsOverlayView   pointsOverlayView;
-    private byte[]              myPubKey;
-    private byte[]              myPrivKey;
-    private String              myManifest;
 
     // handler for received data from service
     private final BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
@@ -101,47 +102,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             LocalBroadcastManager bm = LocalBroadcastManager.getInstance(this);
             bm.registerReceiver(mBroadcastReceiver, filter);
 
-            //init db
-            ContentValues cv = new ContentValues();
-            /* подключаемся к БД
-            dbHelper = new DBHelper(this);
-            SQLiteDatabase db = dbHelper.getWritableDatabase();
-            Cursor c = db.query("users",
-                    null,
-                    "privKey NOT NULL", null,
-                    null,
-                    null,
-                    null,
-                    String.valueOf(1));
-            Long index = 0L;
-            if (c.moveToFirst()) {
-                int idColIndex = c.getColumnIndex("id");
-                int pubKeyColIndex = c.getColumnIndex("pubKey");
-                int privKeyColIndex = c.getColumnIndex("privKey");
-                int manifestColIndex = c.getColumnIndex("manifest");
-                do {
-                    index = index+1;
-                    myPubKey = c.getBlob(pubKeyColIndex);
-                    myPrivKey = c.getBlob(privKeyColIndex);
-                    myManifest = c.getString(manifestColIndex);
-                } while (c.moveToNext());
-            }else{
-                ECKey myECKey=new ECKey();
-                myPrivKey = myECKey.getPrivKeyBytes();
-                myPubKey = myECKey.getPubKeyHash();
-                myManifest = "";
-                //todo ask manifest
-                cv.put("pubKey", myPubKey);
-                cv.put("privKey", myPrivKey);
-                cv.put("manifest", myManifest);
-                index = db.insert("users", null, cv);
-                cv.clear();
-                //ECKey myECKey1= new ECKey().fromPrivate(myPrivateKey);
-            }
-            */
-            //Core.startActionInsert(this,"Main",myPubKey, Shorts.toByteArray(index.shortValue()), nodeDir);
-
-            //startActionTest(this, "Main");
             for(int i=0;i<10512;i++){
                 ECKey myECKey=new ECKey();
                 byte[] myPrivKey = myECKey.getPrivKeyBytes();

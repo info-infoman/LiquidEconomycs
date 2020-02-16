@@ -8,6 +8,7 @@ import com.google.common.primitives.Longs;
 
 import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.Sha256Hash;
+import org.bitcoinj.core.SignatureDecodeException;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -102,7 +103,23 @@ public class Utils {
         return childsMap;//result.array();
     }
 
+    public static byte[] sigMsg(byte[] privKey, byte msgType, byte[] payload) {
+        //flip type
+        byte[] digest = new byte[1];
+        digest[0] = msgType;
+        digest = Sha256Hash.hash(Bytes.concat(digest, payload));
+        ECKey key = ECKey.fromPrivate(privKey);
+        ECKey.ECDSASignature sig = key.sign(Sha256Hash.wrap(digest));
+        return sig.encodeToDER();
+    }
 
+    public static boolean chekSigMsg(byte[] pubKey, byte[] sig, byte msgType, byte[] payload) throws SignatureDecodeException {
+        byte[] digest = new byte[1];
+        digest[0] = msgType;
+        digest = Sha256Hash.hash(Bytes.concat(digest, payload));
+        ECKey publicKey = ECKey.fromPublicOnly(pubKey);
+        return publicKey.verify(digest,sig);
+    }
 
 
 }
