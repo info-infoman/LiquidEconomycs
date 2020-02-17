@@ -33,14 +33,16 @@ public class SyncServiceIntent extends IntentService {
     private Core app;
     private boolean isSync;
 
-    public static void startActionSync(Context context, boolean slave) {
-        SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(context);
-        String signalServer = sharedPref.getString("Signal_server_URL", "");
-
+    public static void startActionSync(Context context, String signalServer, byte[] pubKey, boolean slave) {
+        if(!slave) {
+            SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(context);
+            signalServer = sharedPref.getString("Signal_server_URL", "");
+        }
         Intent intent = new Intent(context, SyncServiceIntent.class);
         intent.setAction(ACTION_Start);
         intent.putExtra(EXTRA_SIGNAL_SERVER, signalServer);
         intent.putExtra(EXTRA_Slave, slave);
+        intent.putExtra(EXTRA_KEY, pubKey);
         context.startService(intent);
     }
 
@@ -148,15 +150,11 @@ public class SyncServiceIntent extends IntentService {
                     }
 
                 }, mExtraHeaders);
-                app.mClient.connect(URI.create(signalServer+(slave ? "/?myKey="+String.valueOf(myKey.first) : "/?slave="+String.valueOf(pubKey))));
+                //+(slave ? "/?myKey="+String.valueOf(myKey.first) : "/?slave="+String.valueOf(pubKey)))
+                app.mClient.connect(URI.create(signalServer+":3000"));
 
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
 
-                while (app.mClient.isConnected()){
+                while (!isSync){
                 }
 
                 stopForeground(true);

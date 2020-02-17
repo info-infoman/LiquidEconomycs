@@ -65,13 +65,17 @@ public class ScanerActivity extends AppCompatActivity implements ActivityCompat.
                     resultTextView.setText(app.myKey.first.toString()+answer.toString());
                 }else if(!Provide_service){
                     byte[] provideRootHash = Utils.getBytesPart(resultTextView.getText().toString().getBytes(), 20, 20);
+                    byte[] providePubKey = Utils.getBytesPart(resultTextView.getText().toString().getBytes(), 0, 20);
                     String URL="";
-                    if(provideRootHash.equals(answer)){
+                    if(!provideRootHash.equals(answer)){
                         SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(context);
                         String signalServer = sharedPref.getString("Signal_server_URL", "");
                         URL = Base64.encodeToString(signalServer.getBytes(), Base64.DEFAULT);
+                        startActionSync(getApplicationContext(), URL, providePubKey, false);
                     }
                     generate((app.myKey.first.toString())+(!URL.equals("")?URL.getBytes().toString():URL));
+
+
                 }else{
 
                 }
@@ -150,7 +154,11 @@ public class ScanerActivity extends AppCompatActivity implements ActivityCompat.
         if(!Provide_service){
             startActionGetHash(getApplicationContext(),"Scanner",0L);
         }else{
-            startActionSync(getApplicationContext(), false);
+            byte[] pubKey = Utils.getBytesPart(text.getBytes(), 0, 20);
+
+            byte[] URL = Base64.decode(Utils.getBytesPart(text.getBytes(), 20, text.getBytes().length), Base64.DEFAULT);
+
+            startActionSync(getApplicationContext(), URL.toString(), pubKey, false);
         }
 
         pointsOverlayView.setPoints(points);

@@ -5,8 +5,10 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
@@ -113,9 +115,13 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         });
 
         final Button connect = findViewById(R.id.Connect);
+
         connect.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
-                startActionSync(getApplicationContext(), false);
+                SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+                String signalServer = sharedPref.getString("Signal_server_URL", "");
+                Core app_ = (Core) getApplicationContext();
+                startActionSync(getApplicationContext(), signalServer, (byte[]) app_.myKey.first, false);
             }
         });
 
