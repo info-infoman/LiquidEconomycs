@@ -2,30 +2,19 @@ package com.example.liquideconomycs;
 
 import android.Manifest;
 import android.content.BroadcastReceiver;
-import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
-import android.content.res.AssetManager;
-import android.graphics.PointF;
 import android.os.Bundle;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
-import android.widget.CheckBox;
-import android.widget.CompoundButton;
-import android.widget.TextView;
 
-import com.dlazaro66.qrcodereaderview.QRCodeReaderView;
-import com.dlazaro66.qrcodereaderview.QRCodeReaderView.OnQRCodeReadListener;
 import com.google.android.material.snackbar.Snackbar;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import org.bitcoinj.core.ECKey;
+
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import androidx.annotation.NonNull;
@@ -33,11 +22,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
-import com.google.common.primitives.Shorts;
-
-import org.bitcoinj.core.ECKey;
-
-import static com.example.liquideconomycs.SyncServiceIntent.*;
+import static com.example.liquideconomycs.SyncServiceIntent.startActionSync;
 import static com.example.liquideconomycs.TrieServiceIntent.BROADCAST_ACTION_ANSWER;
 import static com.example.liquideconomycs.TrieServiceIntent.EXTRA_ANSWER;
 import static com.example.liquideconomycs.TrieServiceIntent.EXTRA_CMD;
@@ -106,6 +91,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 Intent intent;
                 intent = new Intent(getApplicationContext(), ScanerActivity.class);
                 intent.putExtra(EXTRA_MESSAGE, "Accept_service");
+
                 startActivity(intent);
             }
         });
@@ -119,6 +105,20 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             }
         });
 
+        final Button loadDemo = findViewById(R.id.LoadDemoPubKeys);
+        loadDemo.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                insertDemoInTrie();
+            }
+        });
+
+        final Button connect = findViewById(R.id.Connect);
+        connect.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                startActionSync(getApplicationContext(), false);
+            }
+        });
+
 
     }
 
@@ -128,13 +128,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         bm.unregisterReceiver(mBroadcastReceiver);
         super.onDestroy();
     }
-
-    /*private void wsOnConnected(){
-        client.send(new byte[] {(byte) 0xDE, (byte) 0xAD, (byte) 0xBE, (byte) 0xEF });
-        //client.disconnect();
-    }*/
-
-
 
     @Override public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
                                                      @NonNull int[] grantResults) {
@@ -152,10 +145,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     .show();
         }
     }
-
-
-
-
 
     private void requestINTERNETPermission() {
         if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.INTERNET)) {
@@ -175,9 +164,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             }, MY_PERMISSION_REQUEST_INTERNET);
         }
     }
-
-
-
 
     private void insertDemoInTrie(){
         for(int i=0;i<10512;i++){

@@ -2,25 +2,27 @@ package com.example.liquideconomycs;
 
 import android.app.IntentService;
 import android.app.Notification;
-import android.content.Intent;
 import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.preference.PreferenceManager;
 import android.util.Log;
 
 import com.google.common.primitives.Bytes;
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
 
+import org.apache.http.message.BasicNameValuePair;
+import org.bitcoinj.core.SignatureDecodeException;
+
 import java.io.FileNotFoundException;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.List;
-import org.apache.http.message.BasicNameValuePair;
-import org.bitcoinj.core.SignatureDecodeException;
 
 import androidx.core.util.Pair;
-import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
-import static com.example.liquideconomycs.TrieServiceIntent.*;
+import static com.example.liquideconomycs.TrieServiceIntent.startActionGenerateAnswer;
 
 public class SyncServiceIntent extends IntentService {
 
@@ -31,7 +33,10 @@ public class SyncServiceIntent extends IntentService {
     private Core app;
     private boolean isSync;
 
-    public static void startActionSync(Context context, String signalServer, boolean slave) {
+    public static void startActionSync(Context context, boolean slave) {
+        SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(context);
+        String signalServer = sharedPref.getString("Signal_server_URL", "");
+
         Intent intent = new Intent(context, SyncServiceIntent.class);
         intent.setAction(ACTION_Start);
         intent.putExtra(EXTRA_SIGNAL_SERVER, signalServer);
@@ -63,6 +68,7 @@ public class SyncServiceIntent extends IntentService {
     @Override
     public void onCreate() {
         super.onCreate();
+        android.os.Debug.waitForDebugger();
         Context context = getApplicationContext();
         app = (Core) getApplicationContext();
         Log.i("liquideconomycs", "Service: SyncServiceIntent is create");
@@ -87,7 +93,6 @@ public class SyncServiceIntent extends IntentService {
                         .setProgress(0, 0, true); // display indeterminate progress
 
                 startForeground(9991, builder.build());
-
                 //todo sync processor
                 List<BasicNameValuePair> mExtraHeaders = Arrays.asList(new BasicNameValuePair("Cookie", "session=abcd"));
                 app.mClient = new WebSocketClient(new WebSocketClient.Listener() {
@@ -143,10 +148,15 @@ public class SyncServiceIntent extends IntentService {
                     }
 
                 }, mExtraHeaders);
-
                 app.mClient.connect(URI.create(signalServer+(slave ? "/?myKey="+String.valueOf(myKey.first) : "/?slave="+String.valueOf(pubKey))));
 
-                while (!isSync){
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+
+                while (app.mClient.isConnected()){
                 }
 
                 stopForeground(true);

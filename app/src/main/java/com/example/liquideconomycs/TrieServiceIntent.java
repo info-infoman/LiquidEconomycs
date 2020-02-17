@@ -1,23 +1,17 @@
 package com.example.liquideconomycs;
 
 import android.app.IntentService;
-import android.content.ContentValues;
-import android.content.Intent;
 import android.content.Context;
+import android.content.Intent;
 import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
 import android.util.Log;
 
 import com.google.common.primitives.Bytes;
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.util.Arrays;
-
-import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import static com.example.liquideconomycs.Utils.BRANCH;
 import static com.example.liquideconomycs.Utils.LEAF;
@@ -62,7 +56,7 @@ public class TrieServiceIntent extends IntentService {
     @Override
     public void onCreate() {
         super.onCreate();
-        android.os.Debug.waitForDebugger();
+        //android.os.Debug.waitForDebugger();
         app = (Core) getApplicationContext();
 
     }
@@ -331,8 +325,7 @@ public class TrieServiceIntent extends IntentService {
         intent.putExtra(EXTRA_MASTER, master);
         intent.putExtra(EXTRA_CMD, cmd);
         intent.putExtra(EXTRA_ANSWER, answer);
-        LocalBroadcastManager bm = LocalBroadcastManager.getInstance(this);
-        bm.sendBroadcast(intent);
+        sendBroadcast(intent);
     }
 
     //return null if not found or (pos or age) if found
@@ -718,6 +711,7 @@ public class TrieServiceIntent extends IntentService {
 
         byte[] hash = new byte[20];
         if (pos == 0L) {
+            app.trie.seek(pos);
             app.trie.read(hash, 0, 20);
         } else {
             app.trie.seek(pos+1);
