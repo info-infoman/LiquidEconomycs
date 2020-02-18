@@ -8,7 +8,6 @@ import android.content.SharedPreferences;
 import android.preference.PreferenceManager;
 import android.util.Log;
 
-import com.google.common.primitives.Bytes;
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
 
@@ -20,47 +19,27 @@ import java.net.URI;
 import java.util.Arrays;
 import java.util.List;
 
-import androidx.core.util.Pair;
-
 import static com.example.liquideconomycs.TrieServiceIntent.startActionGenerateAnswer;
 
 public class SyncServiceIntent extends IntentService {
 
     private static final String ACTION_Start = "com.example.liquideconomycs.SyncServiceIntent.action.Start";
     private static final String EXTRA_SIGNAL_SERVER = "com.example.liquideconomycs.SyncServiceIntent.extra.SIGNAL_SERVER";
-    private static final String EXTRA_Slave = "com.example.liquideconomycs.SyncServiceIntent.extra.SLAVE";
+    private static final String EXTRA_Provide_service = "com.example.liquideconomycs.SyncServiceIntent.extra.Provide_service";
     private static final String EXTRA_KEY = "com.example.liquideconomycs.SyncServiceIntent.extra.KEY";
     private Core app;
-    private boolean isSync;
 
-    public static void startActionSync(Context context, String signalServer, byte[] pubKey, boolean slave) {
-        if(!slave) {
+    public static void startActionSync(Context context, String signalServer, byte[] pubKey, boolean Provide_service) {
+        if(Provide_service) {
             SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(context);
             signalServer = sharedPref.getString("Signal_server_URL", "");
         }
         Intent intent = new Intent(context, SyncServiceIntent.class);
         intent.setAction(ACTION_Start);
         intent.putExtra(EXTRA_SIGNAL_SERVER, signalServer);
-        intent.putExtra(EXTRA_Slave, slave);
+        intent.putExtra(EXTRA_Provide_service, Provide_service);
         intent.putExtra(EXTRA_KEY, pubKey);
         context.startService(intent);
-    }
-
-    public void sendMsg(byte msgType, byte[] payload) {
-        if(app.mClient != null && app.mClient.isConnected()) {
-            byte[] type = new byte[1];
-            type[0] = msgType;
-            //todo sig
-            byte[] sig = payload;
-            app.mClient.send(Bytes.concat(type, Ints.toByteArray(sig.length), sig, payload));
-        }
-    }
-
-    public void disconnect() {
-        if(app.mClient != null && app.mClient.isConnected()) {
-            isSync = true;
-            app.mClient.disconnect();
-        }
     }
 
     public SyncServiceIntent() throws FileNotFoundException {
@@ -80,12 +59,11 @@ public class SyncServiceIntent extends IntentService {
     protected void onHandleIntent(Intent intent) {
         if (intent != null) {
             final String action = intent.getAction();
-            if (ACTION_Start.equals(action)) {
-                isSync = false;
+            if (ACTION_Start.equals(action) && !app.isSynchronized) {
+                app.isSynchronized = true;
                 final String signalServer = intent.getStringExtra(EXTRA_SIGNAL_SERVER);
                 final byte[] pubKey = intent.getByteArrayExtra(EXTRA_KEY);
-                final boolean slave = intent.getBooleanExtra(EXTRA_Slave,false);
-                final Pair myKey = app.getMyKey();
+                final boolean Provide_service = intent.getBooleanExtra(EXTRA_Provide_service,true);
 
                 ////////////////////////////////////////////////////////////////
                 Notification.Builder builder = new Notification.Builder(getBaseContext())
@@ -104,8 +82,11 @@ public class SyncServiceIntent extends IntentService {
                     @Override
                     public void onConnect() {
                         Log.d(TAG, "Connected!");
-                        if(!slave){
-                            sendMsg(Utils.getHashs, Longs.toByteArray(0L));
+                        //first send information about as for
+                        app.sendMsg(Utils.master, Provide_service ? (byte[]) app.myKey.first : pubKey);
+
+                        if(!Provide_service){
+                            app.sendMsg(Utils.getHashs, Longs.toByteArray(0L));
                         }
                     }
 
@@ -124,15 +105,15 @@ public class SyncServiceIntent extends IntentService {
                         //todo check sig
                         try {
                             if(!Utils.chekSigMsg(pubKey, sig, msgType, payload))
-                                disconnect();
+                                app.mClient.disconnect();
                         } catch (SignatureDecodeException e) {
-                                disconnect();
+                            app.mClient.disconnect();
                         }
 
-                        //slave - if not owner server - who give work
+                        //Provide_service - if owner server - who give work
                         //
-                        if((slave && msgType != Utils.getHashs) || (!slave && msgType != Utils.hashs)){
-                            disconnect();
+                        if((Provide_service && msgType != Utils.getHashs) || (!Provide_service && msgType != Utils.hashs)){
+                            app.mClient.disconnect();
                         }else {
                             startActionGenerateAnswer(getApplicationContext(), "SyncServiceIntent", msgType, payload);
                         }
@@ -142,19 +123,21 @@ public class SyncServiceIntent extends IntentService {
                     @Override
                     public void onDisconnect(int code, String reason) {
                         Log.d(TAG, String.format("Disconnected! Code: %d Reason: %s", code, reason));
+                        app.isSynchronized = false;
                     }
 
                     @Override
                     public void onError(Exception error) {
                         Log.e(TAG, "Error!", error);
+                        app.isSynchronized=false;
                     }
 
                 }, mExtraHeaders);
                 //+(slave ? "/?myKey="+String.valueOf(myKey.first) : "/?slave="+String.valueOf(pubKey)))
-                app.mClient.connect(URI.create(signalServer+":3000"));
+                app.mClient.connect(URI.create(signalServer));
 
 
-                while (!isSync){
+                while (app.isSynchronized){
                 }
 
                 stopForeground(true);

@@ -21,11 +21,11 @@
 
 
         <EditTextPreference
-            android:defaultValue="http://188.168.128.153/"
+            android:defaultValue="ws://188.168.128.153:80"
             android:key="Signal_server_URL"
             android:selectAllOnFocus="true"
-            android:singleLine="false"
-            android:title="Signal server URL" />
+            android:singleLine="true"
+            android:title="Signal server ws URL" />
 
 
     </PreferenceCategory>

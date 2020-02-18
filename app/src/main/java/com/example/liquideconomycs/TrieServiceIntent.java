@@ -7,7 +7,6 @@ import android.database.Cursor;
 import android.util.Log;
 
 import com.google.common.primitives.Bytes;
-import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
 
 import java.io.IOException;
@@ -186,12 +185,7 @@ public class TrieServiceIntent extends IntentService {
     }
 
     private void sendAnswer(byte msgType, byte[] payload) {
-        if(payload.length>0) {
-            byte[] digest = new byte[1];
-            digest[0] = (msgType == Utils.getHashs ? Utils.hashs : Utils.getHashs);
-            byte[] sig = Utils.sigMsg((byte[]) app.getMyKey().second, digest[0], payload);
-            app.mClient.send(Bytes.concat(digest, Ints.toByteArray(sig.length), sig, payload));
-        }
+
     }
 
     private void generateAnswer(byte msgType, byte[] payload) throws IOException {
@@ -202,7 +196,7 @@ public class TrieServiceIntent extends IntentService {
                 // todo return pos & type & map & array(pos+hash if it is BRANCH or age if it is LEAF)
                 answer = Bytes.concat(answer, Utils.getBytesPart(payload,i*8, 8), getNodeMapAndHashsOrAges(Utils.getBytesPart(payload,i*8, 8)));
             }
-            sendAnswer(msgType, answer);
+            app.sendMsg(msgType, answer);
         }else{
             //нам прислали рание запрошенные узлы, необходимо их расшифровать
             for(int i = 0; i < payload.length;) {
@@ -244,7 +238,7 @@ public class TrieServiceIntent extends IntentService {
                 // внести в базу (prefix + индекс позиции в карте) и позицию, добавить позицию в следующий запрос
                 // 4) Если это тип LEAF и (selfNodePos<>null и узел в карте имеет возраст не равный нашему или selfNodePos==null)
                 // то добавить в список на добавление(изменение) (prefix + индекс цикла) и возраст
-                byte[] answer = new byte[0];
+                byte[] ask = new byte[0];
                 for(int c = 0; c < 255; c++){
                     byte[] c_ = new byte[1];
                     c_[0] = (byte)c;
@@ -261,7 +255,7 @@ public class TrieServiceIntent extends IntentService {
                                 //todo add to table sync add to list new ask
                                 long pos_ = Longs.fromByteArray(Utils.getBytesPart(childsArray, (getChildPosInMap(childsMap, c) * 28) - 28, 8));
                                 app.addPrefixByPos(pos_, Bytes.concat(prefix,c_), null, false);
-                                answer = Bytes.concat(answer, Longs.toByteArray(pos_));
+                                ask = Bytes.concat(ask, Longs.toByteArray(pos_));
                             }
                         }else{
                             byte[] childAge=Utils.getBytesPart(childsArray, (getChildPosInMap(childsMap, c) * offLen) - offLen, offLen);
@@ -275,7 +269,7 @@ public class TrieServiceIntent extends IntentService {
                         }
                     }
                 }
-                sendAnswer(msgType, answer);
+                app.sendMsg(msgType, ask);
             }
         }
 

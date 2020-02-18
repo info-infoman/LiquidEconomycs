@@ -133,9 +133,11 @@ public class WebSocketClient {
                         }
                     }
 
+                    mConnected = true;
+
                     mListener.onConnect();
 
-                    mConnected = true;
+
 
                     // Now decode websocket frames.
                     mParser.start(stream);

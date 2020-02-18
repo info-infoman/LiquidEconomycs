@@ -8,18 +8,14 @@ import android.database.sqlite.SQLiteDatabase;
 
 import com.google.common.primitives.Bytes;
 import com.google.common.primitives.Ints;
-import com.google.common.primitives.Longs;
+
+import org.bitcoinj.core.ECKey;
 
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.util.ArrayList;
 
 import androidx.core.util.Pair;
-
-import org.bitcoinj.core.ECKey;
-import org.bitcoinj.core.Sha256Hash;
 
 import static com.example.liquideconomycs.Utils.copyAssetFolder;
 
@@ -30,6 +26,7 @@ public class Core extends Application {
     public Pair myKey;
     public RandomAccessFile trie;
     public WebSocketClient mClient;
+    public boolean isSynchronized;
 
 
 
@@ -41,6 +38,7 @@ public class Core extends Application {
         db              = dbHelper.getWritableDatabase();
         cv              = new ContentValues();
         mClient         = null;
+        isSynchronized  = false;
 
         setMyKey();
         ///////////init trie//////////////////////////////////////////////////////
@@ -123,6 +121,21 @@ public class Core extends Application {
             cv.clear();
             query.close();
             setMyKey();
+        }
+    }
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+
+    /////////Sync/////////////////////////////////////////////////////////////////////////////////
+    public void sendMsg(byte msgType, byte[] payload) {
+        if(mClient != null && mClient.isConnected()) {
+            if(payload.length>0 && msgType != Utils.master) {
+                byte[] type = new byte[1];
+                type[0] = (msgType == Utils.getHashs ? Utils.hashs : Utils.getHashs);
+                byte[] sig = Utils.sigMsg((byte[]) getMyKey().second, type[0], payload);
+                mClient.send(Bytes.concat(type, Ints.toByteArray(sig.length), sig, payload));
+            }else if(msgType == Utils.master){
+                mClient.send(payload);
+            }
         }
     }
     ///////////////////////////////////////////////////////////////////////////////////////////////
