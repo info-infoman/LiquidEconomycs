@@ -184,10 +184,6 @@ public class TrieServiceIntent extends IntentService {
         }
     }
 
-    private void sendAnswer(byte msgType, byte[] payload) {
-
-    }
-
     private void generateAnswer(byte msgType, byte[] payload) throws IOException {
         //todo
         if(msgType == Utils.getHashs){

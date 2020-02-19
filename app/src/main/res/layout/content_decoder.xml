@@ -25,27 +25,48 @@
         />
 
     <TextView
-        android:background="#55000000"
         android:id="@+id/result_text_view"
         android:layout_width="match_parent"
-        android:gravity="center"
         android:layout_height="wrap_content"
         android:layout_alignParentTop="true"
         android:layout_centerHorizontal="true"
+        android:background="#55000000"
+        android:gravity="center"
         android:padding="16dp"
-        android:textSize="14sp"
-        android:textColor="#ffffff"
-        />
+        android:textColor="#050505"
+        android:textSize="14sp" />
 
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
-        <ImageView
-            android:id="@+id/image"
+        <androidx.constraintlayout.widget.ConstraintLayout
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            app:srcCompat="@android:color/transparent" />
+            android:background="#FFFFFF">
+
+            <ImageView
+                android:id="@+id/image"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent"
+                app:srcCompat="@android:color/transparent" />
+
+            <TextView
+                android:id="@+id/annotation1"
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:text="@string/annotation_one"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@+id/image" />
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
     </FrameLayout>
 
 </RelativeLayout>

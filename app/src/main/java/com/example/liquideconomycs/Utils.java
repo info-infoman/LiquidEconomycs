@@ -1,5 +1,7 @@
 package com.example.liquideconomycs;
 
+import android.content.Context;
+import android.content.Intent;
 import android.content.res.AssetManager;
 
 import com.google.common.primitives.Bytes;
@@ -17,10 +19,11 @@ import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Date;
 
+import androidx.core.content.ContextCompat;
+
 public class Utils {
     public static byte getHashs = 0;
     public static byte hashs = 1;
-    public static byte master = 4;
 
     public static byte ROOT = 1; //
     public static byte BRANCH = 2;
@@ -171,4 +174,15 @@ public class Utils {
         }
     }
 
+    public static String[] parseQRString(String str){
+        String delimeter = " "; // Разделитель
+        return str.split(delimeter); // Разделения строки str с помощью метода split()
+    }
+
+    public static void newShare(Context context, String qr) {
+        Intent intent = new Intent("android.intent.action.SEND");
+        intent.setType("plain/text");
+        intent.putExtra("android.intent.extra.TEXT", qr);
+        ContextCompat.startActivity(context, Intent.createChooser(intent, context.getResources().getString(R.string.Share_QR_code)),null);
+    }
 }

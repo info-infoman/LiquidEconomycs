@@ -127,15 +127,11 @@ public class Core extends Application {
 
     /////////Sync/////////////////////////////////////////////////////////////////////////////////
     public void sendMsg(byte msgType, byte[] payload) {
-        if(mClient != null && mClient.isConnected()) {
-            if(payload.length>0 && msgType != Utils.master) {
-                byte[] type = new byte[1];
-                type[0] = (msgType == Utils.getHashs ? Utils.hashs : Utils.getHashs);
-                byte[] sig = Utils.sigMsg((byte[]) getMyKey().second, type[0], payload);
-                mClient.send(Bytes.concat(type, Ints.toByteArray(sig.length), sig, payload));
-            }else if(msgType == Utils.master){
-                mClient.send(payload);
-            }
+        if(mClient != null && mClient.isConnected() && payload.length>0) {
+            byte[] type = new byte[1];
+            type[0] = (msgType == Utils.getHashs ? Utils.hashs : Utils.getHashs);
+            byte[] sig = Utils.sigMsg((byte[]) getMyKey().second, type[0], payload);
+            mClient.send(Bytes.concat(type, Ints.toByteArray(sig.length), sig, payload));
         }
     }
     ///////////////////////////////////////////////////////////////////////////////////////////////

@@ -120,8 +120,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             public void onClick(View v) {
                 SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
                 String signalServer = sharedPref.getString("Signal_server_URL", "");
+                String token = sharedPref.getString("Signal_server_Token", "");
                 Core app_ = (Core) getApplicationContext();
-                startActionSync(getApplicationContext(), signalServer, (byte[]) app_.myKey.first, true);
+                startActionSync(getApplicationContext(), signalServer, (byte[]) app_.myKey.first, token,true);
             }
         });
 

@@ -9,7 +9,6 @@ import android.preference.PreferenceManager;
 import android.util.Log;
 
 import com.google.common.primitives.Ints;
-import com.google.common.primitives.Longs;
 
 import org.apache.http.message.BasicNameValuePair;
 import org.bitcoinj.core.SignatureDecodeException;
@@ -27,18 +26,21 @@ public class SyncServiceIntent extends IntentService {
     private static final String EXTRA_SIGNAL_SERVER = "com.example.liquideconomycs.SyncServiceIntent.extra.SIGNAL_SERVER";
     private static final String EXTRA_Provide_service = "com.example.liquideconomycs.SyncServiceIntent.extra.Provide_service";
     private static final String EXTRA_KEY = "com.example.liquideconomycs.SyncServiceIntent.extra.KEY";
+    private static String EXTRA_Token = "com.example.liquideconomycs.SyncServiceIntent.extra.Token";;
     private Core app;
 
-    public static void startActionSync(Context context, String signalServer, byte[] pubKey, boolean Provide_service) {
+    public static void startActionSync(Context context, String signalServer, byte[] pubKey, String token, boolean Provide_service) {
         if(Provide_service) {
             SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(context);
             signalServer = sharedPref.getString("Signal_server_URL", "");
+            token = sharedPref.getString("Signal_server_Token", "");
         }
         Intent intent = new Intent(context, SyncServiceIntent.class);
         intent.setAction(ACTION_Start);
         intent.putExtra(EXTRA_SIGNAL_SERVER, signalServer);
         intent.putExtra(EXTRA_Provide_service, Provide_service);
         intent.putExtra(EXTRA_KEY, pubKey);
+        intent.putExtra(EXTRA_Token, token);
         context.startService(intent);
     }
 
@@ -63,6 +65,7 @@ public class SyncServiceIntent extends IntentService {
                 app.isSynchronized = true;
                 final String signalServer = intent.getStringExtra(EXTRA_SIGNAL_SERVER);
                 final byte[] pubKey = intent.getByteArrayExtra(EXTRA_KEY);
+                final String token = intent.getStringExtra(EXTRA_Token);
                 final boolean Provide_service = intent.getBooleanExtra(EXTRA_Provide_service,true);
 
                 ////////////////////////////////////////////////////////////////
@@ -82,17 +85,20 @@ public class SyncServiceIntent extends IntentService {
                     @Override
                     public void onConnect() {
                         Log.d(TAG, "Connected!");
-                        //first send information about as for
-                        app.sendMsg(Utils.master, Provide_service ? (byte[]) app.myKey.first : pubKey);
-
-                        if(!Provide_service){
-                            app.sendMsg(Utils.getHashs, Longs.toByteArray(0L));
-                        }
+                        //first send information about as for signal server
+                        app.mClient.send(token);
                     }
 
                     @Override
                     public void onMessage(String message) {
                         Log.d(TAG, String.format("Got string message! %s", message));
+                        if(message.equals("Completed")){
+                            if(!Provide_service){
+                                app.sendMsg(Utils.getHashs, new byte[8]);
+                            }
+                        }else{
+                            app.mClient.disconnect();
+                        }
                     }
 
                     @Override

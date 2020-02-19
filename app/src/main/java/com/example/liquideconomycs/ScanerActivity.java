@@ -12,7 +12,6 @@ import android.graphics.Color;
 import android.graphics.PointF;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
-import android.util.Base64;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
@@ -25,6 +24,8 @@ import com.google.zxing.WriterException;
 import com.google.zxing.common.BitMatrix;
 import com.google.zxing.qrcode.QRCodeWriter;
 
+import java.util.Arrays;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import androidx.annotation.NonNull;
@@ -55,28 +56,30 @@ public class ScanerActivity extends AppCompatActivity implements ActivityCompat.
     private final BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            if (intent.getAction().equals(BROADCAST_ACTION_ANSWER)) {
+            if (Objects.equals(intent.getAction(), BROADCAST_ACTION_ANSWER)) {
                 final String master = intent.getStringExtra(EXTRA_MASTER);
                 final String cmd = intent.getStringExtra(EXTRA_CMD);
                 final byte[] answer = intent.getByteArrayExtra(EXTRA_ANSWER);
                 if(master.equals("Scanner") && cmd.equals("GetHash") && !Provide_service){
-                    generate(app.myKey.first.toString()+answer.toString());
-                    resultTextView.setText(app.myKey.first.toString()+answer.toString());
+                    assert app.myKey.first != null;
+                    generate(app.myKey.first.toString()+" "+ Arrays.toString(answer));
+                    resultTextView.setText(app.myKey.first.toString()+" "+ Arrays.toString(answer));
                 }else if(Provide_service){
-                    byte[] accepterRootHash = Utils.getBytesPart(resultTextView.getText().toString().getBytes(), 20, 20);
-                    byte[] accepterPubKey = Utils.getBytesPart(resultTextView.getText().toString().getBytes(), 0, 20);
-                    String URL="";
-                    if(!accepterRootHash.equals(answer)){
-                        SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(context);
-                        String signalServer = sharedPref.getString("Signal_server_URL", "");
-                        URL = Base64.encodeToString(signalServer.getBytes(), Base64.DEFAULT);
-                        startActionSync(getApplicationContext(), URL, accepterPubKey, true);
+                    String[] fields         = Utils.parseQRString(resultTextView.getText().toString());
+                    byte[] accepterRootHash = fields[1].getBytes();
+                    byte[] accepterPubKey   = fields[0].getBytes();
+                    String signalServer     = null;
+                    String token            = null;
+
+                    if(!Arrays.equals(accepterRootHash, answer)){
+                        SharedPreferences sharedPref    = PreferenceManager.getDefaultSharedPreferences(context);
+                        signalServer                    = sharedPref.getString("Signal_server_URL", "");
+                        token                           = sharedPref.getString("Signal_server_Token", "");
+
+                        startActionSync(getApplicationContext(), signalServer, accepterPubKey, token,true);
                     }
-                    generate((app.myKey.first.toString())+(!URL.equals("")?URL.getBytes().toString():URL));
-
-
-                }else{
-
+                    assert app.myKey.first != null;
+                    generate((app.myKey.first.toString())+(signalServer!=null?" "+signalServer+" "+token:""));
                 }
                 //resultTextView.setText(param);
             }
@@ -86,7 +89,8 @@ public class ScanerActivity extends AppCompatActivity implements ActivityCompat.
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        app = (Core) getApplicationContext();
+        Context context = getApplicationContext();
+        app = (Core) context;
 
         setContentView(R.layout.activity_scaner);
         mainLayout = (ViewGroup) findViewById(R.id.scaner_layout);
@@ -103,7 +107,7 @@ public class ScanerActivity extends AppCompatActivity implements ActivityCompat.
             Provide_service = true;
         }else{
             Provide_service = false;
-            startActionGetHash(getApplicationContext(),"Scanner",0L);
+            startActionGetHash(context,"Scanner",0L);
         }
 
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
@@ -111,9 +115,6 @@ public class ScanerActivity extends AppCompatActivity implements ActivityCompat.
         } else {
             requestCameraPermission();
         }
-
-
-
     }
 
     @Override
@@ -139,18 +140,13 @@ public class ScanerActivity extends AppCompatActivity implements ActivityCompat.
         }
     }
 
-    // Called when a QR is decoded
-    // "text" : the text encoded in QR
-    // "points" : points where QR control points are placed
     @Override public void onQRCodeRead(String text, PointF[] points) {
-        //text= (String) stringFromJNI(text);
         resultTextView.setText(text);
         if(Provide_service){
             startActionGetHash(getApplicationContext(),"Scanner",0L);
         }else{
-            byte[] pubKey = Utils.getBytesPart(text.getBytes(), 0, 20);
-            byte[] URL = Base64.decode(Utils.getBytesPart(text.getBytes(), 20, text.getBytes().length), Base64.DEFAULT);
-            startActionSync(getApplicationContext(), URL.toString(), pubKey, false);
+            String[] fields = Utils.parseQRString(text);
+            startActionSync(getApplicationContext(), fields[1], fields[0].getBytes(), fields[2],false);
         }
         pointsOverlayView.setPoints(points);
     }
