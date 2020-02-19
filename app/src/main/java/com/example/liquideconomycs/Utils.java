@@ -179,10 +179,5 @@ public class Utils {
         return str.split(delimeter); // Разделения строки str с помощью метода split()
     }
 
-    public static void newShare(Context context, String qr) {
-        Intent intent = new Intent("android.intent.action.SEND");
-        intent.setType("plain/text");
-        intent.putExtra("android.intent.extra.TEXT", qr);
-        ContextCompat.startActivity(context, Intent.createChooser(intent, context.getResources().getString(R.string.Share_QR_code)),null);
-    }
+
 }

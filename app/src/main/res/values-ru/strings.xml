@@ -6,8 +6,8 @@
     <string name="title_activity_scaner">Проверка QR-кода партнера</string>
     <string name="title_activity_settings">Настройки</string>
     <string name="Copied_to_clipboard">Скопированно в буфер обмена.</string>
-    <string name="Share_QR_code">Поделится QR-кодом вручную</string>
-    <string name="annotation_one">Поднесите лицевую сторону вашего смартфона, \\n к лицевой стороне смартфона партнера.</string>
-    <string name="annotation_two">2)Дождитесь звукового сигнала - оповещения об окончании верификации.</string>
+    <string name="annotation_one">Поднесите лицевую сторону вашего смартфона к лицевой стороне смартфона партнера и дождитесь звукового сигнала - оповещения об окончании верификации.</string>
+    <string name="Accept_service">Принять услугу</string>
+    <string name="Provide_service">Оказать услугу</string>
 
 </resources>
