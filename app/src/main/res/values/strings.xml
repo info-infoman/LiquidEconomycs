@@ -27,6 +27,12 @@
     <string name="Attention">Attention!</string>
     <string name="errorConnection">Error connection</string>
     <string name="onConnection">Signal server connection established</string>
-    <string name="onCheckToken">Token verification was successful</string>
-    <string name="onCheckTokenError">Token Verification Error</string>
+    <string name="onCheckToken">Token verification was successful, we begin synchronization, the application can be minimized ...</string>
+    <string name="onCheckTokenError">Token verification error!</string>
+    <string name="Signal_server_URL">Signal server WebSocket URL</string>
+    <string name="Signal_server_Token">Signal server token</string>
+    <string name="errorReadpubKey">"Error get partner pub key "</string>
+    <string name="errorGetSignalServerParam">Error get signal server params</string>
+    <string name="SyncFinish">Sync is finish</string>
+    <string name="disconnect">Сonnection is broken</string>
 </resources>

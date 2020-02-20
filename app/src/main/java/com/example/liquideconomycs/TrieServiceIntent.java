@@ -12,41 +12,14 @@ import com.google.common.primitives.Longs;
 import java.io.IOException;
 import java.util.Arrays;
 
-import static com.example.liquideconomycs.Utils.BRANCH;
-import static com.example.liquideconomycs.Utils.LEAF;
-import static com.example.liquideconomycs.Utils.ROOT;
-import static com.example.liquideconomycs.Utils.changeChildInMap;
-import static com.example.liquideconomycs.Utils.checkExistChildInMap;
-import static com.example.liquideconomycs.Utils.getBytesPart;
-import static com.example.liquideconomycs.Utils.getChildPosInArray;
-import static com.example.liquideconomycs.Utils.getChildPosInMap;
-import static com.example.liquideconomycs.Utils.getChildsCountInMap;
-import static com.example.liquideconomycs.Utils.getCommonKey;
+import static com.example.liquideconomycs.Utils.*;
+
 import static org.bitcoinj.core.Utils.sha256hash160;
 
 
 public class TrieServiceIntent extends IntentService {
 
     private Core app;
-
-    public static final String EXTRA_MASTER = "com.example.liquideconomycs.TrieServiceIntent.extra.MASTER";
-    public static final String EXTRA_CMD = "com.example.liquideconomycs.TrieServiceIntent.extra.CMD";
-    //input fnc
-    private static final String ACTION_GetHash = "com.example.liquideconomycs.TrieServiceIntent.action.GetHash";
-    private static final String ACTION_Insert = "com.example.liquideconomycs.TrieServiceIntent.action.Insert";
-    private static final String ACTION_Find = "com.example.liquideconomycs.TrieServiceIntent.action.Find";
-    private static final String ACTION_Delete = "com.example.liquideconomycs.TrieServiceIntent.action.Delete";
-    private static final String ACTION_GenerateAnswer = "com.example.liquideconomycs.TrieServiceIntent.action.GetAnswer";
-
-    //input params
-    private static final String EXTRA_POS = "com.example.liquideconomycs.TrieServiceIntent.extra.POS";
-    private static final String EXTRA_PUBKEY = "com.example.liquideconomycs.TrieServiceIntent.extra.PUBKEY";
-    private static final String EXTRA_AGE = "com.example.liquideconomycs.TrieServiceIntent.extra.AGE";
-    private static final String EXTRA_MSGTYPE = "com.example.liquideconomycs.TrieServiceIntent.extra.MSGTYPE";
-    private static final String EXTRA_PAYLOAD = "com.example.liquideconomycs.TrieServiceIntent.extra.PAYLOAD";
-
-    public static final String BROADCAST_ACTION_ANSWER = "com.example.liquideconomycs.TrieServiceIntent.broadcast_action.ANSWER";
-    public static final String EXTRA_ANSWER = "com.example.liquideconomycs.TrieServiceIntent.extra.ANSWER";
 
     public TrieServiceIntent() {
         super("TrieServiceIntent");

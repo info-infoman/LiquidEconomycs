@@ -21,6 +21,7 @@ import static com.example.liquideconomycs.TrieServiceIntent.startActionInsert;
 import static com.example.liquideconomycs.Utils.copyAssetFolder;
 
 public class Core extends Application {
+    public long dateTimeLastSync;
     private DBHelper dbHelper;
     private SQLiteDatabase db;
     private ContentValues cv;
@@ -28,8 +29,6 @@ public class Core extends Application {
     public RandomAccessFile trie;
     public WebSocketClient mClient;
     public boolean isSynchronized;
-
-
 
     @Override
     public void onCreate() {

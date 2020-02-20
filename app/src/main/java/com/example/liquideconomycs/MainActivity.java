@@ -25,11 +25,8 @@ import androidx.core.app.ActivityCompat;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import static com.example.liquideconomycs.SyncServiceIntent.startActionSync;
-import static com.example.liquideconomycs.TrieServiceIntent.BROADCAST_ACTION_ANSWER;
-import static com.example.liquideconomycs.TrieServiceIntent.EXTRA_ANSWER;
-import static com.example.liquideconomycs.TrieServiceIntent.EXTRA_CMD;
-import static com.example.liquideconomycs.TrieServiceIntent.EXTRA_MASTER;
 import static com.example.liquideconomycs.TrieServiceIntent.startActionInsert;
+import static com.example.liquideconomycs.Utils.*;
 
 
 public class MainActivity extends AppCompatActivity implements ActivityCompat.OnRequestPermissionsResultCallback {
@@ -111,18 +108,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         loadDemo.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 insertDemoInTrie();
-            }
-        });
-
-        final Button connect = findViewById(R.id.Connect);
-
-        connect.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
-                String signalServer = sharedPref.getString("Signal_server_URL", "");
-                String token = sharedPref.getString("Signal_server_Token", "");
-                Core app_ = (Core) getApplicationContext();
-                startActionSync(getApplicationContext(),"Main", signalServer, (byte[]) app_.myKey.first, token,true);
             }
         });
 

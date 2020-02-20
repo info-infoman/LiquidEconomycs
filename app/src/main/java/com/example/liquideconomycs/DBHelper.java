@@ -21,8 +21,7 @@ public class DBHelper extends SQLiteOpenHelper {
             db.execSQL("create table users ("
                     + "id integer primary key autoincrement,"
                     + "pubKey BLOB,"
-                    + "privKey BLOB,"
-                    + "manifest text" + ");");
+                    + "privKey BLOB" + ");");
             db.execSQL("create table freeSpace ("
                     + "id integer primary key autoincrement,"
                     + "pos LONG,"

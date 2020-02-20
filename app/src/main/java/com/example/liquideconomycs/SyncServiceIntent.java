@@ -16,23 +16,14 @@ import org.bitcoinj.core.SignatureDecodeException;
 import java.io.FileNotFoundException;
 import java.net.URI;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 
 import static com.example.liquideconomycs.TrieServiceIntent.startActionGenerateAnswer;
+import static com.example.liquideconomycs.Utils.*;
 
 public class SyncServiceIntent extends IntentService {
 
-    public static final String EXTRA_MASTER = "com.example.liquideconomycs.SyncServiceIntent.extra.MASTER";
-    public static final String EXTRA_CMD = "com.example.liquideconomycs.SyncServiceIntent.extra.CMD";
-
-    public static final String BROADCAST_ACTION_ANSWER = "com.example.liquideconomycs.SyncServiceIntent.broadcast_action.ANSWER";
-    public static final String EXTRA_ANSWER = "com.example.liquideconomycs.SyncServiceIntent.extra.ANSWER";
-
-    private static final String ACTION_Start = "com.example.liquideconomycs.SyncServiceIntent.action.Start";
-    private static final String EXTRA_SIGNAL_SERVER = "com.example.liquideconomycs.SyncServiceIntent.extra.SIGNAL_SERVER";
-    private static final String EXTRA_Provide_service = "com.example.liquideconomycs.SyncServiceIntent.extra.Provide_service";
-    private static final String EXTRA_KEY = "com.example.liquideconomycs.SyncServiceIntent.extra.KEY";
-    private static String EXTRA_Token = "com.example.liquideconomycs.SyncServiceIntent.extra.Token";;
     private Core app;
 
     public static void startActionSync(Context context, String master, String signalServer, byte[] pubKey, String token, boolean Provide_service) {
@@ -45,7 +36,7 @@ public class SyncServiceIntent extends IntentService {
         intent.setAction(ACTION_Start);
         intent.putExtra(EXTRA_SIGNAL_SERVER, signalServer);
         intent.putExtra(EXTRA_Provide_service, Provide_service);
-        intent.putExtra(EXTRA_KEY, pubKey);
+        intent.putExtra(EXTRA_PUBKEY, pubKey);
         intent.putExtra(EXTRA_Token, token);
         intent.putExtra(EXTRA_MASTER, master);
         context.startService(intent);
@@ -62,6 +53,7 @@ public class SyncServiceIntent extends IntentService {
         Context context = getApplicationContext();
         app = (Core) getApplicationContext();
         Log.i("liquideconomycs", "Service: SyncServiceIntent is create");
+
     }
 
     @Override
@@ -70,11 +62,14 @@ public class SyncServiceIntent extends IntentService {
             final String action = intent.getAction();
             if (ACTION_Start.equals(action) && !app.isSynchronized) {
                 app.isSynchronized = true;
+                app.dateTimeLastSync=new Date().getTime();
                 final String signalServer = intent.getStringExtra(EXTRA_SIGNAL_SERVER);
-                final byte[] pubKey = intent.getByteArrayExtra(EXTRA_KEY);
+                final byte[] pubKey = intent.getByteArrayExtra(EXTRA_PUBKEY);
                 final String token = intent.getStringExtra(EXTRA_Token);
                 final String master = intent.getStringExtra(EXTRA_MASTER);
                 final boolean Provide_service = intent.getBooleanExtra(EXTRA_Provide_service,true);
+
+
 
                 ////////////////////////////////////////////////////////////////
                 Notification.Builder builder = new Notification.Builder(getBaseContext())
@@ -106,6 +101,7 @@ public class SyncServiceIntent extends IntentService {
                             if(!Provide_service){
                                 app.sendMsg(Utils.getHashs, new byte[8]);
                             }
+                            app.dateTimeLastSync = new Date().getTime();
                         }else{
                             broadcastActionMsg(master, "Sync", getResources().getString(R.string.onCheckTokenError));
                             app.mClient.disconnect();
@@ -133,6 +129,7 @@ public class SyncServiceIntent extends IntentService {
                             app.mClient.disconnect();
                         }else {
                             startActionGenerateAnswer(getApplicationContext(), "SyncServiceIntent", msgType, payload);
+                            app.dateTimeLastSync = new Date().getTime();
                         }
 
                     }
@@ -140,6 +137,7 @@ public class SyncServiceIntent extends IntentService {
                     @Override
                     public void onDisconnect(int code, String reason) {
                         Log.d(TAG, String.format("Disconnected! Code: %d Reason: %s", code, reason));
+                        broadcastActionMsg(master, "Sync", getResources().getString(R.string.disconnect)+reason);
                         app.isSynchronized = false;
                     }
 
@@ -155,10 +153,10 @@ public class SyncServiceIntent extends IntentService {
                 app.mClient.connect(URI.create(signalServer));
 
 
-                while (app.isSynchronized){
+                while (app.isSynchronized && (new Date().getTime() - app.dateTimeLastSync)/1000<300){
                 }
 
-
+                broadcastActionMsg(master, "Sync", getResources().getString(R.string.SyncFinish));
                 stopForeground(true);
 
                 ////////////////////////////////////////////////////////////////

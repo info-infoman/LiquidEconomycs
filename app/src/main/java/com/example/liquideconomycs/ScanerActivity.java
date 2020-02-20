@@ -41,12 +41,10 @@ import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
 
 import static com.example.liquideconomycs.SyncServiceIntent.startActionSync;
-import static com.example.liquideconomycs.TrieServiceIntent.BROADCAST_ACTION_ANSWER;
-import static com.example.liquideconomycs.TrieServiceIntent.EXTRA_ANSWER;
-import static com.example.liquideconomycs.TrieServiceIntent.EXTRA_CMD;
-import static com.example.liquideconomycs.TrieServiceIntent.EXTRA_MASTER;
 import static com.example.liquideconomycs.TrieServiceIntent.startActionFind;
 import static com.example.liquideconomycs.TrieServiceIntent.startActionGetHash;
+
+import static com.example.liquideconomycs.Utils.*;
 
 public class ScanerActivity extends AppCompatActivity implements ActivityCompat.OnRequestPermissionsResultCallback , QRCodeReaderView.OnQRCodeReadListener {
 
@@ -87,8 +85,11 @@ public class ScanerActivity extends AppCompatActivity implements ActivityCompat.
                                 SharedPreferences sharedPref    = PreferenceManager.getDefaultSharedPreferences(context);
                                 signalServer                    = sharedPref.getString("Signal_server_URL", "");
                                 token                           = sharedPref.getString("Signal_server_Token", "");
-
-                                startActionSync(getApplicationContext(), "Scanner", signalServer, accepterPubKey, token,true);
+                                if(signalServer.equals("")||token.equals("")){
+                                    Toast.makeText(getApplicationContext(), getResources().getString(R.string.errorGetSignalServerParam),Toast.LENGTH_LONG).show();
+                                }else {
+                                    startActionSync(getApplicationContext(), "Scanner", signalServer, accepterPubKey, token, true);
+                                }
                             }
                             assert app.myKey.first != null;
                             generate(Utils.byteToHex((byte[]) app.myKey.first)+(signalServer!=null?" "+signalServer+" "+token:""));
@@ -101,8 +102,9 @@ public class ScanerActivity extends AppCompatActivity implements ActivityCompat.
                                 startActionGetHash(getApplicationContext(), "Scanner", 0L);
                             }else{
                                 shakeIt();
+                                DialogsFragment alert = new DialogsFragment(getResources().getString(R.string.Attention),
+                                        getResources().getString(R.string.pubKeyNotFound));
 
-                                DialogsFragment alert = new DialogsFragment("alert");
                                 FragmentManager manager = getSupportFragmentManager();
                                 //myDialogFragment.show(manager, "dialog");
 
@@ -185,11 +187,18 @@ public class ScanerActivity extends AppCompatActivity implements ActivityCompat.
         resultTextView.setText(text);
         if(Provide_service){
             String[] fields = Utils.parseQRString(resultTextView.getText().toString());
-            startActionFind(getApplicationContext(),"Scanner", Utils.hexToByte(fields[0]),0L);
+            startActionFind(getApplicationContext(),"Scanner", hexToByte(fields[0]),0L);
         }else{
             shakeIt();
             String[] fields = Utils.parseQRString(text);
-            startActionSync(getApplicationContext(), "Scanner", fields[1], Utils.hexToByte(fields[0]), fields[2],false);
+            if(fields[1].equals("") || fields[2].equals("")){
+                Toast.makeText(getApplicationContext(), getResources().getString(R.string.errorGetSignalServerParam),Toast.LENGTH_LONG).show();
+            }else if(hexToByte(fields[0]).length!=20){
+                Toast.makeText(getApplicationContext(), getResources().getString(R.string.errorReadpubKey),Toast.LENGTH_LONG).show();
+            }else{
+                startActionSync(getApplicationContext(), "Scanner", fields[1], hexToByte(fields[0]), fields[2],false);
+            }
+
         }
         pointsOverlayView.setPoints(points);
     }
@@ -272,9 +281,9 @@ public class ScanerActivity extends AppCompatActivity implements ActivityCompat.
     @SuppressLint("MissingPermission")
     private void shakeIt() {
         if (Build.VERSION.SDK_INT >= 26) {
-            ((Vibrator) getSystemService(VIBRATOR_SERVICE)).vibrate(VibrationEffect.createOneShot(150,10));
+            ((Vibrator) getSystemService(VIBRATOR_SERVICE)).vibrate(VibrationEffect.createOneShot(300,10));
         } else {
-            ((Vibrator) getSystemService(VIBRATOR_SERVICE)).vibrate(150);
+            ((Vibrator) getSystemService(VIBRATOR_SERVICE)).vibrate(300);
         }
     }
 
