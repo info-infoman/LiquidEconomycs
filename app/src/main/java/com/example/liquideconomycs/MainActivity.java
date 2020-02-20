@@ -122,7 +122,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 String signalServer = sharedPref.getString("Signal_server_URL", "");
                 String token = sharedPref.getString("Signal_server_Token", "");
                 Core app_ = (Core) getApplicationContext();
-                startActionSync(getApplicationContext(), signalServer, (byte[]) app_.myKey.first, token,true);
+                startActionSync(getApplicationContext(),"Main", signalServer, (byte[]) app_.myKey.first, token,true);
             }
         });
 

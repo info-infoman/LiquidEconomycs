@@ -22,6 +22,12 @@ import static com.example.liquideconomycs.TrieServiceIntent.startActionGenerateA
 
 public class SyncServiceIntent extends IntentService {
 
+    public static final String EXTRA_MASTER = "com.example.liquideconomycs.SyncServiceIntent.extra.MASTER";
+    public static final String EXTRA_CMD = "com.example.liquideconomycs.SyncServiceIntent.extra.CMD";
+
+    public static final String BROADCAST_ACTION_ANSWER = "com.example.liquideconomycs.SyncServiceIntent.broadcast_action.ANSWER";
+    public static final String EXTRA_ANSWER = "com.example.liquideconomycs.SyncServiceIntent.extra.ANSWER";
+
     private static final String ACTION_Start = "com.example.liquideconomycs.SyncServiceIntent.action.Start";
     private static final String EXTRA_SIGNAL_SERVER = "com.example.liquideconomycs.SyncServiceIntent.extra.SIGNAL_SERVER";
     private static final String EXTRA_Provide_service = "com.example.liquideconomycs.SyncServiceIntent.extra.Provide_service";
@@ -29,7 +35,7 @@ public class SyncServiceIntent extends IntentService {
     private static String EXTRA_Token = "com.example.liquideconomycs.SyncServiceIntent.extra.Token";;
     private Core app;
 
-    public static void startActionSync(Context context, String signalServer, byte[] pubKey, String token, boolean Provide_service) {
+    public static void startActionSync(Context context, String master, String signalServer, byte[] pubKey, String token, boolean Provide_service) {
         if(Provide_service) {
             SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(context);
             signalServer = sharedPref.getString("Signal_server_URL", "");
@@ -41,6 +47,7 @@ public class SyncServiceIntent extends IntentService {
         intent.putExtra(EXTRA_Provide_service, Provide_service);
         intent.putExtra(EXTRA_KEY, pubKey);
         intent.putExtra(EXTRA_Token, token);
+        intent.putExtra(EXTRA_MASTER, master);
         context.startService(intent);
     }
 
@@ -51,7 +58,7 @@ public class SyncServiceIntent extends IntentService {
     @Override
     public void onCreate() {
         super.onCreate();
-        android.os.Debug.waitForDebugger();
+        //android.os.Debug.waitForDebugger();
         Context context = getApplicationContext();
         app = (Core) getApplicationContext();
         Log.i("liquideconomycs", "Service: SyncServiceIntent is create");
@@ -66,6 +73,7 @@ public class SyncServiceIntent extends IntentService {
                 final String signalServer = intent.getStringExtra(EXTRA_SIGNAL_SERVER);
                 final byte[] pubKey = intent.getByteArrayExtra(EXTRA_KEY);
                 final String token = intent.getStringExtra(EXTRA_Token);
+                final String master = intent.getStringExtra(EXTRA_MASTER);
                 final boolean Provide_service = intent.getBooleanExtra(EXTRA_Provide_service,true);
 
                 ////////////////////////////////////////////////////////////////
@@ -85,6 +93,7 @@ public class SyncServiceIntent extends IntentService {
                     @Override
                     public void onConnect() {
                         Log.d(TAG, "Connected!");
+                        broadcastActionMsg(master, "Sync", getResources().getString(R.string.onConnection));
                         //first send information about as for signal server
                         app.mClient.send(token);
                     }
@@ -93,10 +102,12 @@ public class SyncServiceIntent extends IntentService {
                     public void onMessage(String message) {
                         Log.d(TAG, String.format("Got string message! %s", message));
                         if(message.equals("Completed")){
+                            broadcastActionMsg(master, "Sync", getResources().getString(R.string.onCheckToken));
                             if(!Provide_service){
                                 app.sendMsg(Utils.getHashs, new byte[8]);
                             }
                         }else{
+                            broadcastActionMsg(master, "Sync", getResources().getString(R.string.onCheckTokenError));
                             app.mClient.disconnect();
                         }
                     }
@@ -135,6 +146,7 @@ public class SyncServiceIntent extends IntentService {
                     @Override
                     public void onError(Exception error) {
                         Log.e(TAG, "Error!", error);
+                        broadcastActionMsg(master, "Sync", getResources().getString(R.string.errorConnection) + error);
                         app.isSynchronized=false;
                     }
 
@@ -146,10 +158,20 @@ public class SyncServiceIntent extends IntentService {
                 while (app.isSynchronized){
                 }
 
+
                 stopForeground(true);
 
                 ////////////////////////////////////////////////////////////////
             }
         }
+    }
+
+    // called to send data to Activity
+    public void broadcastActionMsg(String master, String cmd, String answer) {
+        Intent intent = new Intent(BROADCAST_ACTION_ANSWER);
+        intent.putExtra(EXTRA_MASTER, master);
+        intent.putExtra(EXTRA_CMD, cmd);
+        intent.putExtra(EXTRA_ANSWER, answer);
+        sendBroadcast(intent);
     }
 }

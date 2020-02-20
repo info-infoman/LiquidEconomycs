@@ -1,6 +1,7 @@
 package com.example.liquideconomycs;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -10,12 +11,16 @@ import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.PointF;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
 import android.preference.PreferenceManager;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.dlazaro66.qrcodereaderview.QRCodeReaderView;
 import com.google.android.material.snackbar.Snackbar;
@@ -32,12 +37,15 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.app.ActivityCompat;
+import androidx.fragment.app.FragmentManager;
+import androidx.fragment.app.FragmentTransaction;
 
 import static com.example.liquideconomycs.SyncServiceIntent.startActionSync;
 import static com.example.liquideconomycs.TrieServiceIntent.BROADCAST_ACTION_ANSWER;
 import static com.example.liquideconomycs.TrieServiceIntent.EXTRA_ANSWER;
 import static com.example.liquideconomycs.TrieServiceIntent.EXTRA_CMD;
 import static com.example.liquideconomycs.TrieServiceIntent.EXTRA_MASTER;
+import static com.example.liquideconomycs.TrieServiceIntent.startActionFind;
 import static com.example.liquideconomycs.TrieServiceIntent.startActionGetHash;
 
 public class ScanerActivity extends AppCompatActivity implements ActivityCompat.OnRequestPermissionsResultCallback , QRCodeReaderView.OnQRCodeReadListener {
@@ -59,27 +67,55 @@ public class ScanerActivity extends AppCompatActivity implements ActivityCompat.
             if (Objects.equals(intent.getAction(), BROADCAST_ACTION_ANSWER)) {
                 final String master = intent.getStringExtra(EXTRA_MASTER);
                 final String cmd = intent.getStringExtra(EXTRA_CMD);
-                final byte[] answer = intent.getByteArrayExtra(EXTRA_ANSWER);
-                if(master.equals("Scanner") && cmd.equals("GetHash") && !Provide_service){
-                    assert app.myKey.first != null;
-                    generate(app.myKey.first.toString()+" "+ Arrays.toString(answer));
-                    resultTextView.setText(app.myKey.first.toString()+" "+ Arrays.toString(answer));
-                }else if(Provide_service){
-                    String[] fields         = Utils.parseQRString(resultTextView.getText().toString());
-                    byte[] accepterRootHash = fields[1].getBytes();
-                    byte[] accepterPubKey   = fields[0].getBytes();
-                    String signalServer     = null;
-                    String token            = null;
 
-                    if(!Arrays.equals(accepterRootHash, answer)){
-                        SharedPreferences sharedPref    = PreferenceManager.getDefaultSharedPreferences(context);
-                        signalServer                    = sharedPref.getString("Signal_server_URL", "");
-                        token                           = sharedPref.getString("Signal_server_Token", "");
+                if(master.equals("Scanner")){
+                    if(cmd.equals("GetHash")){
+                        final byte[] answer = intent.getByteArrayExtra(EXTRA_ANSWER);
+                        if (!Provide_service){
+                            assert app.myKey.first != null;
+                            String source = Utils.byteToHex((byte[]) app.myKey.first)+" "+ Utils.byteToHex(answer);
+                            generate(source);
+                            resultTextView.setText(source);
+                        }else{
+                            String[] fields         = Utils.parseQRString(resultTextView.getText().toString());
+                            byte[] accepterRootHash = Utils.hexToByte(fields[1]);
+                            byte[] accepterPubKey   = Utils.hexToByte(fields[0]);
+                            String signalServer     = null;
+                            String token            = null;
 
-                        startActionSync(getApplicationContext(), signalServer, accepterPubKey, token,true);
+                            if(!Arrays.equals(accepterRootHash, answer)){
+                                SharedPreferences sharedPref    = PreferenceManager.getDefaultSharedPreferences(context);
+                                signalServer                    = sharedPref.getString("Signal_server_URL", "");
+                                token                           = sharedPref.getString("Signal_server_Token", "");
+
+                                startActionSync(getApplicationContext(), "Scanner", signalServer, accepterPubKey, token,true);
+                            }
+                            assert app.myKey.first != null;
+                            generate(Utils.byteToHex((byte[]) app.myKey.first)+(signalServer!=null?" "+signalServer+" "+token:""));
+                        }
+                    }else if(cmd.equals("Find")){
+                        final byte[] answer = intent.getByteArrayExtra(EXTRA_ANSWER);
+                        if(Provide_service){
+
+                            if(answer!=null) {
+                                startActionGetHash(getApplicationContext(), "Scanner", 0L);
+                            }else{
+                                shakeIt();
+
+                                DialogsFragment alert = new DialogsFragment("alert");
+                                FragmentManager manager = getSupportFragmentManager();
+                                //myDialogFragment.show(manager, "dialog");
+
+                                FragmentTransaction transaction = manager.beginTransaction();
+                                alert.show(transaction, "dialog");
+                            }
+                        }
+
+                    }else if(cmd.equals("Sync")){
+                        final String answer = intent.getStringExtra(EXTRA_ANSWER);
+                        Toast.makeText(getApplicationContext(), answer,Toast.LENGTH_LONG).show();
                     }
-                    assert app.myKey.first != null;
-                    generate((app.myKey.first.toString())+(signalServer!=null?" "+signalServer+" "+token:""));
+
                 }
                 //resultTextView.setText(param);
             }
@@ -141,12 +177,19 @@ public class ScanerActivity extends AppCompatActivity implements ActivityCompat.
     }
 
     @Override public void onQRCodeRead(String text, PointF[] points) {
+
+        if (qrCodeReaderView != null) {
+            qrCodeReaderView.stopCamera();
+        }
+
         resultTextView.setText(text);
         if(Provide_service){
-            startActionGetHash(getApplicationContext(),"Scanner",0L);
+            String[] fields = Utils.parseQRString(resultTextView.getText().toString());
+            startActionFind(getApplicationContext(),"Scanner", Utils.hexToByte(fields[0]),0L);
         }else{
+            shakeIt();
             String[] fields = Utils.parseQRString(text);
-            startActionSync(getApplicationContext(), fields[1], fields[0].getBytes(), fields[2],false);
+            startActionSync(getApplicationContext(), "Scanner", fields[1], Utils.hexToByte(fields[0]), fields[2],false);
         }
         pointsOverlayView.setPoints(points);
     }
@@ -223,5 +266,19 @@ public class ScanerActivity extends AppCompatActivity implements ActivityCompat.
         } catch (WriterException e) {
             e.printStackTrace();
         }
+    }
+
+    // Vibrate for 150 milliseconds
+    @SuppressLint("MissingPermission")
+    private void shakeIt() {
+        if (Build.VERSION.SDK_INT >= 26) {
+            ((Vibrator) getSystemService(VIBRATOR_SERVICE)).vibrate(VibrationEffect.createOneShot(150,10));
+        } else {
+            ((Vibrator) getSystemService(VIBRATOR_SERVICE)).vibrate(150);
+        }
+    }
+
+    public void okPubKeyNotFoundClicked() {
+        startActionGetHash(getApplicationContext(), "Scanner", 0L);
     }
 }

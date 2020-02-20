@@ -1,7 +1,5 @@
 package com.example.liquideconomycs;
 
-import android.content.Context;
-import android.content.Intent;
 import android.content.res.AssetManager;
 
 import com.google.common.primitives.Bytes;
@@ -19,7 +17,6 @@ import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Date;
 
-import androidx.core.content.ContextCompat;
 
 public class Utils {
     public static byte getHashs = 0;
@@ -178,6 +175,26 @@ public class Utils {
         String delimeter = " "; // Разделитель
         return str.split(delimeter); // Разделения строки str с помощью метода split()
     }
+
+    public static String byteToHex(byte[] b1) {
+        StringBuilder strBuilder = new StringBuilder();
+        for(byte val : b1) {
+            strBuilder.append(String.format("%02x", val&0xff));
+        }
+        return strBuilder.toString();
+    }
+
+    public static byte[] hexToByte(String str) {
+
+        byte[] val = new byte[str.length() / 2];
+        for (int i = 0; i < val.length; i++) {
+            int index = i * 2;
+            int j = Integer.parseInt(str.substring(index, index + 2), 16);
+            val[i] = (byte) j;
+        }
+        return val;
+    }
+
 
 
 }

@@ -322,7 +322,7 @@ public class TrieServiceIntent extends IntentService {
     private byte[] find(byte[] key, long pos) throws IOException {
         byte[] s=search(key, pos);
 
-        if (s!=null && key.length>1){
+        if (s!=null && s.length>2 && key.length>1){
             return find(getBytesPart(key, 1, key.length - 1), Longs.fromByteArray(s));
         }else if(s!=null){
             return s;
