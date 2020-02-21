@@ -43,8 +43,12 @@ import androidx.fragment.app.FragmentTransaction;
 import static com.example.liquideconomycs.SyncServiceIntent.startActionSync;
 import static com.example.liquideconomycs.TrieServiceIntent.startActionFind;
 import static com.example.liquideconomycs.TrieServiceIntent.startActionGetHash;
-
-import static com.example.liquideconomycs.Utils.*;
+import static com.example.liquideconomycs.Utils.BROADCAST_ACTION_ANSWER;
+import static com.example.liquideconomycs.Utils.EXTRA_ANSWER;
+import static com.example.liquideconomycs.Utils.EXTRA_CMD;
+import static com.example.liquideconomycs.Utils.EXTRA_MASTER;
+import static com.example.liquideconomycs.Utils.EXTRA_MESSAGE;
+import static com.example.liquideconomycs.Utils.hexToByte;
 
 public class ScanerActivity extends AppCompatActivity implements ActivityCompat.OnRequestPermissionsResultCallback , QRCodeReaderView.OnQRCodeReadListener {
 
@@ -102,7 +106,7 @@ public class ScanerActivity extends AppCompatActivity implements ActivityCompat.
                                 startActionGetHash(getApplicationContext(), "Scanner", 0L);
                             }else{
                                 shakeIt();
-                                DialogsFragment alert = new DialogsFragment(getResources().getString(R.string.Attention),
+                                DialogsFragment alert = new DialogsFragment("ScanerActivity", getResources().getString(R.string.Attention),
                                         getResources().getString(R.string.pubKeyNotFound));
 
                                 FragmentManager manager = getSupportFragmentManager();
@@ -140,7 +144,7 @@ public class ScanerActivity extends AppCompatActivity implements ActivityCompat.
         Intent intent = getIntent();
         registerReceiver(mBroadcastReceiver, new IntentFilter(BROADCAST_ACTION_ANSWER));
 
-        String message = intent.getStringExtra(MainActivity.EXTRA_MESSAGE);
+        String message = intent.getStringExtra(EXTRA_MESSAGE);
         if(message.equals("Provide_service")){
             Provide_service = true;
         }else{

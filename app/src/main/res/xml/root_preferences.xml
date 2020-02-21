@@ -16,11 +16,8 @@
 
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
-
     <PreferenceCategory app:title="@string/sync_header">
-
-
-        <EditTextPreference
+    <EditTextPreference
             android:defaultValue="ws://188.168.128.153:80"
             android:key="Signal_server_URL"
             android:selectAllOnFocus="true"
@@ -32,8 +29,6 @@
             android:selectAllOnFocus="true"
             android:singleLine="true"
             android:title="@string/Signal_server_Token" />
-
-
 
     </PreferenceCategory>
 

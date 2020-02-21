@@ -153,8 +153,10 @@ public class SyncServiceIntent extends IntentService {
                 app.mClient.connect(URI.create(signalServer));
 
 
-                while (app.isSynchronized && (new Date().getTime() - app.dateTimeLastSync)/1000<300){
+                while (app.isSynchronized && (new Date().getTime() - app.dateTimeLastSync)/1000<50){
                 }
+
+                app.mClient.disconnect();
 
                 broadcastActionMsg(master, "Sync", getResources().getString(R.string.SyncFinish));
                 stopForeground(true);

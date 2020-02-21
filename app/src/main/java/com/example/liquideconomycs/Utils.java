@@ -26,6 +26,8 @@ public class Utils {
     public static byte BRANCH = 2;
     public static byte LEAF = 3;
 
+    public static final String EXTRA_MESSAGE = "com.example.liquideconomycs.MESSAGE";
+
     public static final String EXTRA_MASTER = "com.example.liquideconomycs.extra.MASTER";
     public static final String EXTRA_CMD = "com.example.liquideconomycs.extra.CMD";
     //input fnc

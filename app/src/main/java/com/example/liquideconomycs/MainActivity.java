@@ -5,33 +5,27 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
-import android.preference.PreferenceManager;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 
 import com.google.android.material.snackbar.Snackbar;
 
-import org.bitcoinj.core.ECKey;
-
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
-import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
-import static com.example.liquideconomycs.SyncServiceIntent.startActionSync;
-import static com.example.liquideconomycs.TrieServiceIntent.startActionInsert;
-import static com.example.liquideconomycs.Utils.*;
-
+import static com.example.liquideconomycs.Utils.BROADCAST_ACTION_ANSWER;
+import static com.example.liquideconomycs.Utils.EXTRA_ANSWER;
+import static com.example.liquideconomycs.Utils.EXTRA_CMD;
+import static com.example.liquideconomycs.Utils.EXTRA_MASTER;
+import static com.example.liquideconomycs.Utils.EXTRA_MESSAGE;
 
 public class MainActivity extends AppCompatActivity implements ActivityCompat.OnRequestPermissionsResultCallback {
-
-    public static final String EXTRA_MESSAGE = "com.example.liquideconomycs.MESSAGE";
 
     private static final int MY_PERMISSION_REQUEST_INTERNET = 0;
 
@@ -59,19 +53,11 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         setContentView(R.layout.activity_main);
         mainLayout = (ViewGroup) findViewById(R.id.main_layout);
 
-
-
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.INTERNET) == PackageManager.PERMISSION_GRANTED) {} else {
             requestINTERNETPermission();
         }
 
-
-        IntentFilter filter = new IntentFilter();
-        filter.addAction(BROADCAST_ACTION_ANSWER);
-        LocalBroadcastManager bm = LocalBroadcastManager.getInstance(this);
-        bm.registerReceiver(mBroadcastReceiver, filter);
-
-
+        registerReceiver(mBroadcastReceiver, new IntentFilter(BROADCAST_ACTION_ANSWER));
 
         final Button Provide_service = findViewById(R.id.Provide_service);
         Provide_service.setOnClickListener(new View.OnClickListener() {
@@ -104,21 +90,23 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             }
         });
 
-        final Button loadDemo = findViewById(R.id.LoadDemoPubKeys);
-        loadDemo.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                insertDemoInTrie();
-            }
-        });
 
 
     }
 
     @Override
     protected void onDestroy() {
-        LocalBroadcastManager bm = LocalBroadcastManager.getInstance(this);
-        bm.unregisterReceiver(mBroadcastReceiver);
         super.onDestroy();
+    }
+
+    @Override protected void onPause() {
+        super.onPause();
+        unregisterReceiver(mBroadcastReceiver);
+    }
+
+    @Override protected void onResume() {
+        super.onResume();
+        registerReceiver(mBroadcastReceiver, new IntentFilter(BROADCAST_ACTION_ANSWER));
     }
 
     @Override public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
@@ -157,14 +145,5 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         }
     }
 
-    private void insertDemoInTrie(){
-        for(int i=0;i<10512;i++){
-            ECKey myECKey=new ECKey();
-            byte[] myPubKey = myECKey.getPubKeyHash();
 
-            byte[] age = Utils.ageToBytes();
-            startActionInsert(getApplicationContext(), "Main", myPubKey, age);
-
-        }
-    }
 }
