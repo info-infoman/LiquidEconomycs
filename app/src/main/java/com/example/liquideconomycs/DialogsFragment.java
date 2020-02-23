@@ -28,15 +28,15 @@ public class DialogsFragment extends AppCompatDialogFragment {
                 //.setIcon(R.drawable.ic_launcher_cat)
                 .setPositiveButton(getResources().getString(android.R.string.ok), new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int id) {
-                        if(dialogActivity.equals("ScanerActivity"))
-                            ((ScanerActivity) getActivity()).okPubKeyNotFoundClicked();
+                        if(dialogActivity.equals("MainActivity"))
+                            ((MainActivity) getActivity()).okPubKeyNotFoundClicked();
 
                         dialog.cancel();
                     }
                 })
                 .setNegativeButton(getResources().getString(android.R.string.cancel), new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int id) {
-                        if(dialogActivity.equals("ScanerActivity")) {
+                        if(dialogActivity.equals("MainActivity")) {
                             Intent intent;
                             intent = new Intent(getActivity().getApplicationContext(), MainActivity.class);
                             startActivity(intent);
