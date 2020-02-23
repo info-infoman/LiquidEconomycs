@@ -139,18 +139,22 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         Context context = getApplicationContext();
         app = (Core) context;
 
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED ||
-                ActivityCompat.checkSelfPermission(this, Manifest.permission.INTERNET) == PackageManager.PERMISSION_GRANTED) {
+        setContentView(R.layout.activity_main);
+        mainLayout = (ViewGroup) findViewById(R.id.main_layout);
+
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
             initQRCodeReaderView();
         } else {
             requestCameraPermission();
+        }
+
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.INTERNET) == PackageManager.PERMISSION_GRANTED) {} else {
             requestINTERNETPermission();
         }
 
         registerReceiver(mBroadcastReceiver, new IntentFilter(BROADCAST_ACTION_ANSWER));
 
-        setContentView(R.layout.activity_main);
-        mainLayout = (ViewGroup) findViewById(R.id.main_layout);
+
 
         bSwitch = findViewById(R.id.bSwitch);
         tbwNFC = findViewById(R.id.tbNFC);
@@ -233,7 +237,10 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     @Override public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
                                                      @NonNull int[] grantResults) {
         AtomicBoolean ret= new AtomicBoolean(true);
-        if (requestCode == MY_PERMISSION_REQUEST_INTERNET || requestCode == MY_PERMISSION_REQUEST_CAMERA) {
+        if (requestCode == MY_PERMISSION_REQUEST_CAMERA) {
+            ret.set(false);
+        }
+        if (requestCode == MY_PERMISSION_REQUEST_INTERNET) {
             ret.set(false);
         }
         if(ret.get()){
@@ -294,8 +301,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         qrCodeReaderView = (QRCodeReaderView) content.findViewById(R.id.qrdecoderview);
         resultTextView = (TextView) content.findViewById(R.id.result_text_view);
         pointsOverlayView = (PointsOverlayView) content.findViewById(R.id.points_overlay_view);
-        //qrCodeReaderView.setTorchEnabled(false);
-        //qrCodeReaderView.setQRDecodingEnabled(true);
+        qrCodeReaderView.setTorchEnabled(false);
+        qrCodeReaderView.setQRDecodingEnabled(true);
 
         qrCodeReaderView.setAutofocusInterval(2000L);
         qrCodeReaderView.setOnQRCodeReadListener(this);

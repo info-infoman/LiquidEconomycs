@@ -3,8 +3,8 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/main_layout"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
+    android:layout_width="10dp"
+    android:layout_height="10dp"
     tools:context=".MainActivity"
     >
 
@@ -13,8 +13,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_alignParentLeft="true"
-        android:layout_alignParentTop="true"
-        android:visibility="visible" />
+        android:layout_alignParentTop="true"/>
 
     <com.example.liquideconomycs.PointsOverlayView
         android:id="@+id/points_overlay_view"
