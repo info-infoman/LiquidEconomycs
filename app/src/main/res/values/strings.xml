@@ -20,7 +20,7 @@
     <string name="title_activity_main2" translatable="false">Main2Activity</string>
     <string name="title_activity_pairing" translatable="false">PairingActivity</string>
     <string name="Copied_to_clipboard">Copied to the clipboard</string>
-    <string name="annotation_one">Bring the front side of your smartphone to the front side of the partner smartphone. Wait for the signal - notification about the end of verification.</string>
+    <string name="annotation_qr">Bring at a distance of 15 centimeters the front side of your smartphone to the front side of the partner smartphone. Wait for the signal - notification about the end of verification.</string>
     <string name="Accept_service">Accept service</string>
     <string name="Provide_service">Provide service</string>
     <string name="pubKeyNotFound">Public key yours partner not found, do you want to continue?</string>
@@ -35,4 +35,5 @@
     <string name="errorGetSignalServerParam">Error get signal server params</string>
     <string name="SyncFinish">Sync is finish</string>
     <string name="disconnect">Сonnection is broken</string>
+    <string name="annotation_nfc">Bring your smartphone to partner smartphone. Wait for the signal - notification about the end of verification.</string>
 </resources>

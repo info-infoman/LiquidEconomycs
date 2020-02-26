@@ -6,7 +6,7 @@
     <string name="title_activity_scaner">Проверка QR-кода партнера</string>
     <string name="title_activity_settings">Настройки</string>
     <string name="Copied_to_clipboard">Скопированно в буфер обмена.</string>
-    <string name="annotation_one">Поднесите лицевую сторону вашего смартфона к лицевой стороне смартфона партнера и дождитесь сигнала - оповещения об окончании верификации.</string>
+    <string name="annotation_qr">Поднесите на расстояние 15 сантиметров лицевую сторону вашего смартфона к лицевой стороне смартфона партнера и дождитесь сигнала - оповещения об окончании верификации.</string>
     <string name="Accept_service">Принять услугу</string>
     <string name="Provide_service">Оказать услугу</string>
     <string name="pubKeyNotFound">Открытый ключ вашего партнера не найден, вы хотите продолжить?</string>
@@ -21,5 +21,6 @@
     <string name="errorGetSignalServerParam">Ошибка получения параметров сигнального сервера</string>
     <string name="SyncFinish">Синхронизация завершена.</string>
     <string name="disconnect">Соединение прерванно.</string>
+    <string name="annotation_nfc">Поднесите ваш смартфона к смартфону партнера и дождитесь сигнала - оповещения об окончании верификации.</string>
 
 </resources>

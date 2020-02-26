@@ -3,7 +3,6 @@ package com.example.liquideconomycs;
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.content.DialogInterface;
-import android.content.Intent;
 import android.os.Bundle;
 
 import androidx.annotation.NonNull;
@@ -29,19 +28,12 @@ public class DialogsFragment extends AppCompatDialogFragment {
                 .setPositiveButton(getResources().getString(android.R.string.ok), new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int id) {
                         if(dialogActivity.equals("MainActivity"))
-                            ((MainActivity) getActivity()).okPubKeyNotFoundClicked();
-
+                            ((MainActivity) getActivity()).startSyncForProvide(null);
                         dialog.cancel();
                     }
                 })
                 .setNegativeButton(getResources().getString(android.R.string.cancel), new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int id) {
-                        if(dialogActivity.equals("MainActivity")) {
-                            Intent intent;
-                            intent = new Intent(getActivity().getApplicationContext(), MainActivity.class);
-                            startActivity(intent);
-                        }
-
                         dialog.cancel();
                     }
                 });

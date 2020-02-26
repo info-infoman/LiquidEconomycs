@@ -4,6 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="#FFFFFF"
     tools:context=".MainActivity">
 
     <androidx.constraintlayout.widget.ConstraintLayout
@@ -21,7 +22,8 @@
             android:gravity="right"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintTop_toTopOf="parent"
-            tools:ignore="MissingConstraints" />
+            tools:ignore="MissingConstraints"
+            tools:targetApi="honeycomb" />
 
         <ImageView
             android:id="@+id/image"
@@ -35,11 +37,22 @@
             tools:ignore="ContentDescription,MissingConstraints" />
 
 
+        <TextView
+            android:id="@+id/notation"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textSize="18sp"
+            app:layout_constraintBottom_toTopOf="@+id/constraintLayout"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/image" />
+
         <androidx.constraintlayout.widget.ConstraintLayout
             android:id="@+id/constraintLayout"
             android:layout_width="match_parent"
             android:layout_height="70dp"
-            android:background="#FFFFFF"
+            android:background="#F7F7F7"
 
             android:gravity="bottom"
             app:layout_constraintBottom_toBottomOf="parent">
@@ -74,7 +87,7 @@
                     android:gravity="center">
 
                     <ToggleButton
-                        android:id="@+id/tbNFC"
+                        android:id="@+id/tbQR"
                         style="?android:attr/borderlessButtonStyle"
                         android:layout_width="30dp"
                         android:layout_height="30dp"
@@ -86,10 +99,11 @@
                         android:focusable="false"
                         android:text=""
                         android:textOff=""
-                        android:textOn="" />
+                        android:textOn=""
+                        tools:targetApi="honeycomb" />
 
                     <ToggleButton
-                        android:id="@+id/tbQR"
+                        android:id="@+id/tbNFC"
                         style="?android:attr/borderlessButtonStyle"
                         android:layout_width="30dp"
                         android:layout_height="30dp"
@@ -100,7 +114,8 @@
                         android:focusable="false"
                         android:text=""
                         android:textOff=""
-                        android:textOn="" />
+                        android:textOn=""
+                        tools:targetApi="honeycomb" />
 
 
                 </RelativeLayout>
@@ -124,7 +139,8 @@
                     android:gravity="center"
                     android:text=""
                     android:thumb="@drawable/thumb1"
-                    android:track="@drawable/track" />
+                    android:track="@drawable/track"
+                    tools:targetApi="ice_cream_sandwich" />
 
                 <RelativeLayout
                     android:layout_width="wrap_content"
@@ -148,7 +164,8 @@
                         android:focusable="false"
                         android:text=""
                         android:textOff=""
-                        android:textOn="" />
+                        android:textOn=""
+                        tools:targetApi="honeycomb" />
 
                     <ToggleButton
                         android:id="@+id/tbMade"
@@ -162,7 +179,8 @@
                         android:focusable="false"
                         android:text=""
                         android:textOff=""
-                        android:textOn="" />
+                        android:textOn=""
+                        tools:targetApi="honeycomb" />
 
 
                 </RelativeLayout>

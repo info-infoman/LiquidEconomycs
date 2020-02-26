@@ -50,7 +50,6 @@ public class SyncServiceIntent extends IntentService {
     public void onCreate() {
         super.onCreate();
         //android.os.Debug.waitForDebugger();
-        Context context = getApplicationContext();
         app = (Core) getApplicationContext();
         Log.i("liquideconomycs", "Service: SyncServiceIntent is create");
 
@@ -153,7 +152,7 @@ public class SyncServiceIntent extends IntentService {
                 app.mClient.connect(URI.create(signalServer));
 
 
-                while (app.isSynchronized && (new Date().getTime() - app.dateTimeLastSync)/1000<50){
+                while (app.isSynchronized && (new Date().getTime() - app.dateTimeLastSync) / 1000 < 300){
                 }
 
                 app.mClient.disconnect();

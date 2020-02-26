@@ -2,7 +2,6 @@ package com.example.liquideconomycs;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
-import android.app.Activity;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -17,6 +16,7 @@ import android.os.Bundle;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.preference.PreferenceManager;
+import android.view.SurfaceHolder;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
@@ -43,30 +43,32 @@ import androidx.core.app.ActivityCompat;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
 
-import static com.example.liquideconomycs.SyncServiceIntent.*;
-import static com.example.liquideconomycs.TrieServiceIntent.*;
-import static com.example.liquideconomycs.Utils.*;
+import static com.example.liquideconomycs.SyncServiceIntent.startActionSync;
+import static com.example.liquideconomycs.TrieServiceIntent.startActionFind;
+import static com.example.liquideconomycs.TrieServiceIntent.startActionGetHash;
+import static com.example.liquideconomycs.Utils.BROADCAST_ACTION_ANSWER;
+import static com.example.liquideconomycs.Utils.EXTRA_ANSWER;
+import static com.example.liquideconomycs.Utils.EXTRA_CMD;
+import static com.example.liquideconomycs.Utils.EXTRA_MASTER;
+import static com.example.liquideconomycs.Utils.hexToByte;
 
 public class MainActivity extends AppCompatActivity implements ActivityCompat.OnRequestPermissionsResultCallback , QRCodeReaderView.OnQRCodeReadListener {
 
     private static final int MY_PERMISSION_REQUEST_INTERNET = 0;
     private static final int MY_PERMISSION_REQUEST_CAMERA = 0;
 
-    private ViewGroup mainLayout;
-    private Switch aSwitch;
-    private ToggleButton tbResive, tbMade;
-
-    private Switch bSwitch;
-    private ToggleButton tbwNFC, tbQR;
-
-    private Button settings;
-
-    private TextView resultTextView;
-    private QRCodeReaderView qrCodeReaderView;
+    private ViewGroup           mainLayout;
+    private Switch              aSwitch;
+    private ToggleButton        tbResive, tbMade;
+    private Switch              bSwitch;
+    private ToggleButton        tbwNFC, tbQR;
+    private Button              settings;
+    private TextView            resultTextView;
+    private TextView            notation;
+    private QRCodeReaderView    qrCodeReaderView;
     private PointsOverlayView   pointsOverlayView;
-
-    private boolean Provide_service;
-    private Core app;
+    private boolean             provideService;
+    private Core                app;
 
     // handler for received data from service
     private final BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
@@ -78,50 +80,37 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 if(master.equals("Main")){
                     if(cmd.equals("GetHash")){
                         final byte[] answer = intent.getByteArrayExtra(EXTRA_ANSWER);
-                        if (!Provide_service){
+                        if (!provideService){
                             assert app.myKey.first != null;
                             String source = Utils.byteToHex((byte[]) app.myKey.first)+" "+ Utils.byteToHex(answer);
                             generate(source);
                             resultTextView.setText(source);
                         }else{
-                            String[] fields         = Utils.parseQRString(resultTextView.getText().toString());
-                            byte[] accepterRootHash = Utils.hexToByte(fields[1]);
-                            byte[] accepterPubKey   = Utils.hexToByte(fields[0]);
-                            String signalServer     = null;
-                            String token            = null;
-
-                            if(!Arrays.equals(accepterRootHash, answer)){
-                                SharedPreferences sharedPref    = PreferenceManager.getDefaultSharedPreferences(context);
-                                signalServer                    = sharedPref.getString("Signal_server_URL", "");
-                                token                           = sharedPref.getString("Signal_server_Token", "");
-                                if(signalServer.equals("")||token.equals("")){
-                                    Toast.makeText(getApplicationContext(), getResources().getString(R.string.errorGetSignalServerParam),Toast.LENGTH_LONG).show();
-                                }else {
-                                    startActionSync(getApplicationContext(), "Main", signalServer, accepterPubKey, token, true);
-                                }
+                            SharedPreferences sharedPref    = PreferenceManager.getDefaultSharedPreferences(context);
+                            String signalServer  = sharedPref.getString("Signal_server_URL", "");
+                            String token = sharedPref.getString("Signal_server_Token", "");
+                            if(signalServer.equals("")||token.equals("")){
+                                Toast.makeText(getApplicationContext(), getResources().getString(R.string.errorGetSignalServerParam),Toast.LENGTH_LONG).show();
+                            }else {
+                                generate(null);
                             }
-                            assert app.myKey.first != null;
-                            generate(Utils.byteToHex((byte[]) app.myKey.first)+(signalServer!=null?" "+signalServer+" "+token:""));
                         }
                     }else if(cmd.equals("Find")){
                         final byte[] answer = intent.getByteArrayExtra(EXTRA_ANSWER);
-                        if(Provide_service){
+                        if(provideService){
 
                             if(answer!=null) {
-                                startActionGetHash(getApplicationContext(), "Main", 0L);
+                                startSyncForProvide(answer);
                             }else{
                                 shakeIt();
-                                DialogsFragment alert = new DialogsFragment("ScanerActivity", getResources().getString(R.string.Attention),
+                                DialogsFragment alert = new DialogsFragment("MainActivity", getResources().getString(R.string.Attention),
                                         getResources().getString(R.string.pubKeyNotFound));
 
                                 FragmentManager manager = getSupportFragmentManager();
-                                //myDialogFragment.show(manager, "dialog");
-
                                 FragmentTransaction transaction = manager.beginTransaction();
                                 alert.show(transaction, "dialog");
                             }
                         }
-
                     }else if(cmd.equals("Sync")){
                         final String answer = intent.getStringExtra(EXTRA_ANSWER);
                         Toast.makeText(getApplicationContext(), answer,Toast.LENGTH_LONG).show();
@@ -138,23 +127,14 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
         Context context = getApplicationContext();
         app = (Core) context;
-
         setContentView(R.layout.activity_main);
         mainLayout = (ViewGroup) findViewById(R.id.main_layout);
-
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
-            initQRCodeReaderView();
-        } else {
-            requestCameraPermission();
-        }
+        notation = (TextView) findViewById(R.id.notation);
 
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.INTERNET) == PackageManager.PERMISSION_GRANTED) {} else {
             requestINTERNETPermission();
         }
-
         registerReceiver(mBroadcastReceiver, new IntentFilter(BROADCAST_ACTION_ANSWER));
-
-
 
         bSwitch = findViewById(R.id.bSwitch);
         tbwNFC = findViewById(R.id.tbNFC);
@@ -170,12 +150,13 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
                 if(isChecked){
-                    tbwNFC.setChecked(false);
-                    tbQR.setChecked(true);
-                }else{
                     tbwNFC.setChecked(true);
                     tbQR.setChecked(false);
+                }else{
+                    tbwNFC.setChecked(false);
+                    tbQR.setChecked(true);
                 }
+                initPairingInstrument(true);
             }
         });
 
@@ -185,15 +166,13 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 if(isChecked){
                     tbResive.setChecked(false);
                     tbMade.setChecked(true);
-
-                    Provide_service = true;
+                    provideService = true;
                 }else{
                     tbResive.setChecked(true);
                     tbMade.setChecked(false);
-
-                    Provide_service = false;
-                    startActionGetHash(getApplicationContext(),"Main",0L);
+                    provideService = false;
                 }
+                startActionGetHash(getApplicationContext(),"Main",0L);
             }
         });
 
@@ -206,7 +185,10 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             }
         });
 
-        Provide_service = false;
+        provideService = false;
+
+        initPairingInstrument(true);
+
         startActionGetHash(getApplicationContext(),"Main",0L);
     }
 
@@ -219,9 +201,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         super.onPause();
         unregisterReceiver(mBroadcastReceiver);
 
-        if (qrCodeReaderView != null) {
-            qrCodeReaderView.stopCamera();
-        }
+        initPairingInstrument(false);
+
     }
 
     @Override protected void onResume() {
@@ -229,9 +210,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
         registerReceiver(mBroadcastReceiver, new IntentFilter(BROADCAST_ACTION_ANSWER));
 
-        if (qrCodeReaderView != null) {
-            qrCodeReaderView.startCamera();
-        }
+        initPairingInstrument(true);
+
     }
 
     @Override public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
@@ -312,22 +292,39 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     }
 
     public void generate(String args) {
-        QRCodeWriter writer = new QRCodeWriter();
-        try {
-            BitMatrix bitMatrix = writer.encode(args, BarcodeFormat.QR_CODE, 512, 512);
-            int width = bitMatrix.getWidth();
-            int height = bitMatrix.getHeight();
-            Bitmap bmp = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565);
-            for (int x = 0; x < width; x++) {
-                for (int y = 0; y < height; y++) {
-                    bmp.setPixel(x, y, bitMatrix.get(x, y) ? Color.BLACK : Color.WHITE);
-                }
+        if(tbQR.isChecked()) {
+            SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+            String signalServer = sharedPref.getString("Signal_server_URL", "");
+            String token = sharedPref.getString("Signal_server_Token", "");
+            if (provideService) {
+                assert app.myKey.first != null;
+                args = Utils.byteToHex((byte[]) app.myKey.first) + (signalServer != null ? " " + signalServer + " " + token : "");
             }
-            ((ImageView) findViewById(R.id.image)).setImageBitmap(bmp);
 
-        } catch (WriterException e) {
-            e.printStackTrace();
+            QRCodeWriter writer = new QRCodeWriter();
+            try {
+                BitMatrix bitMatrix = writer.encode(args, BarcodeFormat.QR_CODE, 512, 512);
+                int width = bitMatrix.getWidth();
+                int height = bitMatrix.getHeight();
+                Bitmap bmp = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565);
+                for (int x = 0; x < width; x++) {
+                    for (int y = 0; y < height; y++) {
+                        bmp.setPixel(x, y, bitMatrix.get(x, y) ? Color.BLACK : Color.WHITE);
+                    }
+                }
+                ((ImageView) findViewById(R.id.image)).setImageBitmap(bmp);
+
+            } catch (WriterException e) {
+                e.printStackTrace();
+            }
+
+            notation.setText(getResources().getString(R.string.annotation_qr));
+        }else{
+            //todo add create nfc msg
+            notation.setText(getResources().getString(R.string.annotation_nfc));
+
         }
+
     }
 
     @Override public void onQRCodeRead(String text, PointF[] points) {
@@ -336,22 +333,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             qrCodeReaderView.stopCamera();
         }
 
-        resultTextView.setText(text);
-        if(Provide_service){
-            String[] fields = Utils.parseQRString(resultTextView.getText().toString());
-            startActionFind(getApplicationContext(),"Main", hexToByte(fields[0]),0L);
-        }else{
-            shakeIt();
-            String[] fields = Utils.parseQRString(text);
-            if(fields[1].equals("") || fields[2].equals("")){
-                Toast.makeText(getApplicationContext(), getResources().getString(R.string.errorGetSignalServerParam),Toast.LENGTH_LONG).show();
-            }else if(hexToByte(fields[0]).length!=20){
-                Toast.makeText(getApplicationContext(), getResources().getString(R.string.errorReadpubKey),Toast.LENGTH_LONG).show();
-            }else{
-                startActionSync(getApplicationContext(), "Main", fields[1], hexToByte(fields[0]), fields[2],false);
-            }
+        codeReadTrigger(text);
 
-        }
         pointsOverlayView.setPoints(points);
     }
 
@@ -364,7 +347,68 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         }
     }
 
-    public void okPubKeyNotFoundClicked() {
-        startActionGetHash(getApplicationContext(), "Main", 0L);
+    public void codeReadTrigger(String text){
+        resultTextView.setText(text);
+        if(provideService){
+            String[] fields = Utils.parseQRString(resultTextView.getText().toString());
+            startActionFind(getApplicationContext(),"Main", hexToByte(fields[0]),0L);
+        }else{
+            shakeIt();
+            String[] fields = Utils.parseQRString(text);
+
+            if(fields.length < 2 || fields[1].equals("") || fields[2].equals("")){
+                Toast.makeText(getApplicationContext(), getResources().getString(R.string.errorGetSignalServerParam),Toast.LENGTH_LONG).show();
+            }else if(hexToByte(fields[0]).length!=20){
+                Toast.makeText(getApplicationContext(), getResources().getString(R.string.errorReadpubKey),Toast.LENGTH_LONG).show();
+            }else{
+                startActionSync(getApplicationContext(), "Main", fields[1], hexToByte(fields[0]), fields[2],false);
+            }
+
+        }
+    }
+
+    public void startSyncForProvide(byte[] answer) {
+        String[] fields = Utils.parseQRString(resultTextView.getText().toString());
+        byte[] accepterRootHash = Utils.hexToByte(fields[1]);
+        byte[] accepterPubKey = Utils.hexToByte(fields[0]);
+        String signalServer = null;
+        String token = null;
+
+        if (answer==null || !Arrays.equals(accepterRootHash, answer)) {
+            SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+            signalServer = sharedPref.getString("Signal_server_URL", "");
+            token = sharedPref.getString("Signal_server_Token", "");
+            if (signalServer.equals("") || token.equals("")) {
+                Toast.makeText(getApplicationContext(), getResources().getString(R.string.errorGetSignalServerParam), Toast.LENGTH_LONG).show();
+            } else {
+                startActionSync(getApplicationContext(), "Main", signalServer, accepterPubKey, token, true);
+            }
+        }
+    }
+
+    private void initPairingInstrument(boolean start){
+        if (tbQR.isChecked()) {
+            if(qrCodeReaderView == null) {
+                if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                    initQRCodeReaderView();
+                } else {
+                    requestCameraPermission();
+                }
+            }else{
+                if(start) {
+                    qrCodeReaderView.startCamera();
+                }else{
+                    qrCodeReaderView.stopCamera();
+                }
+            }
+
+        }else{
+            if(qrCodeReaderView != null) {
+                qrCodeReaderView.stopCamera();
+                SurfaceHolder holder = qrCodeReaderView.getHolder();
+                qrCodeReaderView.surfaceDestroyed(holder);
+                qrCodeReaderView=null;
+            }
+        }
     }
 }
