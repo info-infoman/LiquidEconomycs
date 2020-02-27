@@ -1,8 +1,15 @@
 package com.example.liquideconomycs;
 
+import android.content.Intent;
 import android.content.res.AssetManager;
+import android.nfc.NdefMessage;
+import android.nfc.NdefRecord;
+import android.nfc.NfcAdapter;
+import android.os.Parcelable;
+import android.widget.Toast;
 
 import com.google.common.primitives.Bytes;
+import com.google.common.reflect.Reflection;
 
 import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.Sha256Hash;
@@ -13,6 +20,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Date;
@@ -218,6 +226,23 @@ public class Utils {
             val[i] = (byte) j;
         }
         return val;
+    }
+
+    public static NdefRecord[] createNFCrecords(String msg) {
+
+        NdefRecord[] records = new NdefRecord[1];
+
+        byte[] payload = msg.getBytes(Charset.forName("UTF-8"));
+
+        NdefRecord record = new NdefRecord(
+                NdefRecord.TNF_WELL_KNOWN,  //Our 3-bit Type name format
+                NdefRecord.RTD_TEXT,        //Description of our payload
+                new byte[0],                //The optional id for our Record
+                payload);                   //Our payload for the Record
+
+        records[0] = record;
+
+        return records;
     }
 
 

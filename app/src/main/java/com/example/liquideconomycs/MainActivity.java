@@ -11,12 +11,16 @@ import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.PointF;
+import android.nfc.NdefMessage;
+import android.nfc.NdefRecord;
+import android.nfc.NfcAdapter;
+import android.nfc.NfcEvent;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Parcelable;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.preference.PreferenceManager;
-import android.view.SurfaceHolder;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
@@ -27,6 +31,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.ToggleButton;
 
+import com.bumptech.glide.Glide;
 import com.dlazaro66.qrcodereaderview.QRCodeReaderView;
 import com.google.android.material.snackbar.Snackbar;
 import com.google.zxing.BarcodeFormat;
@@ -52,7 +57,7 @@ import static com.example.liquideconomycs.Utils.EXTRA_CMD;
 import static com.example.liquideconomycs.Utils.EXTRA_MASTER;
 import static com.example.liquideconomycs.Utils.hexToByte;
 
-public class MainActivity extends AppCompatActivity implements ActivityCompat.OnRequestPermissionsResultCallback , QRCodeReaderView.OnQRCodeReadListener {
+public class MainActivity extends AppCompatActivity implements ActivityCompat.OnRequestPermissionsResultCallback , QRCodeReaderView.OnQRCodeReadListener, NfcAdapter.CreateNdefMessageCallback {
 
     private static final int MY_PERMISSION_REQUEST_INTERNET = 0;
     private static final int MY_PERMISSION_REQUEST_CAMERA = 0;
@@ -69,6 +74,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     private PointsOverlayView   pointsOverlayView;
     private boolean             provideService;
     private Core                app;
+    private NfcAdapter          mNfcAdapter;
 
     // handler for received data from service
     private final BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
@@ -122,6 +128,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         }
     };
 
+
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
@@ -157,6 +164,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     tbQR.setChecked(true);
                 }
                 initPairingInstrument(true);
+                startActionGetHash(getApplicationContext(),"Main",0L);
             }
         });
 
@@ -188,7 +196,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         provideService = false;
 
         initPairingInstrument(true);
-
         startActionGetHash(getApplicationContext(),"Main",0L);
     }
 
@@ -196,6 +203,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     protected void onDestroy() {
         super.onDestroy();
     }
+
 
     @Override protected void onPause() {
         super.onPause();
@@ -211,7 +219,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         registerReceiver(mBroadcastReceiver, new IntentFilter(BROADCAST_ACTION_ANSWER));
 
         initPairingInstrument(true);
-
+        startActionGetHash(getApplicationContext(),"Main",0L);
     }
 
     @Override public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
@@ -292,11 +300,12 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     }
 
     public void generate(String args) {
+        ImageView img = (ImageView) findViewById(R.id.image);
         if(tbQR.isChecked()) {
-            SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
-            String signalServer = sharedPref.getString("Signal_server_URL", "");
-            String token = sharedPref.getString("Signal_server_Token", "");
             if (provideService) {
+                SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+                String signalServer = sharedPref.getString("Signal_server_URL", "");
+                String token = sharedPref.getString("Signal_server_Token", "");
                 assert app.myKey.first != null;
                 args = Utils.byteToHex((byte[]) app.myKey.first) + (signalServer != null ? " " + signalServer + " " + token : "");
             }
@@ -312,7 +321,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         bmp.setPixel(x, y, bitMatrix.get(x, y) ? Color.BLACK : Color.WHITE);
                     }
                 }
-                ((ImageView) findViewById(R.id.image)).setImageBitmap(bmp);
+                img.setImageBitmap(bmp);
 
             } catch (WriterException e) {
                 e.printStackTrace();
@@ -320,8 +329,21 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
             notation.setText(getResources().getString(R.string.annotation_qr));
         }else{
-            //todo add create nfc msg
-            notation.setText(getResources().getString(R.string.annotation_nfc));
+            mNfcAdapter = NfcAdapter.getDefaultAdapter(this);
+            if(mNfcAdapter != null) {
+                //todo add create nfc msg
+                //clear img
+                img.setImageDrawable(null);
+                Glide.with(getApplicationContext())
+                        .asGif()
+                        .load(R.drawable.nfc_img)
+                        .into(img);
+                notation.setText(getResources().getString(R.string.annotation_nfc));
+                mNfcAdapter.setNdefPushMessageCallback(this, this);
+            }else{
+                img.setImageResource(R.drawable.nfc_error_img);
+                notation.setText(getResources().getString(R.string.error_nfc));
+            }
 
         }
 
@@ -387,6 +409,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     }
 
     private void initPairingInstrument(boolean start){
+
         if (tbQR.isChecked()) {
             if(qrCodeReaderView == null) {
                 if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
@@ -405,9 +428,77 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         }else{
             if(qrCodeReaderView != null) {
                 qrCodeReaderView.stopCamera();
-                SurfaceHolder holder = qrCodeReaderView.getHolder();
-                qrCodeReaderView.surfaceDestroyed(holder);
-                qrCodeReaderView=null;
+                qrCodeReaderView.setOnQRCodeReadListener(null);
+                qrCodeReaderView.onDetachedFromWindow();
+                qrCodeReaderView = null;
+                clearQRCodeReaderViewView(mainLayout);
+            }
+
+        }
+    }
+
+    private void clearQRCodeReaderViewView(ViewGroup v) {
+        boolean doBreak = false;
+        while (!doBreak) {
+            int childCount = v.getChildCount();
+            int i;
+            for(i=0; i<childCount; i++) {
+                View currentChild = v.getChildAt(i);
+                // Change ImageView with your desired type view
+                if (currentChild instanceof com.dlazaro66.qrcodereaderview.QRCodeReaderView) {
+                    v.removeView(currentChild);
+                    break;
+                }else{
+                    if(currentChild instanceof ViewGroup) {
+                        clearQRCodeReaderViewView((ViewGroup) currentChild);
+                    }
+                }
+            }
+
+            if (i == childCount) {
+                doBreak = true;
+            }
+        }
+    }
+
+    @Override
+    public NdefMessage createNdefMessage(NfcEvent event) {
+        if(provideService){
+            SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+            String signalServer = sharedPref.getString("Signal_server_URL", "");
+            String token = sharedPref.getString("Signal_server_Token", "");
+            assert app.myKey.first != null;
+            String args = Utils.byteToHex((byte[]) app.myKey.first) + (signalServer != null ? " " + signalServer + " " + token : "");
+            if(!args.equals(""))
+                return new NdefMessage(Utils.createNFCrecords(args));
+        }else{
+            if(!resultTextView.getText().toString().equals(""))
+                return new NdefMessage(Utils.createNFCrecords(resultTextView.getText().toString()));
+        }
+        return null;
+    }
+
+    @Override
+    public void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        handleNfcIntent(intent);
+    }
+
+    private void handleNfcIntent(Intent NfcIntent) {
+        if (NfcAdapter.ACTION_NDEF_DISCOVERED.equals(NfcIntent.getAction())) {
+            Parcelable[] receivedArray =
+                    NfcIntent.getParcelableArrayExtra(NfcAdapter.EXTRA_NDEF_MESSAGES);
+
+            if(receivedArray != null) {
+                NdefMessage receivedMessage = (NdefMessage) receivedArray[0];
+                NdefRecord[] attachedRecords = receivedMessage.getRecords();
+
+                for (NdefRecord record:attachedRecords) {
+                    String string = new String(record.getPayload());
+                    //Make sure we don't pass along our AAR (Android Application Record)
+                    if (string.equals(getPackageName())) { continue; }
+                    codeReadTrigger(string);
+                }
             }
         }
     }
