@@ -23,5 +23,6 @@
     <string name="disconnect">Соединение прерванно.</string>
     <string name="annotation_nfc">Чтобы начать процедуру верификации и синхронизации - приложите ваше устройство к устройству вашего партнера</string>
     <string name="error_nfc">Ваше устройство не поддерживает технологию NFC, для сопряжения устройств используйте сканер QR-кода</string>
+    <string name="Scanner">Сканер QR-кода</string>
 
 </resources>

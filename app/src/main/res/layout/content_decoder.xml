@@ -3,33 +3,39 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/main_layout"
-    android:layout_width="1dp"
-    android:layout_height="1dp"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
     tools:context=".MainActivity"
+    android:gravity="center"
     >
+
+    <TextView
+        android:id="@+id/textView2"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/Scanner"
+        android:textAlignment="center"
+        android:textSize="8sp"/>
 
     <com.dlazaro66.qrcodereaderview.QRCodeReaderView
         android:id="@+id/qrdecoderview"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_alignParentLeft="true"
-        android:layout_alignParentTop="true"/>
+        android:layout_alignParentBottom="true"
+        android:layout_marginTop="20dp" />
 
     <com.example.liquideconomycs.PointsOverlayView
         android:id="@+id/points_overlay_view"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        />
+        android:layout_alignParentBottom="true"
+        android:layout_marginTop="20dp"/>
 
     <TextView
         android:id="@+id/result_text_view"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_alignParentTop="true"
-        android:layout_centerHorizontal="true"
-        android:background="#55000000"
-        android:gravity="center"
-        android:padding="16dp"
-        android:textColor="#050505"
-        android:textSize="14sp" />
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_marginTop="20dp"
+        android:textSize="8sp" />
 </RelativeLayout>

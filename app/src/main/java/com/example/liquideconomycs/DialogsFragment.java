@@ -1,5 +1,6 @@
 package com.example.liquideconomycs;
 
+import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.content.DialogInterface;
@@ -29,11 +30,13 @@ public class DialogsFragment extends AppCompatDialogFragment {
                     public void onClick(DialogInterface dialog, int id) {
                         if(dialogActivity.equals("MainActivity"))
                             ((MainActivity) getActivity()).startSyncForProvide(null);
+                        ((MainActivity) getActivity()).redyToNextScan = true;
                         dialog.cancel();
                     }
                 })
                 .setNegativeButton(getResources().getString(android.R.string.cancel), new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int id) {
+                        ((MainActivity) getActivity()).redyToNextScan = true;
                         dialog.cancel();
                     }
                 });

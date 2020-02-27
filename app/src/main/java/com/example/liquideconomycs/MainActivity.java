@@ -25,6 +25,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.CompoundButton;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.Switch;
 import android.widget.TextView;
@@ -40,10 +41,12 @@ import com.google.zxing.common.BitMatrix;
 import com.google.zxing.qrcode.QRCodeWriter;
 
 import java.util.Arrays;
+import java.util.Date;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.core.app.ActivityCompat;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
@@ -75,6 +78,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     private boolean             provideService;
     private Core                app;
     private NfcAdapter          mNfcAdapter;
+    public boolean redyToNextScan;
 
     // handler for received data from service
     private final BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
@@ -163,7 +167,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     tbwNFC.setChecked(false);
                     tbQR.setChecked(true);
                 }
-                initPairingInstrument(true);
+                initPairingInstrument();
                 startActionGetHash(getApplicationContext(),"Main",0L);
             }
         });
@@ -195,8 +199,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
         provideService = false;
 
-        initPairingInstrument(true);
-        startActionGetHash(getApplicationContext(),"Main",0L);
     }
 
     @Override
@@ -209,7 +211,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         super.onPause();
         unregisterReceiver(mBroadcastReceiver);
 
-        initPairingInstrument(false);
+        initPairingInstrument();
 
     }
 
@@ -218,7 +220,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
         registerReceiver(mBroadcastReceiver, new IntentFilter(BROADCAST_ACTION_ANSWER));
 
-        initPairingInstrument(true);
+        initPairingInstrument();
         startActionGetHash(getApplicationContext(),"Main",0L);
     }
 
@@ -284,6 +286,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     }
 
     private void initQRCodeReaderView() {
+
+        redyToNextScan = true;
+
         View content = getLayoutInflater().inflate(R.layout.content_decoder, mainLayout, true);
 
         qrCodeReaderView = (QRCodeReaderView) content.findViewById(R.id.qrdecoderview);
@@ -295,8 +300,12 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         qrCodeReaderView.setAutofocusInterval(2000L);
         qrCodeReaderView.setOnQRCodeReadListener(this);
         //qrCodeReaderView.setBackCamera();
-        qrCodeReaderView.setFrontCamera();
+        qrCodeReaderView.setBackCamera();
         qrCodeReaderView.startCamera();
+
+        ConstraintLayout.LayoutParams lp = new ConstraintLayout.LayoutParams(150, 150);
+        FrameLayout relativeLayout = content.findViewById(R.id.main_layout);
+        relativeLayout.setLayoutParams(lp);
     }
 
     public void generate(String args) {
@@ -350,14 +359,12 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     }
 
     @Override public void onQRCodeRead(String text, PointF[] points) {
-
-        if (qrCodeReaderView != null) {
-            qrCodeReaderView.stopCamera();
+        if(redyToNextScan) {
+            redyToNextScan = false;
+            codeReadTrigger(text);
+            pointsOverlayView.setPoints(points);
         }
 
-        codeReadTrigger(text);
-
-        pointsOverlayView.setPoints(points);
     }
 
     @SuppressLint("MissingPermission")
@@ -378,7 +385,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             shakeIt();
             String[] fields = Utils.parseQRString(text);
 
-            if(fields.length < 2 || fields[1].equals("") || fields[2].equals("")){
+            if(fields.length < 3 || fields[1].equals("") || fields[2].equals("")){
                 Toast.makeText(getApplicationContext(), getResources().getString(R.string.errorGetSignalServerParam),Toast.LENGTH_LONG).show();
             }else if(hexToByte(fields[0]).length!=20){
                 Toast.makeText(getApplicationContext(), getResources().getString(R.string.errorReadpubKey),Toast.LENGTH_LONG).show();
@@ -408,7 +415,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         }
     }
 
-    private void initPairingInstrument(boolean start){
+    private void initPairingInstrument(){
 
         if (tbQR.isChecked()) {
             if(qrCodeReaderView == null) {
@@ -418,11 +425,16 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     requestCameraPermission();
                 }
             }else{
-                if(start) {
-                    qrCodeReaderView.startCamera();
-                }else{
-                    qrCodeReaderView.stopCamera();
-                }
+                qrCodeReaderView.stopCamera();
+                qrCodeReaderView.setOnQRCodeReadListener(null);
+                qrCodeReaderView.onDetachedFromWindow();
+                qrCodeReaderView = null;
+                clearQRCodeReaderViewView(mainLayout);
+                ConstraintLayout.LayoutParams lp = new ConstraintLayout.LayoutParams(1, 1);
+                FrameLayout relativeLayout = this.mainLayout.findViewById(R.id.main_layout);
+                relativeLayout.setLayoutParams(lp);
+               // FrameLayout frameLayout = (FrameLayout) findViewById(R.id.main_layout);
+                //frameLayout.setLayoutParams(new FrameLayout.LayoutParams(1, 1));
             }
 
         }else{
@@ -432,6 +444,11 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 qrCodeReaderView.onDetachedFromWindow();
                 qrCodeReaderView = null;
                 clearQRCodeReaderViewView(mainLayout);
+                ConstraintLayout.LayoutParams lp = new ConstraintLayout.LayoutParams(1, 1);
+                FrameLayout relativeLayout = this.mainLayout.findViewById(R.id.main_layout);
+                relativeLayout.setLayoutParams(lp);
+                //FrameLayout frameLayout = (FrameLayout) findViewById(R.id.main_layout);
+                //frameLayout.setLayoutParams(new FrameLayout.LayoutParams(1, 1));
             }
 
         }
