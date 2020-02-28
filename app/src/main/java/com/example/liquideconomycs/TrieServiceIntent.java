@@ -127,7 +127,7 @@ public class TrieServiceIntent extends IntentService {
                 ////////////////////////////////////////////////////////////////
             }
 
-            if (ACTION_Find.equals(action)) {
+            if (ACTION_Delete.equals(action)) {
                 final String master = intent.getStringExtra(EXTRA_MASTER);
                 final String cmd = "Delete";
                 final byte[] key = intent.getByteArrayExtra(EXTRA_PUBKEY);

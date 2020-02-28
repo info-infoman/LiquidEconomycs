@@ -17,7 +17,6 @@ import java.io.RandomAccessFile;
 
 import androidx.core.util.Pair;
 
-import static com.example.liquideconomycs.TrieServiceIntent.startActionInsert;
 import static com.example.liquideconomycs.Utils.copyAssetFolder;
 
 public class Core extends Application {
@@ -119,7 +118,7 @@ public class Core extends Application {
             cv.put("pubKey", myPubKey);
             cv.put("privKey", myPrivKey);
             db.insert("users", null, cv);
-            startActionInsert(this, "Core", myPubKey, Utils.ageToBytes());
+            //startActionInsert(this, "Core", myPubKey, Utils.ageToBytes());
             cv.clear();
             query.close();
             setMyKey();

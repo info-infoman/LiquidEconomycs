@@ -17,12 +17,17 @@
     <string name="onCheckTokenError">Ошибка верификации токена!</string>
     <string name="Signal_server_URL">WebSocket URL сигнального сервера</string>
     <string name="Signal_server_Token">Токен сигнального сервера</string>
-    <string name="errorReadpubKey">Ошибка получения публичного ключа партнера</string>
     <string name="errorGetSignalServerParam">Ошибка получения параметров сигнального сервера</string>
     <string name="SyncFinish">Синхронизация завершена.</string>
     <string name="disconnect">Соединение прерванно.</string>
     <string name="annotation_nfc">Чтобы начать процедуру верификации и синхронизации - приложите ваше устройство к устройству вашего партнера</string>
     <string name="error_nfc">Ваше устройство не поддерживает технологию NFC, для сопряжения устройств используйте сканер QR-кода</string>
     <string name="Scanner">Сканер QR-кода</string>
+    <string name="getINTERNETPermission">Доступ к Интернету необходим для отображения предварительного просмотра в Интернете.</string>
+    <string name="permission_is_not_available_INTERNET">Разрешение недоступно. Запрос разрешения ИНТЕРНЕТ.</string>
+    <string name="getCAMERAPermission">Доступ к камере необходим для отображения предварительного просмотра камеры.</string>
+    <string name="permission_is_not_available_CAMERA">Разрешение не доступно. Запрос разрешения камеры.</string>
+    <string name="ErrorReceivingPartnerData">Ошибка получения данных партнера</string>
+    <string name="pubKeyFound">Your partner’s public key has been found.</string>
 
 </resources>

@@ -29,11 +29,16 @@
     <string name="onCheckTokenError">Token verification error!</string>
     <string name="Signal_server_URL">Signal server WebSocket URL</string>
     <string name="Signal_server_Token">Signal server token</string>
-    <string name="errorReadpubKey">"Error get partner pub key "</string>
     <string name="errorGetSignalServerParam">Error get signal server params</string>
     <string name="SyncFinish">Sync is finish</string>
     <string name="disconnect">Сonnection is broken</string>
     <string name="annotation_nfc">To begin the verification and synchronization procedure - attach your device to your partner’s device</string>
     <string name="error_nfc">Your device does not support NFC technology, use a QR code scanner to pair devices.</string>
     <string name="Scanner">QR-code scanner</string>
+    <string name="getINTERNETPermission">INTERNET access is required to display the INTERNET preview.</string>
+    <string name="permission_is_not_available_INTERNET">Permission is not available. Requesting INTERNET permission.</string>
+    <string name="getCAMERAPermission">Camera access is required to display the camera preview.</string>
+    <string name="permission_is_not_available_CAMERA">Permission is not available. Requesting camera permission.</string>
+    <string name="ErrorReceivingPartnerData">Error receiving partner data</string>
+    <string name="pubKeyFound">Your partner’s public key has been found.</string>
 </resources>

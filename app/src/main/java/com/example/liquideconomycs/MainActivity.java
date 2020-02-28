@@ -40,8 +40,6 @@ import com.google.zxing.WriterException;
 import com.google.zxing.common.BitMatrix;
 import com.google.zxing.qrcode.QRCodeWriter;
 
-import java.util.Arrays;
-import java.util.Date;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import androidx.annotation.NonNull;
@@ -53,7 +51,7 @@ import androidx.fragment.app.FragmentTransaction;
 
 import static com.example.liquideconomycs.SyncServiceIntent.startActionSync;
 import static com.example.liquideconomycs.TrieServiceIntent.startActionFind;
-import static com.example.liquideconomycs.TrieServiceIntent.startActionGetHash;
+import static com.example.liquideconomycs.TrieServiceIntent.startActionInsert;
 import static com.example.liquideconomycs.Utils.BROADCAST_ACTION_ANSWER;
 import static com.example.liquideconomycs.Utils.EXTRA_ANSWER;
 import static com.example.liquideconomycs.Utils.EXTRA_CMD;
@@ -65,57 +63,32 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     private static final int MY_PERMISSION_REQUEST_INTERNET = 0;
     private static final int MY_PERMISSION_REQUEST_CAMERA = 0;
 
+    private Core                app;
     private ViewGroup           mainLayout;
-    private Switch              aSwitch;
     private ToggleButton        tbResive, tbMade;
-    private Switch              bSwitch;
     private ToggleButton        tbwNFC, tbQR;
-    private Button              settings;
-    private TextView            resultTextView;
+    public TextView            resultTextView;
     private TextView            notation;
     private QRCodeReaderView    qrCodeReaderView;
     private PointsOverlayView   pointsOverlayView;
     private boolean             provideService;
-    private Core                app;
-    private NfcAdapter          mNfcAdapter;
-    public boolean redyToNextScan;
+    public boolean              redyToNextScan;
 
-    // handler for received data from service
+    // handler for received data from service///////////////////////////////////////////////////////
     private final BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
+        @Override public void onReceive(Context context, Intent intent) {
             if (intent.getAction().equals(BROADCAST_ACTION_ANSWER)) {
                 final String master = intent.getStringExtra(EXTRA_MASTER);
                 final String cmd = intent.getStringExtra(EXTRA_CMD);
                 if(master.equals("Main")){
-                    if(cmd.equals("GetHash")){
-                        final byte[] answer = intent.getByteArrayExtra(EXTRA_ANSWER);
-                        if (!provideService){
-                            assert app.myKey.first != null;
-                            String source = Utils.byteToHex((byte[]) app.myKey.first)+" "+ Utils.byteToHex(answer);
-                            generate(source);
-                            resultTextView.setText(source);
-                        }else{
-                            SharedPreferences sharedPref    = PreferenceManager.getDefaultSharedPreferences(context);
-                            String signalServer  = sharedPref.getString("Signal_server_URL", "");
-                            String token = sharedPref.getString("Signal_server_Token", "");
-                            if(signalServer.equals("")||token.equals("")){
-                                Toast.makeText(getApplicationContext(), getResources().getString(R.string.errorGetSignalServerParam),Toast.LENGTH_LONG).show();
-                            }else {
-                                generate(null);
-                            }
-                        }
-                    }else if(cmd.equals("Find")){
+                    if(cmd.equals("Find")){
                         final byte[] answer = intent.getByteArrayExtra(EXTRA_ANSWER);
                         if(provideService){
-
+                            shakeIt(300,10);
                             if(answer!=null) {
-                                startSyncForProvide(answer);
+                                startActionSync(getApplicationContext(), "Main", "", Utils.hexToByte(resultTextView.getText().toString()), "", true);
                             }else{
-                                shakeIt();
-                                DialogsFragment alert = new DialogsFragment("MainActivity", getResources().getString(R.string.Attention),
-                                        getResources().getString(R.string.pubKeyNotFound));
-
+                                DialogsFragment alert = new DialogsFragment("MainActivity", 0);
                                 FragmentManager manager = getSupportFragmentManager();
                                 FragmentTransaction transaction = manager.beginTransaction();
                                 alert.show(transaction, "dialog");
@@ -132,6 +105,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         }
     };
 
+    //Overrides/////////////////////////////////////////////////////////////////////////////////////
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -147,15 +121,15 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         }
         registerReceiver(mBroadcastReceiver, new IntentFilter(BROADCAST_ACTION_ANSWER));
 
-        bSwitch = findViewById(R.id.bSwitch);
+        Switch bSwitch = findViewById(R.id.bSwitch);
         tbwNFC = findViewById(R.id.tbNFC);
         tbQR = findViewById(R.id.tbQR);
 
-        aSwitch = findViewById(R.id.aSwitch);
+        Switch aSwitch = findViewById(R.id.aSwitch);
         tbResive = findViewById(R.id.tbResive);
         tbMade = findViewById(R.id.tbMade);
 
-        settings = findViewById(R.id.settings);
+        Button settings = findViewById(R.id.settings);
 
         bSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
@@ -168,7 +142,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     tbQR.setChecked(true);
                 }
                 initPairingInstrument();
-                startActionGetHash(getApplicationContext(),"Main",0L);
+                generatePairingMsg();
             }
         });
 
@@ -184,7 +158,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     tbMade.setChecked(false);
                     provideService = false;
                 }
-                startActionGetHash(getApplicationContext(),"Main",0L);
+                generatePairingMsg();
             }
         });
 
@@ -201,18 +175,15 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
     }
 
-    @Override
-    protected void onDestroy() {
+    @Override protected void onDestroy() {
         super.onDestroy();
     }
-
 
     @Override protected void onPause() {
         super.onPause();
         unregisterReceiver(mBroadcastReceiver);
 
         initPairingInstrument();
-
     }
 
     @Override protected void onResume() {
@@ -221,11 +192,10 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         registerReceiver(mBroadcastReceiver, new IntentFilter(BROADCAST_ACTION_ANSWER));
 
         initPairingInstrument();
-        startActionGetHash(getApplicationContext(),"Main",0L);
+        generatePairingMsg();
     }
 
-    @Override public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
-                                                     @NonNull int[] grantResults) {
+    @Override public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         AtomicBoolean ret= new AtomicBoolean(true);
         if (requestCode == MY_PERMISSION_REQUEST_CAMERA) {
             ret.set(false);
@@ -247,10 +217,72 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         }
     }
 
+    @Override public void onQRCodeRead(String text, PointF[] points) {
+        if(redyToNextScan) {
+            redyToNextScan = false;
+            codeReadTrigger(text);
+            pointsOverlayView.setPoints(points);
+        }
+
+    }
+
+    @SuppressLint("MissingPermission") private void shakeIt(int s, int i) {
+        if (Build.VERSION.SDK_INT >= 26) {
+            ((Vibrator) getSystemService(VIBRATOR_SERVICE)).vibrate(VibrationEffect.createOneShot(s,i));
+        } else {
+            ((Vibrator) getSystemService(VIBRATOR_SERVICE)).vibrate(s);
+        }
+    }
+
+    @Override public NdefMessage createNdefMessage(NfcEvent event) {
+        assert app.myKey.first != null;
+        String msg = Utils.byteToHex((byte[]) app.myKey.first);
+        if(provideService){
+            SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
+            String signalServer = sharedPref.getString("Signal_server_URL", "");
+            String token = sharedPref.getString("Signal_server_Token", "");
+            String args = msg + (signalServer != null ? " " + signalServer + " " + token : "");
+            if(!msg.equals(""))
+                return new NdefMessage(Utils.createNFCrecords(args));
+        }else{
+            if(!msg.equals(""))
+                return new NdefMessage(Utils.createNFCrecords(msg));
+        }
+        return null;
+    }
+
+    @Override public void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        handleNfcIntent(intent);
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+
+    private void initPairingInstrument(){
+        if (tbQR.isChecked() && qrCodeReaderView == null) {
+            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                    initQRCodeReaderView();
+            } else {
+                requestCameraPermission();
+            }
+        }else{
+            if(qrCodeReaderView != null) {
+                qrCodeReaderView.stopCamera();
+                qrCodeReaderView.setOnQRCodeReadListener(null);
+                qrCodeReaderView.onDetachedFromWindow();
+                qrCodeReaderView = null;
+                clearQRCodeReaderViewView(mainLayout);
+                ConstraintLayout.LayoutParams lp = new ConstraintLayout.LayoutParams(1, 1);
+                FrameLayout relativeLayout = this.mainLayout.findViewById(R.id.main_layout);
+                relativeLayout.setLayoutParams(lp);
+            }
+        }
+    }
+
     private void requestINTERNETPermission() {
         if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.INTERNET)) {
-            Snackbar.make(mainLayout, "INTERNET access is required to display the INTERNET preview.",
-                    Snackbar.LENGTH_INDEFINITE).setAction("OK", new View.OnClickListener() {
+            Snackbar.make(mainLayout, getResources().getText(R.string.getINTERNETPermission),
+                    Snackbar.LENGTH_INDEFINITE).setAction(getResources().getString(android.R.string.ok), new View.OnClickListener() {
                 @Override public void onClick(View view) {
                     ActivityCompat.requestPermissions(MainActivity.this, new String[] {
                             Manifest.permission.INTERNET
@@ -258,7 +290,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 }
             }).show();
         } else {
-            Snackbar.make(mainLayout, "Permission is not available. Requesting INTERNET permission.",
+            Snackbar.make(mainLayout, getResources().getText(R.string.permission_is_not_available_INTERNET),
                     Snackbar.LENGTH_SHORT).show();
             ActivityCompat.requestPermissions(this, new String[] {
                     Manifest.permission.INTERNET
@@ -268,8 +300,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
     private void requestCameraPermission() {
         if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.CAMERA)) {
-            Snackbar.make(mainLayout, "Camera access is required to display the camera preview.",
-                    Snackbar.LENGTH_INDEFINITE).setAction("OK", new View.OnClickListener() {
+            Snackbar.make(mainLayout, getResources().getText(R.string.getCAMERAPermission),
+                    Snackbar.LENGTH_INDEFINITE).setAction(getResources().getString(android.R.string.ok), new View.OnClickListener() {
                 @Override public void onClick(View view) {
                     ActivityCompat.requestPermissions(MainActivity.this, new String[] {
                             Manifest.permission.CAMERA
@@ -277,7 +309,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 }
             }).show();
         } else {
-            Snackbar.make(mainLayout, "Permission is not available. Requesting camera permission.",
+            Snackbar.make(mainLayout, getResources().getText(R.string.permission_is_not_available_CAMERA),
                     Snackbar.LENGTH_SHORT).show();
             ActivityCompat.requestPermissions(this, new String[] {
                     Manifest.permission.CAMERA
@@ -308,20 +340,45 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         relativeLayout.setLayoutParams(lp);
     }
 
-    public void generate(String args) {
+    public void codeReadTrigger(String text){
+        resultTextView.setText(text);
+        if(provideService){
+            byte[] accepterPubKey = Utils.hexToByte(resultTextView.getText().toString());
+            if(accepterPubKey.length!=20){
+                Toast.makeText(getApplicationContext(), getResources().getString(R.string.ErrorReceivingPartnerData),Toast.LENGTH_LONG).show();
+            }
+            startActionFind(getApplicationContext(),"Main", accepterPubKey,0L);
+        }else{
+            shakeIt(300,10);
+            String[] fields = Utils.parseQRString(text);
+
+            if(fields.length < 3 || fields[1].equals("") || fields[2].equals("") || hexToByte(fields[0]).length!=20){
+               Toast.makeText(getApplicationContext(), getResources().getString(R.string.ErrorReceivingPartnerData),Toast.LENGTH_LONG).show();
+            }else{
+                startActionInsert(this, "Main", hexToByte(fields[0]), Utils.ageToBytes());
+                startActionSync(getApplicationContext(), "Main", fields[1], hexToByte(fields[0]), fields[2],false);
+            }
+
+        }
+    }
+
+    public void generatePairingMsg() {
         ImageView img = (ImageView) findViewById(R.id.image);
+        assert app.myKey.first != null;
+        String msg = Utils.byteToHex((byte[]) app.myKey.first);
+
         if(tbQR.isChecked()) {
             if (provideService) {
                 SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
                 String signalServer = sharedPref.getString("Signal_server_URL", "");
                 String token = sharedPref.getString("Signal_server_Token", "");
-                assert app.myKey.first != null;
-                args = Utils.byteToHex((byte[]) app.myKey.first) + (signalServer != null ? " " + signalServer + " " + token : "");
+
+                msg = msg + (signalServer != null ? " " + signalServer + " " + token : "");
             }
 
             QRCodeWriter writer = new QRCodeWriter();
             try {
-                BitMatrix bitMatrix = writer.encode(args, BarcodeFormat.QR_CODE, 512, 512);
+                BitMatrix bitMatrix = writer.encode(msg, BarcodeFormat.QR_CODE, 512, 512);
                 int width = bitMatrix.getWidth();
                 int height = bitMatrix.getHeight();
                 Bitmap bmp = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565);
@@ -338,9 +395,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
             notation.setText(getResources().getString(R.string.annotation_qr));
         }else{
-            mNfcAdapter = NfcAdapter.getDefaultAdapter(this);
+            NfcAdapter mNfcAdapter = NfcAdapter.getDefaultAdapter(this);
             if(mNfcAdapter != null) {
-                //todo add create nfc msg
                 //clear img
                 img.setImageDrawable(null);
                 Glide.with(getApplicationContext())
@@ -356,102 +412,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
         }
 
-    }
-
-    @Override public void onQRCodeRead(String text, PointF[] points) {
-        if(redyToNextScan) {
-            redyToNextScan = false;
-            codeReadTrigger(text);
-            pointsOverlayView.setPoints(points);
-        }
-
-    }
-
-    @SuppressLint("MissingPermission")
-    private void shakeIt() {
-        if (Build.VERSION.SDK_INT >= 26) {
-            ((Vibrator) getSystemService(VIBRATOR_SERVICE)).vibrate(VibrationEffect.createOneShot(300,10));
-        } else {
-            ((Vibrator) getSystemService(VIBRATOR_SERVICE)).vibrate(300);
-        }
-    }
-
-    public void codeReadTrigger(String text){
-        resultTextView.setText(text);
-        if(provideService){
-            String[] fields = Utils.parseQRString(resultTextView.getText().toString());
-            startActionFind(getApplicationContext(),"Main", hexToByte(fields[0]),0L);
-        }else{
-            shakeIt();
-            String[] fields = Utils.parseQRString(text);
-
-            if(fields.length < 3 || fields[1].equals("") || fields[2].equals("")){
-                Toast.makeText(getApplicationContext(), getResources().getString(R.string.errorGetSignalServerParam),Toast.LENGTH_LONG).show();
-            }else if(hexToByte(fields[0]).length!=20){
-                Toast.makeText(getApplicationContext(), getResources().getString(R.string.errorReadpubKey),Toast.LENGTH_LONG).show();
-            }else{
-                startActionSync(getApplicationContext(), "Main", fields[1], hexToByte(fields[0]), fields[2],false);
-            }
-
-        }
-    }
-
-    public void startSyncForProvide(byte[] answer) {
-        String[] fields = Utils.parseQRString(resultTextView.getText().toString());
-        byte[] accepterRootHash = Utils.hexToByte(fields[1]);
-        byte[] accepterPubKey = Utils.hexToByte(fields[0]);
-        String signalServer = null;
-        String token = null;
-
-        if (answer==null || !Arrays.equals(accepterRootHash, answer)) {
-            SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
-            signalServer = sharedPref.getString("Signal_server_URL", "");
-            token = sharedPref.getString("Signal_server_Token", "");
-            if (signalServer.equals("") || token.equals("")) {
-                Toast.makeText(getApplicationContext(), getResources().getString(R.string.errorGetSignalServerParam), Toast.LENGTH_LONG).show();
-            } else {
-                startActionSync(getApplicationContext(), "Main", signalServer, accepterPubKey, token, true);
-            }
-        }
-    }
-
-    private void initPairingInstrument(){
-
-        if (tbQR.isChecked()) {
-            if(qrCodeReaderView == null) {
-                if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
-                    initQRCodeReaderView();
-                } else {
-                    requestCameraPermission();
-                }
-            }else{
-                qrCodeReaderView.stopCamera();
-                qrCodeReaderView.setOnQRCodeReadListener(null);
-                qrCodeReaderView.onDetachedFromWindow();
-                qrCodeReaderView = null;
-                clearQRCodeReaderViewView(mainLayout);
-                ConstraintLayout.LayoutParams lp = new ConstraintLayout.LayoutParams(1, 1);
-                FrameLayout relativeLayout = this.mainLayout.findViewById(R.id.main_layout);
-                relativeLayout.setLayoutParams(lp);
-               // FrameLayout frameLayout = (FrameLayout) findViewById(R.id.main_layout);
-                //frameLayout.setLayoutParams(new FrameLayout.LayoutParams(1, 1));
-            }
-
-        }else{
-            if(qrCodeReaderView != null) {
-                qrCodeReaderView.stopCamera();
-                qrCodeReaderView.setOnQRCodeReadListener(null);
-                qrCodeReaderView.onDetachedFromWindow();
-                qrCodeReaderView = null;
-                clearQRCodeReaderViewView(mainLayout);
-                ConstraintLayout.LayoutParams lp = new ConstraintLayout.LayoutParams(1, 1);
-                FrameLayout relativeLayout = this.mainLayout.findViewById(R.id.main_layout);
-                relativeLayout.setLayoutParams(lp);
-                //FrameLayout frameLayout = (FrameLayout) findViewById(R.id.main_layout);
-                //frameLayout.setLayoutParams(new FrameLayout.LayoutParams(1, 1));
-            }
-
-        }
     }
 
     private void clearQRCodeReaderViewView(ViewGroup v) {
@@ -476,29 +436,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 doBreak = true;
             }
         }
-    }
-
-    @Override
-    public NdefMessage createNdefMessage(NfcEvent event) {
-        if(provideService){
-            SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
-            String signalServer = sharedPref.getString("Signal_server_URL", "");
-            String token = sharedPref.getString("Signal_server_Token", "");
-            assert app.myKey.first != null;
-            String args = Utils.byteToHex((byte[]) app.myKey.first) + (signalServer != null ? " " + signalServer + " " + token : "");
-            if(!args.equals(""))
-                return new NdefMessage(Utils.createNFCrecords(args));
-        }else{
-            if(!resultTextView.getText().toString().equals(""))
-                return new NdefMessage(Utils.createNFCrecords(resultTextView.getText().toString()));
-        }
-        return null;
-    }
-
-    @Override
-    public void onNewIntent(Intent intent) {
-        super.onNewIntent(intent);
-        handleNfcIntent(intent);
     }
 
     private void handleNfcIntent(Intent NfcIntent) {
