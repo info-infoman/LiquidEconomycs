@@ -5,26 +5,28 @@ import android.app.Dialog;
 import android.content.DialogInterface;
 import android.os.Bundle;
 
+import java.util.Objects;
+
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatDialogFragment;
 
 import static com.example.liquideconomycs.SyncServiceIntent.startActionSync;
 
 public class DialogsFragment extends AppCompatDialogFragment {
-    int dialogCmd;
-    String  dialogHead;
-    String dialogMsg;
-    String dialogActivity;
+    private int dialogCmd;
+    private String  dialogHead;
+    private String dialogMsg;
+    private String dialogActivity;
 
-    int cantFindPubKey = 0;
-    int findPubKey = 1;
+    private int cantFindPubKey = 0;
 
-    public DialogsFragment(String activity, int cmd) {
+    DialogsFragment(String activity, int cmd) {
 
+        int findPubKey = 1;
         if(cmd==cantFindPubKey){
             dialogHead = getResources().getString(R.string.Attention);
             dialogMsg = getResources().getString(R.string.pubKeyNotFound);
-        }else if(cmd==findPubKey){
+        }else if(cmd== findPubKey){
             dialogHead = getResources().getString(R.string.Attention);
             dialogMsg = getResources().getString(R.string.pubKeyFound);
         }
@@ -44,7 +46,7 @@ public class DialogsFragment extends AppCompatDialogFragment {
                     builder.setPositiveButton(getResources().getString(android.R.string.yes), new DialogInterface.OnClickListener() {
                         public void onClick(DialogInterface dialog, int id) {
                             if (dialogActivity.equals("MainActivity")) {
-                                startActionSync(((MainActivity) getActivity()), "Main", "", Utils.hexToByte(((MainActivity) getActivity()).resultTextView.getText().toString()), "", true);
+                                startActionSync(((MainActivity) getActivity()), "Main", "", Utils.hexToByte(((MainActivity) Objects.requireNonNull(getActivity())).resultTextView.getText().toString()), "", true);
                                 ((MainActivity) getActivity()).redyToNextScan = true;
                                 dialog.cancel();
                             }
@@ -52,7 +54,7 @@ public class DialogsFragment extends AppCompatDialogFragment {
                     })
                     .setNegativeButton(getResources().getString(android.R.string.no), new DialogInterface.OnClickListener() {
                         public void onClick(DialogInterface dialog, int id) {
-                            ((MainActivity) getActivity()).redyToNextScan = true;
+                            ((MainActivity) Objects.requireNonNull(getActivity())).redyToNextScan = true;
                             dialog.cancel();
                         }
                     });

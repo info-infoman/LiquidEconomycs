@@ -18,7 +18,7 @@
     <string name="attachment_summary_off" translatable="false">Only download attachments when manually requested</string>
     <string name="title_activity_scaner">Partner QR code verification</string>
     <string name="Copied_to_clipboard">Copied to the clipboard</string>
-    <string name="annotation_qr">To begin the verification and synchronization process, provide your partner with the opportunity to scan your QR code and scan the QR code provided by him.</string>
+    <string name="annotation_qr">To begin the verification and synchronization process, provide your partner with the opportunity to scan your QR code, and also scan the QR code provided by him.</string>
     <string name="Accept_service">Accept service</string>
     <string name="Provide_service">Provide service</string>
     <string name="pubKeyNotFound">Public key yours partner not found, do you want to continue?</string>
@@ -34,7 +34,6 @@
     <string name="disconnect">Сonnection is broken</string>
     <string name="annotation_nfc">To begin the verification and synchronization procedure - attach your device to your partner’s device</string>
     <string name="error_nfc">Your device does not support NFC technology, use a QR code scanner to pair devices.</string>
-    <string name="Scanner">QR-code scanner</string>
     <string name="getINTERNETPermission">INTERNET access is required to display the INTERNET preview.</string>
     <string name="permission_is_not_available_INTERNET">Permission is not available. Requesting INTERNET permission.</string>
     <string name="getCAMERAPermission">Camera access is required to display the camera preview.</string>
