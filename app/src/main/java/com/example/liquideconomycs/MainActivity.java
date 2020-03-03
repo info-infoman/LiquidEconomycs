@@ -65,8 +65,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     private ViewGroup           mainLayout;
     private ToggleButton        tbResive, tbMade;
     private ToggleButton        tbwNFC, tbQR;
-    public TextView            resultTextView;
-    private TextView            notation;
+    private Button              startBtn;
+    public TextView            resultTextView, notation, role_capture, scan_gen;
     private QRCodeReaderView    qrCodeReaderView;
     private PointsOverlayView   pointsOverlayView;
     private boolean             provideService;
@@ -84,12 +84,14 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         if(provideService){
                             shakeIt(300,10);
                             if(answer!=null) {
+                                generatePairingMsg();
                                 startActionSync(getApplicationContext(), "Main", "", Utils.hexToByte(resultTextView.getText().toString()), "", true);
                             }else{
                                 DialogsFragment alert = new DialogsFragment("MainActivity", 0);
                                 FragmentManager manager = getSupportFragmentManager();
                                 FragmentTransaction transaction = manager.beginTransaction();
                                 alert.show(transaction, "dialog");
+                                generatePairingMsg();
                             }
                         }
                     }else if(cmd.equals("Sync")){
@@ -127,6 +129,10 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         tbResive = findViewById(R.id.tbResive);
         tbMade = findViewById(R.id.tbMade);
 
+        role_capture = findViewById(R.id.role_capture);
+        scan_gen = findViewById(R.id.scan_gen);
+        startBtn = findViewById(R.id.startScanner);
+
         Button settings = findViewById(R.id.settings);
 
         bSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
@@ -139,7 +145,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     tbwNFC.setChecked(false);
                     tbQR.setChecked(true);
                 }
-                initPairingInstrument();
                 generatePairingMsg();
             }
         });
@@ -151,28 +156,35 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                     tbResive.setChecked(false);
                     tbMade.setChecked(true);
                     provideService = true;
-                    MainActivity.this.setTitle(R.string.app_name+"("+R.string.Provide_service+"(");
+                    role_capture.setText(getResources().getString(R.string.Provide_service));
                 }else{
                     tbResive.setChecked(true);
                     tbMade.setChecked(false);
                     provideService = false;
-                    MainActivity.this.setTitle(R.string.app_name+"("+R.string.Accept_service+"(");
+                    role_capture.setText(getResources().getString(R.string.Accept_service));
                 }
                 generatePairingMsg();
             }
         });
 
         settings.setOnClickListener(new CompoundButton.OnClickListener() {
-            @Override
-            public void onClick(View v) {
+            @Override public void onClick(View v) {
                 Intent intent;
                 intent = new Intent(getApplicationContext(), SettingsActivity.class);
                 startActivity(intent);
             }
         });
 
-        provideService = false;
+        startBtn.setOnClickListener(new CompoundButton.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                initPairingInstrument();
+            }
+        });
 
+        provideService = false;
+        role_capture.setText(getResources().getString(R.string.Accept_service));
+        scan_gen.setText(getResources().getString(R.string.QR_generator));
     }
 
     @Override protected void onDestroy() {
@@ -183,7 +195,14 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         super.onPause();
         unregisterReceiver(mBroadcastReceiver);
 
-        initPairingInstrument();
+        if (tbQR.isChecked() && qrCodeReaderView != null) {
+            qrCodeReaderView.stopCamera();
+            qrCodeReaderView.setOnQRCodeReadListener(null);
+            qrCodeReaderView.onDetachedFromWindow();
+            qrCodeReaderView = null;
+            clearQRCodeReaderViewView(mainLayout);
+        }
+
     }
 
     @Override protected void onResume() {
@@ -191,7 +210,14 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
         registerReceiver(mBroadcastReceiver, new IntentFilter(BROADCAST_ACTION_ANSWER));
 
-        initPairingInstrument();
+        if (tbQR.isChecked() && qrCodeReaderView != null) {
+            qrCodeReaderView.stopCamera();
+            qrCodeReaderView.setOnQRCodeReadListener(null);
+            qrCodeReaderView.onDetachedFromWindow();
+            qrCodeReaderView = null;
+            clearQRCodeReaderViewView(mainLayout);
+        }
+
         generatePairingMsg();
     }
 
@@ -218,12 +244,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     }
 
     @Override public void onQRCodeRead(String text, PointF[] points) {
-        if(redyToNextScan) {
-            redyToNextScan = false;
-            codeReadTrigger(text);
-            pointsOverlayView.setPoints(points);
-        }
-
+        initPairingInstrument();
+        codeReadTrigger(text);
+        pointsOverlayView.setPoints(points);
     }
 
     @SuppressLint("MissingPermission") private void shakeIt(int s, int i) {
@@ -260,6 +283,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
     private void initPairingInstrument(){
         if (tbQR.isChecked() && qrCodeReaderView == null) {
+            scan_gen.setText(getResources().getString(R.string.QR_scanner));
+            startBtn.setText(getResources().getString(R.string.stopScan));
             if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
                     initQRCodeReaderView();
             } else {
@@ -272,9 +297,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 qrCodeReaderView.onDetachedFromWindow();
                 qrCodeReaderView = null;
                 clearQRCodeReaderViewView(mainLayout);
-                //ConstraintLayout.LayoutParams lp = new ConstraintLayout.LayoutParams(1, 1);
-                //FrameLayout relativeLayout = this.mainLayout.findViewById(R.id.main_layout);
-                //relativeLayout.setLayoutParams(lp);
             }
         }
     }
@@ -393,8 +415,14 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 e.printStackTrace();
             }
 
+            scan_gen.setText(getResources().getString(R.string.QR_generator));
+            scan_gen.setVisibility(View.VISIBLE);
+            startBtn.setVisibility(View.VISIBLE);
+            startBtn.setText(getResources().getString(R.string.startScan));
             notation.setText(getResources().getString(R.string.annotation_qr));
         }else{
+            scan_gen.setVisibility(View.INVISIBLE);
+            startBtn.setVisibility(View.INVISIBLE);
             NfcAdapter mNfcAdapter = NfcAdapter.getDefaultAdapter(this);
             if(mNfcAdapter != null) {
                 //clear img

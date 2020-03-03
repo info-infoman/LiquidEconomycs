@@ -47,14 +47,12 @@ public class DialogsFragment extends AppCompatDialogFragment {
                         public void onClick(DialogInterface dialog, int id) {
                             if (dialogActivity.equals("MainActivity")) {
                                 startActionSync(((MainActivity) getActivity()), "Main", "", Utils.hexToByte(((MainActivity) Objects.requireNonNull(getActivity())).resultTextView.getText().toString()), "", true);
-                                ((MainActivity) getActivity()).redyToNextScan = true;
                                 dialog.cancel();
                             }
                         }
                     })
                     .setNegativeButton(getResources().getString(android.R.string.no), new DialogInterface.OnClickListener() {
                         public void onClick(DialogInterface dialog, int id) {
-                            ((MainActivity) Objects.requireNonNull(getActivity())).redyToNextScan = true;
                             dialog.cancel();
                         }
                     });

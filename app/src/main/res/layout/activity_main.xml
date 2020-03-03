@@ -8,6 +8,13 @@
     android:background="#FFFFFF"
     tools:context=".MainActivity">
 
+    <TextView
+        android:id="@+id/result_text_view"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:visibility="invisible"
+        tools:ignore="MissingConstraints" />
+
     <Button
         android:id="@+id/settings"
         style="?android:attr/borderlessButtonStyle"
@@ -29,14 +36,41 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 
+        <TextView
+            android:id="@+id/role_capture"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:padding="10dp"
+            android:text=""
+            android:textAlignment="center"
+            android:textSize="14sp"
+            app:layout_constraintBottom_toTopOf="@+id/scan_gen"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <TextView
+            android:id="@+id/scan_gen"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:padding="10dp"
+            android:text=""
+            android:textAlignment="center"
+            android:textSize="8sp"
+            app:layout_constraintTop_toBottomOf="@+id/role_capture"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            tools:ignore="MissingConstraints" />
+
         <ImageView
             android:id="@+id/image"
             android:layout_width="512px"
             android:layout_height="512px"
-            app:layout_constraintBottom_toTopOf="@+id/notation"
+            app:layout_constraintBottom_toTopOf="@+id/startScanner"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/scan_gen"
+            android:layout_marginBottom="1dp"
             app:srcCompat="@android:color/transparent"
             tools:ignore="ContentDescription,MissingConstraints" />
 
@@ -44,11 +78,19 @@
             android:id="@+id/main_layout"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            app:layout_constraintBottom_toTopOf="@+id/notation"
+            app:layout_constraintBottom_toTopOf="@+id/startScanner"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent"
-            ></FrameLayout>
+            app:layout_constraintTop_toBottomOf="@+id/scan_gen"/>
+
+        <Button
+            android:id="@+id/startScanner"
+            android:layout_width="wrap_content"
+            android:layout_height="35dp"
+            android:text=""
+            app:layout_constraintBottom_toTopOf="@+id/notation"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent" />
 
         <TextView
             android:id="@+id/notation"
@@ -57,7 +99,7 @@
             android:padding="10dp"
             android:text=""
             android:textAlignment="center"
-            android:textSize="14sp"
+            android:textSize="8sp"
             app:layout_constraintBottom_toTopOf="@+id/constraintLayout"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"/>

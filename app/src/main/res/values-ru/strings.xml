@@ -3,10 +3,10 @@
     <string name="app_name">Жидкая экномика</string>
     <string name="messages_header">Сообщения</string>
     <string name="sync_header">Синхронизация</string>
-    <string name="title_activity_scaner">Проверка QR-кода партнера</string>
+    <string name="QR_scanner">Сканер QR-кода</string>
     <string name="title_activity_settings">Настройки</string>
     <string name="Copied_to_clipboard">Скопированно в буфер обмена.</string>
-    <string name="annotation_qr">Чтобы начать процедуру верификации и синхронизации - предоставьте вашему партнеру возможность сканировать ваш QR-код, а также сканируйте предоставленный им QR-код.</string>
+    <string name="annotation_qr">Чтобы начать процедуру верификации и синхронизации, Вам, с вашим пратнером необходимо обменяться  QR кодами, для этого предоставьте вашему партнеру возможность сканировать ваш QR-код. Для того, чтобы сканировать QR-код вашего партнера коснитесь кнопки \"сканировать\".</string>
     <string name="Accept_service">Принять услугу</string>
     <string name="Provide_service">Оказать услугу</string>
     <string name="pubKeyNotFound">Открытый ключ вашего партнера не найден, вы хотите продолжить?</string>
@@ -28,5 +28,8 @@
     <string name="permission_is_not_available_CAMERA">Разрешение не доступно. Запрос разрешения камеры.</string>
     <string name="ErrorReceivingPartnerData">Ошибка получения данных партнера</string>
     <string name="pubKeyFound">Your partner’s public key has been found.</string>
+    <string name="QR_generator">Ваш QR-код</string>
+    <string name="startScan">Сканировать</string>
+    <string name="stopScan">Остановить</string>
 
 </resources>

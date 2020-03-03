@@ -16,9 +16,9 @@
     <string name="attachment_summary_on" translatable="false">Automatically download attachments for incoming emails
     </string>
     <string name="attachment_summary_off" translatable="false">Only download attachments when manually requested</string>
-    <string name="title_activity_scaner">Partner QR code verification</string>
+    <string name="QR_scanner">QR code scanner</string>
     <string name="Copied_to_clipboard">Copied to the clipboard</string>
-    <string name="annotation_qr">To begin the verification and synchronization process, provide your partner with the opportunity to scan your QR code, and also scan the QR code provided by him.</string>
+    <string name="annotation_qr">To begin the verification and synchronization process, you and your partner need to exchange QR codes, for this, give your partner the opportunity to scan your QR code. In order to scan the QR code of your partner, tap the \"scan\" button.</string>
     <string name="Accept_service">Accept service</string>
     <string name="Provide_service">Provide service</string>
     <string name="pubKeyNotFound">Public key yours partner not found, do you want to continue?</string>
@@ -40,4 +40,7 @@
     <string name="permission_is_not_available_CAMERA">Permission is not available. Requesting camera permission.</string>
     <string name="ErrorReceivingPartnerData">Error receiving partner data</string>
     <string name="pubKeyFound">Your partner’s public key has been found.</string>
+    <string name="QR_generator">Your QR code</string>
+    <string name="startScan">start scanning</string>
+    <string name="stopScan">stop scanning</string>
 </resources>
