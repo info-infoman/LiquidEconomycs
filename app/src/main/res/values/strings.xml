@@ -21,11 +21,11 @@
     <string name="annotation_qr">To begin the verification and synchronization process, you and your partner need to exchange QR codes, for this, give your partner the opportunity to scan your QR code. In order to scan the QR code of your partner, tap the \"scan\" button.</string>
     <string name="Accept_service">Accept service</string>
     <string name="Provide_service">Provide service</string>
-    <string name="pubKeyNotFound">Public key yours partner not found, do you want to continue?</string>
+    <string name="pubKeyNotFound">Your partner\'s public key can not be found, perhaps in front of you people who have not provided services to the community, you want to continue to give him a favor?</string>
     <string name="Attention">Attention!</string>
     <string name="errorConnection">Error connection</string>
     <string name="onConnection">Signal server connection established</string>
-    <string name="onCheckToken">Token verification was successful, we begin synchronization, the application can be minimized ...</string>
+    <string name="onCheckToken">Begin synchronization...</string>
     <string name="onCheckTokenError">Token verification error!</string>
     <string name="Signal_server_URL">Signal server WebSocket URL</string>
     <string name="Signal_server_Token">Signal server token</string>

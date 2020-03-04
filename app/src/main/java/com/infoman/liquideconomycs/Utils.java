@@ -1,15 +1,9 @@
-package com.example.liquideconomycs;
+package com.infoman.liquideconomycs;
 
-import android.content.Intent;
 import android.content.res.AssetManager;
-import android.nfc.NdefMessage;
 import android.nfc.NdefRecord;
-import android.nfc.NfcAdapter;
-import android.os.Parcelable;
-import android.widget.Toast;
 
 import com.google.common.primitives.Bytes;
-import com.google.common.reflect.Reflection;
 
 import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.Sha256Hash;
@@ -34,30 +28,30 @@ public class Utils {
     public static byte BRANCH = 2;
     public static byte LEAF = 3;
 
-    public static final String EXTRA_MESSAGE = "com.example.liquideconomycs.MESSAGE";
+    public static final String EXTRA_MESSAGE = "com.infoman.liquideconomycs.MESSAGE";
 
-    public static final String EXTRA_MASTER = "com.example.liquideconomycs.extra.MASTER";
-    public static final String EXTRA_CMD = "com.example.liquideconomycs.extra.CMD";
+    public static final String EXTRA_MASTER = "com.infoman.liquideconomycs.extra.MASTER";
+    public static final String EXTRA_CMD = "com.infoman.liquideconomycs.extra.CMD";
     //input fnc
-    public static final String ACTION_GetHash = "com.example.liquideconomycs.action.GetHash";
-    public static final String ACTION_Insert = "com.example.liquideconomycs.action.Insert";
-    public static final String ACTION_Find = "com.example.liquideconomycs.action.Find";
-    public static final String ACTION_Delete = "com.example.liquideconomycs.action.Delete";
-    public static final String ACTION_GenerateAnswer = "com.example.liquideconomycs.action.GetAnswer";
+    public static final String ACTION_GetHash = "com.infoman.liquideconomycs.action.GetHash";
+    public static final String ACTION_Insert = "com.infoman.liquideconomycs.action.Insert";
+    public static final String ACTION_Find = "com.infoman.liquideconomycs.action.Find";
+    public static final String ACTION_Delete = "com.infoman.liquideconomycs.action.Delete";
+    public static final String ACTION_GenerateAnswer = "com.infoman.liquideconomycs.action.GetAnswer";
 
     //input params
-    public static final String ACTION_Start = "com.example.liquideconomycs.action.Start";
-    public static final String EXTRA_SIGNAL_SERVER = "com.example.liquideconomycs.extra.SIGNAL_SERVER";
-    public static final String EXTRA_Provide_service = "com.example.liquideconomycs.extra.Provide_service";
-    public static final String EXTRA_Token = "com.example.liquideconomycs.extra.Token";;
-    public static final String EXTRA_POS = "com.example.liquideconomycs.extra.POS";
-    public static final String EXTRA_PUBKEY = "com.example.liquideconomycs.extra.PUBKEY";
-    public static final String EXTRA_AGE = "com.example.liquideconomycs.extra.AGE";
-    public static final String EXTRA_MSGTYPE = "com.example.liquideconomycs.extra.MSGTYPE";
-    public static final String EXTRA_PAYLOAD = "com.example.liquideconomycs.extra.PAYLOAD";
+    public static final String ACTION_Start = "com.infoman.liquideconomycs.action.Start";
+    public static final String EXTRA_SIGNAL_SERVER = "com.infoman.liquideconomycs.extra.SIGNAL_SERVER";
+    public static final String EXTRA_Provide_service = "com.infoman.liquideconomycs.extra.Provide_service";
+    public static final String EXTRA_Token = "com.infoman.liquideconomycs.extra.Token";;
+    public static final String EXTRA_POS = "com.infoman.liquideconomycs.extra.POS";
+    public static final String EXTRA_PUBKEY = "com.infoman.liquideconomycs.extra.PUBKEY";
+    public static final String EXTRA_AGE = "com.infoman.liquideconomycs.extra.AGE";
+    public static final String EXTRA_MSGTYPE = "com.infoman.liquideconomycs.extra.MSGTYPE";
+    public static final String EXTRA_PAYLOAD = "com.infoman.liquideconomycs.extra.PAYLOAD";
 
-    public static final String BROADCAST_ACTION_ANSWER = "com.example.liquideconomycs.broadcast_action.ANSWER";
-    public static final String EXTRA_ANSWER = "com.example.liquideconomycs.extra.ANSWER";
+    public static final String BROADCAST_ACTION_ANSWER = "com.infoman.liquideconomycs.broadcast_action.ANSWER";
+    public static final String EXTRA_ANSWER = "com.infoman.liquideconomycs.extra.ANSWER";
 
     public static byte[] getBytesPart(byte[] src, int off, int len){
         byte[] result= new byte[len];
@@ -222,7 +216,12 @@ public class Utils {
         byte[] val = new byte[str.length() / 2];
         for (int i = 0; i < val.length; i++) {
             int index = i * 2;
-            int j = Integer.parseInt(str.substring(index, index + 2), 16);
+            int j;
+            try {
+                j = Integer.parseInt(str.substring(index, index + 2), 16);
+            }catch (NumberFormatException e){
+                j = 0;
+            }
             val[i] = (byte) j;
         }
         return val;
@@ -244,7 +243,5 @@ public class Utils {
 
         return records;
     }
-
-
 
 }

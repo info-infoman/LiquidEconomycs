@@ -1,7 +1,8 @@
-package com.example.liquideconomycs;
+package com.infoman.liquideconomycs;
 
 import android.app.AlertDialog;
 import android.app.Dialog;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.os.Bundle;
 
@@ -10,7 +11,7 @@ import java.util.Objects;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatDialogFragment;
 
-import static com.example.liquideconomycs.SyncServiceIntent.startActionSync;
+import static com.infoman.liquideconomycs.SyncServiceIntent.startActionSync;
 
 public class DialogsFragment extends AppCompatDialogFragment {
     private int dialogCmd;
@@ -20,12 +21,12 @@ public class DialogsFragment extends AppCompatDialogFragment {
 
     private int cantFindPubKey = 0;
 
-    DialogsFragment(String activity, int cmd) {
+    DialogsFragment(Context context, String activity, int cmd) {
 
         int findPubKey = 1;
         if(cmd==cantFindPubKey){
-            dialogHead = getResources().getString(R.string.Attention);
-            dialogMsg = getResources().getString(R.string.pubKeyNotFound);
+            dialogHead = context.getResources().getString(R.string.Attention);
+            dialogMsg = context.getResources().getString(R.string.pubKeyNotFound);
         }else if(cmd== findPubKey){
             dialogHead = getResources().getString(R.string.Attention);
             dialogMsg = getResources().getString(R.string.pubKeyFound);

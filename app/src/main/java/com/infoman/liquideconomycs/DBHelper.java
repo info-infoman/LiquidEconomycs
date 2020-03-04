@@ -1,4 +1,4 @@
-package com.example.liquideconomycs;
+package com.infoman.liquideconomycs;
 
 import android.content.Context;
 import android.database.sqlite.SQLiteDatabase;

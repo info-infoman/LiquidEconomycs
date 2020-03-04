@@ -1,4 +1,4 @@
-package com.example.liquideconomycs;
+package com.infoman.liquideconomycs;
 
 //
 // HybiParser.java: draft-ietf-hybi-thewebsocketprotocol-13 parser

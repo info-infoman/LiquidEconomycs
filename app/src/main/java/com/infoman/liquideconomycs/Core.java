@@ -1,4 +1,4 @@
-package com.example.liquideconomycs;
+package com.infoman.liquideconomycs;
 
 import android.app.Application;
 import android.content.ContentValues;
@@ -17,7 +17,7 @@ import java.io.RandomAccessFile;
 
 import androidx.core.util.Pair;
 
-import static com.example.liquideconomycs.Utils.copyAssetFolder;
+import static com.infoman.liquideconomycs.Utils.copyAssetFolder;
 
 public class Core extends Application {
     public long dateTimeLastSync;

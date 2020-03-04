@@ -9,11 +9,11 @@
     <string name="annotation_qr">Чтобы начать процедуру верификации и синхронизации, Вам, с вашим пратнером необходимо обменяться  QR кодами, для этого предоставьте вашему партнеру возможность сканировать ваш QR-код. Для того, чтобы сканировать QR-код вашего партнера коснитесь кнопки \"сканировать\".</string>
     <string name="Accept_service">Принять услугу</string>
     <string name="Provide_service">Оказать услугу</string>
-    <string name="pubKeyNotFound">Открытый ключ вашего партнера не найден, вы хотите продолжить?</string>
+    <string name="pubKeyNotFound">Открытый ключ вашего партнера не найден, возможно перед вами человек, который давно не оказывал услуги обществу, вы хотите продолжить оказывать ему услугу?</string>
     <string name="Attention">Внимание!</string>
     <string name="errorConnection">"Ошибка соединения "</string>
     <string name="onConnection">Соединение установлено</string>
-    <string name="onCheckToken">Верификация токена прошла успешно, начинаем синхронизацию, приложение можно свернуть...</string>
+    <string name="onCheckToken">Начинаю синхронизацию...</string>
     <string name="onCheckTokenError">Ошибка верификации токена!</string>
     <string name="Signal_server_URL">WebSocket URL сигнального сервера</string>
     <string name="Signal_server_Token">Токен сигнального сервера</string>

@@ -1,4 +1,4 @@
-package com.example.liquideconomycs;
+package com.infoman.liquideconomycs;
 
 import android.app.IntentService;
 import android.app.Notification;
@@ -19,8 +19,8 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 
-import static com.example.liquideconomycs.TrieServiceIntent.startActionGenerateAnswer;
-import static com.example.liquideconomycs.Utils.*;
+import static com.infoman.liquideconomycs.TrieServiceIntent.startActionGenerateAnswer;
+import static com.infoman.liquideconomycs.Utils.*;
 
 public class SyncServiceIntent extends IntentService {
 
@@ -110,6 +110,9 @@ public class SyncServiceIntent extends IntentService {
                     @Override
                     public void onMessage(byte[] data) {
                         Log.d(TAG, String.format("Got binary message! %s", data.toString()));
+                        if(data.length<7)
+                            app.mClient.disconnect();
+
                         byte msgType    = Utils.getBytesPart(data,0,1)[0];
                         int sigLength   = Ints.fromByteArray(Utils.getBytesPart(data,1,4));
                         byte[] sig      = Utils.getBytesPart(data,5, sigLength);

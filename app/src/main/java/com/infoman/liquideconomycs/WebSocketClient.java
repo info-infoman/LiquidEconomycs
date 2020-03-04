@@ -1,4 +1,4 @@
-package com.example.liquideconomycs;
+package com.infoman.liquideconomycs;
 
 import android.os.Handler;
 import android.os.HandlerThread;

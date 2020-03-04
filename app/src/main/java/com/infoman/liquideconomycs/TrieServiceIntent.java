@@ -1,4 +1,4 @@
-package com.example.liquideconomycs;
+package com.infoman.liquideconomycs;
 
 import android.app.IntentService;
 import android.content.Context;
@@ -12,7 +12,7 @@ import com.google.common.primitives.Longs;
 import java.io.IOException;
 import java.util.Arrays;
 
-import static com.example.liquideconomycs.Utils.*;
+import static com.infoman.liquideconomycs.Utils.*;
 
 import static org.bitcoinj.core.Utils.sha256hash160;
 
