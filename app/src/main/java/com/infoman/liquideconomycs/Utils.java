@@ -18,6 +18,7 @@ import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Date;
+import java.util.concurrent.TimeUnit;
 
 
 public class Utils {
@@ -32,31 +33,40 @@ public class Utils {
 
     public static final String EXTRA_MASTER = "com.infoman.liquideconomycs.extra.MASTER";
     public static final String EXTRA_CMD = "com.infoman.liquideconomycs.extra.CMD";
+
     //input fnc
     public static final String ACTION_GetHash = "com.infoman.liquideconomycs.action.GetHash";
     public static final String ACTION_Insert = "com.infoman.liquideconomycs.action.Insert";
     public static final String ACTION_Find = "com.infoman.liquideconomycs.action.Find";
     public static final String ACTION_Delete = "com.infoman.liquideconomycs.action.Delete";
     public static final String ACTION_GenerateAnswer = "com.infoman.liquideconomycs.action.GetAnswer";
-
-    //input params
     public static final String ACTION_Start = "com.infoman.liquideconomycs.action.Start";
+    public static final String ACTION_UpdateAfterSync = "com.infoman.liquideconomycs.action.UpdateAfterSync";
+
+    //input param
     public static final String EXTRA_SIGNAL_SERVER = "com.infoman.liquideconomycs.extra.SIGNAL_SERVER";
     public static final String EXTRA_Provide_service = "com.infoman.liquideconomycs.extra.Provide_service";
     public static final String EXTRA_Token = "com.infoman.liquideconomycs.extra.Token";;
     public static final String EXTRA_POS = "com.infoman.liquideconomycs.extra.POS";
     public static final String EXTRA_PUBKEY = "com.infoman.liquideconomycs.extra.PUBKEY";
     public static final String EXTRA_AGE = "com.infoman.liquideconomycs.extra.AGE";
+    public static final String EXTRA_MaxAge = "com.infoman.liquideconomycs.extra.MaxAge";
     public static final String EXTRA_MSGTYPE = "com.infoman.liquideconomycs.extra.MSGTYPE";
     public static final String EXTRA_PAYLOAD = "com.infoman.liquideconomycs.extra.PAYLOAD";
 
     public static final String BROADCAST_ACTION_ANSWER = "com.infoman.liquideconomycs.broadcast_action.ANSWER";
     public static final String EXTRA_ANSWER = "com.infoman.liquideconomycs.extra.ANSWER";
 
+
     public static byte[] getBytesPart(byte[] src, int off, int len){
         byte[] result= new byte[len];
         System.arraycopy(src, off, result, 0, result.length);
         return result;
+    }
+
+    public static long compareDate(Date oldDate, Date newDate){
+        long diffInMillies = Math.abs(newDate.getTime() - oldDate.getTime());
+        return TimeUnit.DAYS.convert(diffInMillies, TimeUnit.MILLISECONDS);
     }
 
     public static Date reconstructAgeFromBytes(byte[] d) {
@@ -243,5 +253,7 @@ public class Utils {
 
         return records;
     }
+
+
 
 }

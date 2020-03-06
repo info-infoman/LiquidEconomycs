@@ -55,8 +55,6 @@ public class Core extends Application {
             }
         }
 
-
-
         //MySingleton.initInstance();
     }
 
@@ -76,25 +74,10 @@ public class Core extends Application {
         cv.clear();
     }
 
-    public byte[] getPrefixByPos(long pos) {
-        byte[] prefix = null;
-        Cursor query = db.rawQuery("SELECT * FROM sync where pos="+pos, null);
-        if (query.moveToFirst()) {
-            int pubKeyColIndex = query.getColumnIndex("pubKey");
-            prefix = query.getBlob(pubKeyColIndex);
-        }
-        query.close();
-        return prefix;
-    }
 
-    public void addPrefixByPos(long pos, byte[] key, byte[] age, boolean del){
-        cv.put("pos", pos);
-        cv.put("pubKey", key);
-        cv.put("age", age);
-        cv.put("del", del);
-        db.insert("sync", null, cv);
-        cv.clear();
-    }
+
+
+
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
     /////////MyKey/////////////////////////////////////////////////////////////////////////////////
@@ -136,5 +119,26 @@ public class Core extends Application {
             mClient.send(Bytes.concat(type, Ints.toByteArray(sig.length), sig, payload));
         }
     }
+
+    public byte[] getPrefixByPos(long pos) {
+        byte[] prefix = null;
+        Cursor query = db.rawQuery("SELECT * FROM sync where pos="+pos, null);
+        if (query.moveToFirst()) {
+            int pubKeyColIndex = query.getColumnIndex("pubKey");
+            prefix = query.getBlob(pubKeyColIndex);
+        }
+        query.close();
+        return prefix;
+    }
+
+    public void addPrefixByPos(long pos, byte[] key, byte[] age, boolean del){
+        cv.put("pos", pos);
+        cv.put("pubKey", key);
+        cv.put("age", age);
+        cv.put("del", del);
+        db.insert("sync", null, cv);
+        cv.clear();
+    }
+
     ///////////////////////////////////////////////////////////////////////////////////////////////
 }

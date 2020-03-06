@@ -64,8 +64,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
     private Core                app;
     private ViewGroup           mainLayout;
-    private ToggleButton        tbResive, tbMade;
-    private ToggleButton        tbwNFC, tbQR;
+    private ToggleButton        tbResive, tbMade, tbwNFC, tbQR;
     private Button              startBtn;
     public TextView            resultTextView, notation, role_capture, scan_gen;
     private QRCodeReaderView    qrCodeReaderView;
@@ -83,6 +82,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         if(provideService){
                             shakeIt(300,10);
                             if(answer!=null) {
+                                Toast.makeText(getApplicationContext(), getResources().getString(R.string.pubKeyFound),Toast.LENGTH_LONG).show();
                                 startActionSync(getApplicationContext(), "Main", "", Utils.hexToByte(resultTextView.getText().toString()), "", true);
                             }else{
                                 DialogsFragment alert = new DialogsFragment(getApplicationContext(), "MainActivity", 0);

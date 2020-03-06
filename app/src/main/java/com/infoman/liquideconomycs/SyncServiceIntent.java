@@ -20,7 +20,15 @@ import java.util.Date;
 import java.util.List;
 
 import static com.infoman.liquideconomycs.TrieServiceIntent.startActionGenerateAnswer;
-import static com.infoman.liquideconomycs.Utils.*;
+import static com.infoman.liquideconomycs.Utils.ACTION_Start;
+import static com.infoman.liquideconomycs.Utils.BROADCAST_ACTION_ANSWER;
+import static com.infoman.liquideconomycs.Utils.EXTRA_ANSWER;
+import static com.infoman.liquideconomycs.Utils.EXTRA_CMD;
+import static com.infoman.liquideconomycs.Utils.EXTRA_MASTER;
+import static com.infoman.liquideconomycs.Utils.EXTRA_PUBKEY;
+import static com.infoman.liquideconomycs.Utils.EXTRA_Provide_service;
+import static com.infoman.liquideconomycs.Utils.EXTRA_SIGNAL_SERVER;
+import static com.infoman.liquideconomycs.Utils.EXTRA_Token;
 
 public class SyncServiceIntent extends IntentService {
 
@@ -158,11 +166,11 @@ public class SyncServiceIntent extends IntentService {
                 while (app.isSynchronized && (new Date().getTime() - app.dateTimeLastSync) / 1000 < 300){
                 }
 
+                app.isSynchronized=false;
                 app.mClient.disconnect();
-
-                broadcastActionMsg(master, "Sync", getResources().getString(R.string.SyncFinish));
+                //todo clear tmp register
                 stopForeground(true);
-
+                broadcastActionMsg("Main", "Sync", getResources().getString(R.string.SyncFinish));
                 ////////////////////////////////////////////////////////////////
             }
         }

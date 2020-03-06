@@ -12,8 +12,30 @@ import com.google.common.primitives.Longs;
 import java.io.IOException;
 import java.util.Arrays;
 
-import static com.infoman.liquideconomycs.Utils.*;
-
+import static com.infoman.liquideconomycs.Utils.ACTION_Delete;
+import static com.infoman.liquideconomycs.Utils.ACTION_Find;
+import static com.infoman.liquideconomycs.Utils.ACTION_GenerateAnswer;
+import static com.infoman.liquideconomycs.Utils.ACTION_GetHash;
+import static com.infoman.liquideconomycs.Utils.ACTION_Insert;
+import static com.infoman.liquideconomycs.Utils.BRANCH;
+import static com.infoman.liquideconomycs.Utils.BROADCAST_ACTION_ANSWER;
+import static com.infoman.liquideconomycs.Utils.EXTRA_AGE;
+import static com.infoman.liquideconomycs.Utils.EXTRA_ANSWER;
+import static com.infoman.liquideconomycs.Utils.EXTRA_CMD;
+import static com.infoman.liquideconomycs.Utils.EXTRA_MASTER;
+import static com.infoman.liquideconomycs.Utils.EXTRA_MSGTYPE;
+import static com.infoman.liquideconomycs.Utils.EXTRA_PAYLOAD;
+import static com.infoman.liquideconomycs.Utils.EXTRA_POS;
+import static com.infoman.liquideconomycs.Utils.EXTRA_PUBKEY;
+import static com.infoman.liquideconomycs.Utils.LEAF;
+import static com.infoman.liquideconomycs.Utils.ROOT;
+import static com.infoman.liquideconomycs.Utils.changeChildInMap;
+import static com.infoman.liquideconomycs.Utils.checkExistChildInMap;
+import static com.infoman.liquideconomycs.Utils.getBytesPart;
+import static com.infoman.liquideconomycs.Utils.getChildPosInArray;
+import static com.infoman.liquideconomycs.Utils.getChildPosInMap;
+import static com.infoman.liquideconomycs.Utils.getChildsCountInMap;
+import static com.infoman.liquideconomycs.Utils.getCommonKey;
 import static org.bitcoinj.core.Utils.sha256hash160;
 
 
@@ -200,12 +222,11 @@ public class TrieServiceIntent extends IntentService {
                 byte[] childsArray      = Utils.getBytesPart(payload, i + 10 + nodeKeySize + 32, len);
                 i                       = i + 10 + nodeKeySize + 32 + len;
                 //todo В цикле  от 0 - 255 мы должны
-                // 1) Если selfNodePos<>null и узел\возраст не найден в полученной карте, но есть в нашей, тогда внести
-                // список на удаление (параметры prefix + индекс цикла)
+                // 1) Если selfNodePos<>null и узел\возраст не найден в полученной карте, но есть в нашей, тогда ничего не делаем ибо оно есть у нас и не удалено автоматом по возрасту
                 // 2) Если узел\возраст найден:
                 // 3) Если это тип BRANCH и (selfNodePos<>null и узел в карте имеет хеш не равный нашему или selfNodePos==null) то
                 // внести в базу (prefix + индекс позиции в карте) и позицию, добавить позицию в следующий запрос
-                // 4) Если это тип LEAF и (selfNodePos<>null и узел в карте имеет возраст не равный нашему или selfNodePos==null)
+                // 4) Если это тип LEAF и ((selfNodePos<>null и узел в карте имеет возраст не равный нашему  и возраст моложе нашего ) или selfNodePos==null)
                 // то добавить в список на добавление(изменение) (prefix + индекс цикла) и возраст
                 byte[] ask = new byte[0];
                 for(int c = 0; c < 255; c++){
@@ -228,12 +249,15 @@ public class TrieServiceIntent extends IntentService {
                             }
                         }else{
                             byte[] childAge=Utils.getBytesPart(childsArray, (getChildPosInMap(childsMap, c) * offLen) - offLen, offLen);
-                            if(selfNodePos == null || !Arrays.equals(
-                                    childAge,
-                                    Utils.getBytesPart(selfNodeHashOrAge, (getChildPosInMap(selfNodeMap, c) * offLen) - offLen, offLen)
-                            )){
-                                //todo add list add/update
-                                app.addPrefixByPos(0L, Bytes.concat(prefix,c_), childAge, false);
+                            if(selfNodePos == null ||
+                                    (!Arrays.equals(childAge, Utils.getBytesPart(selfNodeHashOrAge, (getChildPosInMap(selfNodeMap, c) * offLen) - offLen, offLen))
+                                            && Utils.compareDate(Utils.reconstructAgeFromBytes(childAge), Utils.reconstructAgeFromBytes(Utils.getBytesPart(selfNodeHashOrAge, (getChildPosInMap(selfNodeMap, c) * offLen) - offLen, offLen)))>0)
+                            ){
+
+                                //app.addPrefixByPos(0L, Bytes.concat(prefix,c_), childAge, false);
+                                //todo add list add/update (check age)
+                                startActionInsert(app.getApplicationContext(), "Main", Bytes.concat(prefix,c_), childAge);
+
                             }
                         }
                     }
