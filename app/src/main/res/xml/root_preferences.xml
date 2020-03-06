@@ -29,10 +29,14 @@
             android:selectAllOnFocus="true"
             android:singleLine="true"
             android:title="@string/Signal_server_Token" />
-
-
-
-    </PreferenceCategory>
+        <EditTextPreference
+            android:defaultValue="30"
+            android:dialogTitle="@string/maxAge"
+            android:inputType="number"
+            android:key="maxAge"
+            android:summary="@string/maxAge_summ"
+            android:title="@string/maxAge" />
+   </PreferenceCategory>
 
 
 

@@ -3,7 +3,9 @@ package com.infoman.liquideconomycs;
 import android.app.IntentService;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.database.Cursor;
+import android.preference.PreferenceManager;
 import android.util.Log;
 
 import com.google.common.primitives.Bytes;
@@ -11,6 +13,7 @@ import com.google.common.primitives.Longs;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Date;
 
 import static com.infoman.liquideconomycs.Utils.ACTION_Delete;
 import static com.infoman.liquideconomycs.Utils.ACTION_Find;
@@ -168,7 +171,6 @@ public class TrieServiceIntent extends IntentService {
                 final byte[] payload = intent.getByteArrayExtra(EXTRA_AGE);
                 ////////////////////////////////////////////////////////////////
                 try {
-                    byte[] answer = null;
                     generateAnswer(msgType, payload);
 
                 } catch (IOException e) {
@@ -180,6 +182,7 @@ public class TrieServiceIntent extends IntentService {
     }
 
     private void generateAnswer(byte msgType, byte[] payload) throws IOException {
+        Context context = app.getApplicationContext();
         //todo
         if(msgType == Utils.getHashs){
             byte[] answer = new byte[0];
@@ -234,7 +237,7 @@ public class TrieServiceIntent extends IntentService {
                     c_[0] = (byte)c;
                     if(selfNodePos!=null && !checkExistChildInMap(childsMap, c) && checkExistChildInMap(selfNodeMap, c)){
                         //todo add to list delete
-                        app.addPrefixByPos(0L, Bytes.concat(prefix,c_), null, true);
+                        app.addPrefixByPos(0L, Bytes.concat(prefix,c_), null);
                     }
                     if(checkExistChildInMap(childsMap, c)){
                         if(nodeType==BRANCH){
@@ -244,7 +247,7 @@ public class TrieServiceIntent extends IntentService {
                             )){
                                 //todo add to table sync add to list new ask
                                 long pos_ = Longs.fromByteArray(Utils.getBytesPart(childsArray, (getChildPosInMap(childsMap, c) * 28) - 28, 8));
-                                app.addPrefixByPos(pos_, Bytes.concat(prefix,c_), null, false);
+                                app.addPrefixByPos(pos_, Bytes.concat(prefix,c_), null);
                                 ask = Bytes.concat(ask, Longs.toByteArray(pos_));
                             }
                         }else{
@@ -256,7 +259,10 @@ public class TrieServiceIntent extends IntentService {
 
                                 //app.addPrefixByPos(0L, Bytes.concat(prefix,c_), childAge, false);
                                 //todo add list add/update (check age)
-                                startActionInsert(app.getApplicationContext(), "Main", Bytes.concat(prefix,c_), childAge);
+                                SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(context);
+                                long maxAge = sharedPref.getLong("maxAge", 30);
+                                if(Utils.compareDate(new Date(), Utils.reconstructAgeFromBytes(childAge))<maxAge && Utils.compareDate(new Date(), Utils.reconstructAgeFromBytes(childAge))>=0)
+                                    startActionInsert(context, "Main", Bytes.concat(prefix,c_), childAge);
 
                             }
                         }

@@ -31,5 +31,7 @@
     <string name="QR_generator">Ваш QR-код</string>
     <string name="startScan">Сканировать</string>
     <string name="stopScan">Остановить</string>
+    <string name="maxAge">Максимальный возраст хранения публичных ключей</string>
+    <string name="maxAge_summ">Публичные ключи ваших партнеров при достижении этого возраста (в днях) будут автоматически удалены из локальной базы данных</string>
 
 </resources>

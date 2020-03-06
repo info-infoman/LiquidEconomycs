@@ -5,6 +5,8 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
+import android.preference.EditTextPreference;
+import android.text.InputType;
 
 import com.google.common.primitives.Bytes;
 import com.google.common.primitives.Ints;
@@ -131,11 +133,10 @@ public class Core extends Application {
         return prefix;
     }
 
-    public void addPrefixByPos(long pos, byte[] key, byte[] age, boolean del){
+    public void addPrefixByPos(long pos, byte[] key, byte[] age){
         cv.put("pos", pos);
         cv.put("pubKey", key);
         cv.put("age", age);
-        cv.put("del", del);
         db.insert("sync", null, cv);
         cv.clear();
     }

@@ -43,4 +43,6 @@
     <string name="QR_generator">Your QR code</string>
     <string name="startScan">start scanning</string>
     <string name="stopScan">stop scanning</string>
+    <string name="maxAge">Maximum age for storing public keys</string>
+    <string name="maxAge_summ">The public keys of your partners on reaching this age (in days) will be automatically deleted from the local database</string>
 </resources>

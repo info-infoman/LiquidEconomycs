@@ -64,7 +64,7 @@ public class Utils {
         return result;
     }
 
-    public static long compareDate(Date oldDate, Date newDate){
+    public static long compareDate(Date newDate, Date oldDate){
         long diffInMillies = Math.abs(newDate.getTime() - oldDate.getTime());
         return TimeUnit.DAYS.convert(diffInMillies, TimeUnit.MILLISECONDS);
     }
