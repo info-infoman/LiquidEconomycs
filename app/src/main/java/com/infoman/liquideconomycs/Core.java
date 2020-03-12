@@ -5,8 +5,6 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
-import android.preference.EditTextPreference;
-import android.text.InputType;
 
 import com.google.common.primitives.Bytes;
 import com.google.common.primitives.Ints;
@@ -76,10 +74,6 @@ public class Core extends Application {
         cv.clear();
     }
 
-
-
-
-
     ///////////////////////////////////////////////////////////////////////////////////////////////
 
     /////////MyKey/////////////////////////////////////////////////////////////////////////////////
@@ -141,5 +135,9 @@ public class Core extends Application {
         cv.clear();
     }
 
+    public void clearPrefixTable() {
+        Cursor query = db.rawQuery("DELETE FROM sync", null);
+        query.close();
+    }
     ///////////////////////////////////////////////////////////////////////////////////////////////
 }

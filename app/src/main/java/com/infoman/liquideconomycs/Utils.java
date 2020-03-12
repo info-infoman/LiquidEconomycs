@@ -41,7 +41,6 @@ public class Utils {
     public static final String ACTION_Delete = "com.infoman.liquideconomycs.action.Delete";
     public static final String ACTION_GenerateAnswer = "com.infoman.liquideconomycs.action.GetAnswer";
     public static final String ACTION_Start = "com.infoman.liquideconomycs.action.Start";
-    public static final String ACTION_UpdateAfterSync = "com.infoman.liquideconomycs.action.UpdateAfterSync";
 
     //input param
     public static final String EXTRA_SIGNAL_SERVER = "com.infoman.liquideconomycs.extra.SIGNAL_SERVER";
@@ -237,7 +236,7 @@ public class Utils {
         return val;
     }
 
-    public static NdefRecord[] createNFCrecords(String msg) {
+    public static NdefRecord[] createNFCRecords(String msg) {
 
         NdefRecord[] records = new NdefRecord[1];
 

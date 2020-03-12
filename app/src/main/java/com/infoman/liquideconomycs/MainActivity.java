@@ -262,10 +262,10 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             String token = sharedPref.getString("Signal_server_Token", "");
             String args = msg + (signalServer != null ? " " + signalServer + " " + token : "");
             if(!msg.equals(""))
-                return new NdefMessage(Utils.createNFCrecords(args));
+                return new NdefMessage(Utils.createNFCRecords(args));
         }else{
             if(!msg.equals(""))
-                return new NdefMessage(Utils.createNFCrecords(msg));
+                return new NdefMessage(Utils.createNFCRecords(msg));
         }
         return null;
     }

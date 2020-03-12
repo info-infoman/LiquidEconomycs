@@ -35,6 +35,7 @@ public class SyncServiceIntent extends IntentService {
     private Core app;
 
     public static void startActionSync(Context context, String master, String signalServer, byte[] pubKey, String token, boolean Provide_service) {
+
         if(Provide_service) {
             SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(context);
             signalServer = sharedPref.getString("Signal_server_URL", "");
@@ -68,6 +69,7 @@ public class SyncServiceIntent extends IntentService {
         if (intent != null) {
             final String action = intent.getAction();
             if (ACTION_Start.equals(action) && !app.isSynchronized) {
+                app.clearPrefixTable();
                 app.isSynchronized = true;
                 app.dateTimeLastSync=new Date().getTime();
                 final String signalServer = intent.getStringExtra(EXTRA_SIGNAL_SERVER);
@@ -118,6 +120,9 @@ public class SyncServiceIntent extends IntentService {
                     @Override
                     public void onMessage(byte[] data) {
                         Log.d(TAG, String.format("Got binary message! %s", data.toString()));
+
+                        app.dateTimeLastSync = new Date().getTime();
+
                         if(data.length<7)
                             app.mClient.disconnect();
 
@@ -139,7 +144,6 @@ public class SyncServiceIntent extends IntentService {
                             app.mClient.disconnect();
                         }else {
                             startActionGenerateAnswer(getApplicationContext(), "SyncServiceIntent", msgType, payload);
-                            app.dateTimeLastSync = new Date().getTime();
                         }
 
                     }
