@@ -201,9 +201,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         super.onPause();
         unregisterReceiver(mBroadcastReceiver);
 
-        if (tbQR.isChecked() && qrCodeReaderView != null) {
+        //if (tbQR.isChecked() && qrCodeReaderView != null) {
             stopScanner();
-        }
+        //}
 
     }
 
@@ -212,9 +212,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
         registerReceiver(mBroadcastReceiver, new IntentFilter(BROADCAST_ACTION_ANSWER));
 
-        if (tbQR.isChecked() && qrCodeReaderView != null) {
+        //if (tbQR.isChecked() && qrCodeReaderView != null) {
             stopScanner();
-        }
+        //}
     }
 
     @Override public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
@@ -262,10 +262,14 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             String token = sharedPref.getString("Signal_server_Token", "");
             String args = msg + (signalServer != null ? " " + signalServer + " " + token : "");
             if(!msg.equals(""))
-                return new NdefMessage(Utils.createNFCRecords(args));
+                return new NdefMessage(NdefRecord.createMime(
+                        "com.infoman.liquideconomycs", args.getBytes()));
+                //return new NdefMessage(Utils.createNFCRecords(args));
         }else{
             if(!msg.equals(""))
-                return new NdefMessage(Utils.createNFCRecords(msg));
+                return new NdefMessage(NdefRecord.createMime(
+                        "com.infoman.liquideconomycs", msg.getBytes()));
+                //return new NdefMessage(Utils.createNFCRecords(msg));
         }
         return null;
     }
