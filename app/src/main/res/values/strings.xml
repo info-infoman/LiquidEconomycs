@@ -45,4 +45,6 @@
     <string name="stopScan">stop scanning</string>
     <string name="maxAge">Maximum age for storing public keys</string>
     <string name="maxAge_summ">The public keys of your partners on reaching this age (in days) will be automatically deleted from the local database</string>
+    <string name="getNFCPermission">Access to NFC is required to pre-pair devices</string>
+    <string name="permission_is_not_available_NFC">Permission is not available. NFC permission request.</string>
 </resources>

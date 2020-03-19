@@ -61,6 +61,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
     private static final int MY_PERMISSION_REQUEST_INTERNET = 0;
     private static final int MY_PERMISSION_REQUEST_CAMERA = 0;
+    private static final int MY_PERMISSION_REQUEST_NFC = 0;
 
     private Core                app;
     private ViewGroup           mainLayout;
@@ -102,6 +103,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         }
     };
 
+
     //Overrides/////////////////////////////////////////////////////////////////////////////////////
 
     @Override protected void onCreate(Bundle savedInstanceState) {
@@ -116,6 +118,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.INTERNET) == PackageManager.PERMISSION_GRANTED) {} else {
             requestINTERNETPermission();
         }
+
         registerReceiver(mBroadcastReceiver, new IntentFilter(BROADCAST_ACTION_ANSWER));
 
         Switch bSwitch = findViewById(R.id.bSwitch);
@@ -191,6 +194,15 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         provideService = false;
         role_capture.setText(getResources().getString(R.string.Accept_service));
         stopScanner();
+
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.NFC) == PackageManager.PERMISSION_GRANTED) {
+            NfcAdapter mNfcAdapter = NfcAdapter.getDefaultAdapter(this);
+            if(mNfcAdapter != null) {
+                mNfcAdapter.setNdefPushMessageCallback(this, this);
+            }
+        } else {
+            requestNFCPermission();
+        }
     }
 
     @Override protected void onDestroy() {
@@ -213,7 +225,12 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         registerReceiver(mBroadcastReceiver, new IntentFilter(BROADCAST_ACTION_ANSWER));
 
         //if (tbQR.isChecked() && qrCodeReaderView != null) {
-            stopScanner();
+        stopScanner();
+
+        if (NfcAdapter.ACTION_NDEF_DISCOVERED.equals(getIntent().getAction())) {
+            handleNfcIntent(getIntent());
+        }
+
         //}
     }
 
@@ -225,6 +242,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         if (requestCode == MY_PERMISSION_REQUEST_INTERNET) {
             ret.set(false);
         }
+        if (requestCode == MY_PERMISSION_REQUEST_NFC) {
+            ret.set(false);
+        }
         if(ret.get()){
             return;
         }
@@ -232,6 +252,12 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             Snackbar.make(mainLayout, "Permission was granted.", Snackbar.LENGTH_SHORT).show();
             if (requestCode == MY_PERMISSION_REQUEST_CAMERA) {
                 initQRCodeReaderView();
+            }
+            if (requestCode == MY_PERMISSION_REQUEST_NFC) {
+                NfcAdapter mNfcAdapter = NfcAdapter.getDefaultAdapter(this);
+                if(mNfcAdapter != null) {
+                    mNfcAdapter.setNdefPushMessageCallback(this, this);
+                }
             }
         } else {
             Snackbar.make(mainLayout, "Permission request was denied.", Snackbar.LENGTH_SHORT)
@@ -263,20 +289,22 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             String args = msg + (signalServer != null ? " " + signalServer + " " + token : "");
             if(!msg.equals(""))
                 return new NdefMessage(NdefRecord.createMime(
-                        "com.infoman.liquideconomycs", args.getBytes()));
+                        "application/com.infoman.liquideconomycs", args.getBytes()));
                 //return new NdefMessage(Utils.createNFCRecords(args));
         }else{
             if(!msg.equals(""))
                 return new NdefMessage(NdefRecord.createMime(
-                        "com.infoman.liquideconomycs", msg.getBytes()));
+                        "application/com.infoman.liquideconomycs", msg.getBytes()));
                 //return new NdefMessage(Utils.createNFCRecords(msg));
         }
         return null;
     }
 
-    @Override public void onNewIntent(Intent intent) {
+    @Override
+    public void onNewIntent(Intent intent) {
+        // onResume gets called after this to handle the intent
         super.onNewIntent(intent);
-        handleNfcIntent(intent);
+        setIntent(intent);
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -316,6 +344,25 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             ActivityCompat.requestPermissions(this, new String[] {
                     Manifest.permission.CAMERA
             }, MY_PERMISSION_REQUEST_CAMERA);
+        }
+    }
+
+    private void requestNFCPermission() {
+        if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.NFC)) {
+            Snackbar.make(mainLayout, getResources().getText(R.string.getNFCPermission),
+                    Snackbar.LENGTH_INDEFINITE).setAction(getResources().getString(android.R.string.ok), new View.OnClickListener() {
+                @Override public void onClick(View view) {
+                    ActivityCompat.requestPermissions(MainActivity.this, new String[] {
+                            Manifest.permission.NFC
+                    }, MY_PERMISSION_REQUEST_NFC);
+                }
+            }).show();
+        } else {
+            Snackbar.make(mainLayout, getResources().getText(R.string.permission_is_not_available_NFC),
+                    Snackbar.LENGTH_SHORT).show();
+            ActivityCompat.requestPermissions(this, new String[] {
+                    Manifest.permission.NFC
+            }, MY_PERMISSION_REQUEST_NFC);
         }
     }
 
@@ -434,7 +481,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         .load(R.drawable.nfc_img)
                         .into(img);
                 notation.setText(getResources().getString(R.string.annotation_nfc));
-                mNfcAdapter.setNdefPushMessageCallback(this, this);
             }else{
                 img.setImageResource(R.drawable.nfc_error_img);
                 notation.setText(getResources().getString(R.string.error_nfc));
@@ -469,21 +515,20 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     }
 
     private void handleNfcIntent(Intent NfcIntent) {
-        if (NfcAdapter.ACTION_NDEF_DISCOVERED.equals(NfcIntent.getAction())) {
-            Parcelable[] receivedArray =
+        Parcelable[] receivedArray =
                     NfcIntent.getParcelableArrayExtra(NfcAdapter.EXTRA_NDEF_MESSAGES);
 
-            if(receivedArray != null) {
-                NdefMessage receivedMessage = (NdefMessage) receivedArray[0];
-                NdefRecord[] attachedRecords = receivedMessage.getRecords();
+        if(receivedArray != null) {
+            NdefMessage receivedMessage = (NdefMessage) receivedArray[0];
+            NdefRecord[] attachedRecords = receivedMessage.getRecords();
 
-                for (NdefRecord record:attachedRecords) {
-                    String string = new String(record.getPayload());
-                    //Make sure we don't pass along our AAR (Android Application Record)
-                    if (string.equals(getPackageName())) { continue; }
-                    codeReadTrigger(string);
-                }
+            for (NdefRecord record:attachedRecords) {
+                String string = new String(record.getPayload());
+                //Make sure we don't pass along our AAR (Android Application Record)
+                if (string.equals(getPackageName())) { continue; }
+                codeReadTrigger(string);
             }
         }
+
     }
 }
