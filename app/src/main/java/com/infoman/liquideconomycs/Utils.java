@@ -22,39 +22,38 @@ import java.util.concurrent.TimeUnit;
 
 
 public class Utils {
-    public static byte getHashs = 0;
-    public static byte hashs = 1;
+    public static byte
+            getHashs    = 0,
+            hashs       = 1,
+            ROOT        = 1,
+            BRANCH      = 2,
+            LEAF        = 3;
 
-    public static byte ROOT = 1; //
-    public static byte BRANCH = 2;
-    public static byte LEAF = 3;
+    public static final String
+        EXTRA_MESSAGE       = "com.infoman.liquideconomycs.message",
+        EXTRA_MASTER        = "com.infoman.liquideconomycs.extra.mster",
+        EXTRA_CMD           = "com.infoman.liquideconomycs.extra.cmd",
+        //input fnc
+        ACTION_GET_HASH     = "com.infoman.liquideconomycs.action.getHash",
+        ACTION_INSERT       = "com.infoman.liquideconomycs.action.insert",
+        ACTION_FIND         = "com.infoman.liquideconomycs.action.find",
+        ACTION_DELETE       = "com.infoman.liquideconomycs.action.delete",
+        ACTION_GENERATE_ANSWER = "com.infoman.liquideconomycs.action.getAnswer",
+        ACTION_START        = "com.infoman.liquideconomycs.action.start",
 
-    public static final String EXTRA_MESSAGE = "com.infoman.liquideconomycs.MESSAGE";
+        //input param
+        EXTRA_SIGNAL_SERVER = "com.infoman.liquideconomycs.extra.signalServer",
+        EXTRA_PROVIDE_SERVICE = "com.infoman.liquideconomycs.extra.provideService",
+        EXTRA_TOKEN         = "com.infoman.liquideconomycs.extra.token",
+        EXTRA_POS           = "com.infoman.liquideconomycs.extra.pos",
+        EXTRA_PUBKEY        = "com.infoman.liquideconomycs.extra.pubKey",
+        EXTRA_AGE           = "com.infoman.liquideconomycs.extra.age",
+        EXTRA_MAX_AGE       = "com.infoman.liquideconomycs.extra.maxAge",
+        EXTRA_MSG_TYPE      = "com.infoman.liquideconomycs.extra.msgType",
+        EXTRA_PAYLOAD       = "com.infoman.liquideconomycs.extra.payload",
 
-    public static final String EXTRA_MASTER = "com.infoman.liquideconomycs.extra.MASTER";
-    public static final String EXTRA_CMD = "com.infoman.liquideconomycs.extra.CMD";
-
-    //input fnc
-    public static final String ACTION_GetHash = "com.infoman.liquideconomycs.action.GetHash";
-    public static final String ACTION_Insert = "com.infoman.liquideconomycs.action.Insert";
-    public static final String ACTION_Find = "com.infoman.liquideconomycs.action.Find";
-    public static final String ACTION_Delete = "com.infoman.liquideconomycs.action.Delete";
-    public static final String ACTION_GenerateAnswer = "com.infoman.liquideconomycs.action.GetAnswer";
-    public static final String ACTION_Start = "com.infoman.liquideconomycs.action.Start";
-
-    //input param
-    public static final String EXTRA_SIGNAL_SERVER = "com.infoman.liquideconomycs.extra.SIGNAL_SERVER";
-    public static final String EXTRA_Provide_service = "com.infoman.liquideconomycs.extra.Provide_service";
-    public static final String EXTRA_Token = "com.infoman.liquideconomycs.extra.Token";;
-    public static final String EXTRA_POS = "com.infoman.liquideconomycs.extra.POS";
-    public static final String EXTRA_PUBKEY = "com.infoman.liquideconomycs.extra.PUBKEY";
-    public static final String EXTRA_AGE = "com.infoman.liquideconomycs.extra.AGE";
-    public static final String EXTRA_MaxAge = "com.infoman.liquideconomycs.extra.MaxAge";
-    public static final String EXTRA_MSGTYPE = "com.infoman.liquideconomycs.extra.MSGTYPE";
-    public static final String EXTRA_PAYLOAD = "com.infoman.liquideconomycs.extra.PAYLOAD";
-
-    public static final String BROADCAST_ACTION_ANSWER = "com.infoman.liquideconomycs.broadcast_action.ANSWER";
-    public static final String EXTRA_ANSWER = "com.infoman.liquideconomycs.extra.ANSWER";
+        BROADCAST_ACTION_ANSWER = "com.infoman.liquideconomycs.broadcast_action.answer",
+        EXTRA_ANSWER        = "com.infoman.liquideconomycs.extra.answer";
 
 
     public static byte[] getBytesPart(byte[] src, int off, int len){
@@ -224,8 +223,7 @@ public class Utils {
 
         byte[] val = new byte[str.length() / 2];
         for (int i = 0; i < val.length; i++) {
-            int index = i * 2;
-            int j;
+            int index = i * 2, j;
             try {
                 j = Integer.parseInt(str.substring(index, index + 2), 16);
             }catch (NumberFormatException e){

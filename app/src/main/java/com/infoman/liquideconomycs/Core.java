@@ -84,15 +84,13 @@ public class Core extends Application {
     public void setMyKey() {
         Cursor query = db.rawQuery("SELECT * FROM users where privKey IS NOT NULL", null);
         if (query.moveToFirst()) {
-            int pubKeyColIndex = query.getColumnIndex("pubKey");
-            int privKeyColIndex = query.getColumnIndex("privKey");
+            int pubKeyColIndex = query.getColumnIndex("pubKey"), privKeyColIndex = query.getColumnIndex("privKey");
             myKey = new Pair(query.getBlob(pubKeyColIndex),query.getBlob(privKeyColIndex));
             //update self key in trie
             query.close();
         }else{
             ECKey myECKey=new ECKey();
-            byte[] myPrivKey = myECKey.getPrivKeyBytes();
-            byte[] myPubKey = myECKey.getPubKeyHash();
+            byte[] myPrivKey = myECKey.getPrivKeyBytes(), myPubKey = myECKey.getPubKeyHash();
             //todo ask manifest
             cv.put("pubKey", myPubKey);
             cv.put("privKey", myPrivKey);

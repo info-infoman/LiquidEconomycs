@@ -1,7 +1,6 @@
 package com.infoman.liquideconomycs;
 
 import android.os.Bundle;
-import android.preference.EditTextPreference;
 import android.text.InputType;
 import android.view.View;
 import android.widget.Button;
@@ -53,7 +52,6 @@ public class SettingsActivity extends AppCompatActivity {
                 @Override
                 public void onBindEditText(@NonNull EditText editText) {
                     editText.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_SIGNED);
-
                 }
             });
         }
@@ -62,11 +60,8 @@ public class SettingsActivity extends AppCompatActivity {
     private void insertDemoInTrie(){
         for(int i=0;i<10512;i++){
             ECKey myECKey=new ECKey();
-            byte[] myPubKey = myECKey.getPubKeyHash();
-
-            byte[] age = Utils.ageToBytes();
+            byte[] myPubKey = myECKey.getPubKeyHash(), age = Utils.ageToBytes();
             startActionInsert(getApplicationContext(), "Main", myPubKey, age);
-
         }
     }
 }

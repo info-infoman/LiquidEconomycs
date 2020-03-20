@@ -12,14 +12,12 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatDialogFragment;
 
 import static com.infoman.liquideconomycs.SyncServiceIntent.startActionSync;
+import static com.infoman.liquideconomycs.TrieServiceIntent.startActionInsert;
+import static com.infoman.liquideconomycs.Utils.ageToBytes;
 
 public class DialogsFragment extends AppCompatDialogFragment {
-    private int dialogCmd;
-    private String  dialogHead;
-    private String dialogMsg;
-    private String dialogActivity;
-
-    private int cantFindPubKey = 0;
+    private int dialogCmd, cantFindPubKey = 0;
+    private String  dialogHead, dialogMsg, dialogActivity;
 
     DialogsFragment(Context context, String activity, int cmd) {
 
@@ -47,8 +45,20 @@ public class DialogsFragment extends AppCompatDialogFragment {
                     builder.setPositiveButton(getResources().getString(android.R.string.yes), new DialogInterface.OnClickListener() {
                         public void onClick(DialogInterface dialog, int id) {
                             if (dialogActivity.equals("MainActivity")) {
-                                startActionSync(((MainActivity) getActivity()), "Main", "", Utils.hexToByte(((MainActivity) Objects.requireNonNull(getActivity())).resultTextView.getText().toString()), "", true);
+
+                                startActionInsert(((MainActivity) getActivity()),
+                                        "Main", Utils.hexToByte(((MainActivity) Objects.requireNonNull(getActivity())).resultTextView.getText().toString()),
+                                        ageToBytes());
+
+                                startActionSync(((MainActivity) getActivity()),
+                                        "Main",
+                                        "",
+                                        Utils.hexToByte(((MainActivity) Objects.requireNonNull(getActivity())).resultTextView.getText().toString()),
+                                        "",
+                                        true);
+
                                 dialog.cancel();
+
                             }
                         }
                     })

@@ -15,18 +15,18 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Date;
 
-import static com.infoman.liquideconomycs.Utils.ACTION_Delete;
-import static com.infoman.liquideconomycs.Utils.ACTION_Find;
-import static com.infoman.liquideconomycs.Utils.ACTION_GenerateAnswer;
-import static com.infoman.liquideconomycs.Utils.ACTION_GetHash;
-import static com.infoman.liquideconomycs.Utils.ACTION_Insert;
+import static com.infoman.liquideconomycs.Utils.ACTION_DELETE;
+import static com.infoman.liquideconomycs.Utils.ACTION_FIND;
+import static com.infoman.liquideconomycs.Utils.ACTION_GENERATE_ANSWER;
+import static com.infoman.liquideconomycs.Utils.ACTION_GET_HASH;
+import static com.infoman.liquideconomycs.Utils.ACTION_INSERT;
 import static com.infoman.liquideconomycs.Utils.BRANCH;
 import static com.infoman.liquideconomycs.Utils.BROADCAST_ACTION_ANSWER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_AGE;
 import static com.infoman.liquideconomycs.Utils.EXTRA_ANSWER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_CMD;
 import static com.infoman.liquideconomycs.Utils.EXTRA_MASTER;
-import static com.infoman.liquideconomycs.Utils.EXTRA_MSGTYPE;
+import static com.infoman.liquideconomycs.Utils.EXTRA_MSG_TYPE;
 import static com.infoman.liquideconomycs.Utils.EXTRA_PAYLOAD;
 import static com.infoman.liquideconomycs.Utils.EXTRA_POS;
 import static com.infoman.liquideconomycs.Utils.EXTRA_PUBKEY;
@@ -50,6 +50,54 @@ public class TrieServiceIntent extends IntentService {
         super("TrieServiceIntent");
     }
 
+    // called by activity to communicate to service
+    public static void startActionGetHash(Context context, String master, long pos) {
+        Intent intent = new Intent(context, TrieServiceIntent.class)
+            .setAction(ACTION_GET_HASH)
+            .putExtra(EXTRA_MASTER, master)
+            .putExtra(EXTRA_POS, pos);
+        context.startService(intent);
+    }
+
+    // called by activity to communicate to service
+    public static void startActionInsert(Context context, String master, byte[] pubKey, byte[] age) {
+        Intent intent = new Intent(context, TrieServiceIntent.class)
+            .setAction(ACTION_INSERT)
+            .putExtra(EXTRA_MASTER, master)
+            .putExtra(EXTRA_PUBKEY, pubKey)
+            .putExtra(EXTRA_AGE, age);
+        context.startService(intent);
+    }
+
+    // called by activity to communicate to service
+    public static void startActionFind(Context context, String master, byte[] pubKey, long pos) {
+        Intent intent = new Intent(context, TrieServiceIntent.class)
+            .setAction(ACTION_FIND)
+            .putExtra(EXTRA_MASTER, master)
+            .putExtra(EXTRA_PUBKEY, pubKey)
+            .putExtra(EXTRA_POS, pos);
+        context.startService(intent);
+    }
+
+    // called by activity to communicate to service
+    public static void startActionDelete(Context context, String master, byte[] pubKey, long pos) {
+        Intent intent = new Intent(context, TrieServiceIntent.class)
+            .setAction(ACTION_DELETE)
+            .putExtra(EXTRA_MASTER, master)
+            .putExtra(EXTRA_PUBKEY, pubKey)
+            .putExtra(EXTRA_POS, pos);
+        context.startService(intent);
+    }
+
+    // called by activity to communicate to service
+    public static void startActionGenerateAnswer(Context context, String master, byte msgType, byte[] payload) {
+        Intent intent = new Intent(context, TrieServiceIntent.class)
+            .setAction(ACTION_GENERATE_ANSWER)
+            .putExtra(EXTRA_MSG_TYPE, msgType)
+            .putExtra(EXTRA_PAYLOAD, payload);
+        context.startService(intent);
+    }
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -58,62 +106,12 @@ public class TrieServiceIntent extends IntentService {
 
     }
 
-    // called by activity to communicate to service
-    public static void startActionGetHash(Context context, String master, long pos) {
-        Intent intent = new Intent(context, TrieServiceIntent.class);
-        intent.setAction(ACTION_GetHash);
-        intent.putExtra(EXTRA_MASTER, master);
-        intent.putExtra(EXTRA_POS, pos);
-        context.startService(intent);
-    }
-
-    // called by activity to communicate to service
-    public static void startActionInsert(Context context, String master, byte[] pubKey, byte[] age) {
-        Intent intent = new Intent(context, TrieServiceIntent.class);
-        intent.setAction(ACTION_Insert);
-        intent.putExtra(EXTRA_MASTER, master);
-        intent.putExtra(EXTRA_PUBKEY, pubKey);
-        intent.putExtra(EXTRA_AGE, age);
-        context.startService(intent);
-    }
-
-    // called by activity to communicate to service
-    public static void startActionFind(Context context, String master, byte[] pubKey, long pos) {
-        Intent intent = new Intent(context, TrieServiceIntent.class);
-        intent.setAction(ACTION_Find);
-        intent.putExtra(EXTRA_MASTER, master);
-        intent.putExtra(EXTRA_PUBKEY, pubKey);
-        intent.putExtra(EXTRA_POS, pos);
-        context.startService(intent);
-    }
-
-    // called by activity to communicate to service
-    public static void startActionDelete(Context context, String master, byte[] pubKey, long pos) {
-        Intent intent = new Intent(context, TrieServiceIntent.class);
-        intent.setAction(ACTION_Delete);
-        intent.putExtra(EXTRA_MASTER, master);
-        intent.putExtra(EXTRA_PUBKEY, pubKey);
-        intent.putExtra(EXTRA_POS, pos);
-        context.startService(intent);
-    }
-
-    // called by activity to communicate to service
-    public static void startActionGenerateAnswer(Context context, String master, byte msgType, byte[] payload) {
-        Intent intent = new Intent(context, TrieServiceIntent.class);
-        intent.setAction(ACTION_GenerateAnswer);
-        intent.putExtra(EXTRA_MSGTYPE, msgType);
-        intent.putExtra(EXTRA_PAYLOAD, payload);
-        context.startService(intent);
-    }
-
-
     @Override
     protected void onHandleIntent(Intent intent) {
         if (intent != null) {
             final String action = intent.getAction();
-            if (ACTION_GetHash.equals(action)) {
-                final String master = intent.getStringExtra(EXTRA_MASTER);
-                final String cmd = "GetHash";
+            if (ACTION_GET_HASH.equals(action)) {
+                final String master = intent.getStringExtra(EXTRA_MASTER), cmd = "GetHash";
                 final long pos = intent.getLongExtra(EXTRA_POS,0L);
                 ////////////////////////////////////////////////////////////////
                 try {
@@ -124,11 +122,9 @@ public class TrieServiceIntent extends IntentService {
                 ////////////////////////////////////////////////////////////////
             }
 
-            if (ACTION_Insert.equals(action)) {
-                final String master = intent.getStringExtra(EXTRA_MASTER);
-                final String cmd = "Insert";
-                final byte[] key = intent.getByteArrayExtra(EXTRA_PUBKEY);
-                final byte[] value = intent.getByteArrayExtra(EXTRA_AGE);
+            if (ACTION_INSERT.equals(action)) {
+                final String master = intent.getStringExtra(EXTRA_MASTER), cmd = "Insert";
+                final byte[] key = intent.getByteArrayExtra(EXTRA_PUBKEY), value = intent.getByteArrayExtra(EXTRA_AGE);
                 ////////////////////////////////////////////////////////////////
                 try {
                     broadcastActionMsg(master, cmd, insert(key, value, 0L));
@@ -138,9 +134,8 @@ public class TrieServiceIntent extends IntentService {
                 ////////////////////////////////////////////////////////////////
             }
 
-            if (ACTION_Find.equals(action)) {
-                final String master = intent.getStringExtra(EXTRA_MASTER);
-                final String cmd = "Find";
+            if (ACTION_FIND.equals(action)) {
+                final String master = intent.getStringExtra(EXTRA_MASTER), cmd = "Find";
                 final byte[] key = intent.getByteArrayExtra(EXTRA_PUBKEY);
                 final long pos = intent.getLongExtra(EXTRA_POS, 0L);
                 ////////////////////////////////////////////////////////////////
@@ -152,9 +147,8 @@ public class TrieServiceIntent extends IntentService {
                 ////////////////////////////////////////////////////////////////
             }
 
-            if (ACTION_Delete.equals(action)) {
-                final String master = intent.getStringExtra(EXTRA_MASTER);
-                final String cmd = "Delete";
+            if (ACTION_DELETE.equals(action)) {
+                final String master = intent.getStringExtra(EXTRA_MASTER), cmd = "Delete";
                 final byte[] key = intent.getByteArrayExtra(EXTRA_PUBKEY);
                 final long pos = intent.getLongExtra(EXTRA_POS, 0L);
                 ////////////////////////////////////////////////////////////////
@@ -166,13 +160,12 @@ public class TrieServiceIntent extends IntentService {
                 ////////////////////////////////////////////////////////////////
             }
 
-            if (ACTION_GenerateAnswer.equals(action)) {
-                final byte msgType = intent.getByteExtra(EXTRA_MSGTYPE, Utils.getHashs);
+            if (ACTION_GENERATE_ANSWER.equals(action)) {
+                final byte msgType = intent.getByteExtra(EXTRA_MSG_TYPE, Utils.getHashs);
                 final byte[] payload = intent.getByteArrayExtra(EXTRA_AGE);
                 ////////////////////////////////////////////////////////////////
                 try {
                     generateAnswer(msgType, payload);
-
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -314,10 +307,10 @@ public class TrieServiceIntent extends IntentService {
 
     // called to send data to Activity
     public void broadcastActionMsg(String master, String cmd, byte[] answer) {
-        Intent intent = new Intent(BROADCAST_ACTION_ANSWER);
-        intent.putExtra(EXTRA_MASTER, master);
-        intent.putExtra(EXTRA_CMD, cmd);
-        intent.putExtra(EXTRA_ANSWER, answer);
+        Intent intent = new Intent(BROADCAST_ACTION_ANSWER)
+            .putExtra(EXTRA_MASTER, master)
+            .putExtra(EXTRA_CMD, cmd)
+            .putExtra(EXTRA_ANSWER, answer);
         sendBroadcast(intent);
     }
 

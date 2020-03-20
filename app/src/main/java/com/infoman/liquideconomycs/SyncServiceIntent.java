@@ -20,15 +20,15 @@ import java.util.Date;
 import java.util.List;
 
 import static com.infoman.liquideconomycs.TrieServiceIntent.startActionGenerateAnswer;
-import static com.infoman.liquideconomycs.Utils.ACTION_Start;
+import static com.infoman.liquideconomycs.Utils.ACTION_START;
 import static com.infoman.liquideconomycs.Utils.BROADCAST_ACTION_ANSWER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_ANSWER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_CMD;
 import static com.infoman.liquideconomycs.Utils.EXTRA_MASTER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_PUBKEY;
-import static com.infoman.liquideconomycs.Utils.EXTRA_Provide_service;
+import static com.infoman.liquideconomycs.Utils.EXTRA_PROVIDE_SERVICE;
 import static com.infoman.liquideconomycs.Utils.EXTRA_SIGNAL_SERVER;
-import static com.infoman.liquideconomycs.Utils.EXTRA_Token;
+import static com.infoman.liquideconomycs.Utils.EXTRA_TOKEN;
 
 public class SyncServiceIntent extends IntentService {
 
@@ -41,13 +41,13 @@ public class SyncServiceIntent extends IntentService {
             signalServer = sharedPref.getString("Signal_server_URL", "");
             token = sharedPref.getString("Signal_server_Token", "");
         }
-        Intent intent = new Intent(context, SyncServiceIntent.class);
-        intent.setAction(ACTION_Start);
-        intent.putExtra(EXTRA_SIGNAL_SERVER, signalServer);
-        intent.putExtra(EXTRA_Provide_service, Provide_service);
-        intent.putExtra(EXTRA_PUBKEY, pubKey);
-        intent.putExtra(EXTRA_Token, token);
-        intent.putExtra(EXTRA_MASTER, master);
+        Intent intent = new Intent(context, SyncServiceIntent.class)
+            .setAction(ACTION_START)
+            .putExtra(EXTRA_SIGNAL_SERVER, signalServer)
+            .putExtra(EXTRA_PROVIDE_SERVICE, Provide_service)
+            .putExtra(EXTRA_PUBKEY, pubKey)
+            .putExtra(EXTRA_TOKEN, token)
+            .putExtra(EXTRA_MASTER, master);
         context.startService(intent);
     }
 
@@ -68,17 +68,15 @@ public class SyncServiceIntent extends IntentService {
     protected void onHandleIntent(Intent intent) {
         if (intent != null) {
             final String action = intent.getAction();
-            if (ACTION_Start.equals(action) && !app.isSynchronized) {
+            if (ACTION_START.equals(action) && !app.isSynchronized) {
                 app.clearPrefixTable();
                 app.isSynchronized = true;
                 app.dateTimeLastSync=new Date().getTime();
-                final String signalServer = intent.getStringExtra(EXTRA_SIGNAL_SERVER);
+                final String    signalServer = intent.getStringExtra(EXTRA_SIGNAL_SERVER),
+                                token = intent.getStringExtra(EXTRA_TOKEN),
+                                master = intent.getStringExtra(EXTRA_MASTER);
                 final byte[] pubKey = intent.getByteArrayExtra(EXTRA_PUBKEY);
-                final String token = intent.getStringExtra(EXTRA_Token);
-                final String master = intent.getStringExtra(EXTRA_MASTER);
-                final boolean Provide_service = intent.getBooleanExtra(EXTRA_Provide_service,true);
-
-
+                final boolean Provide_service = intent.getBooleanExtra(EXTRA_PROVIDE_SERVICE,true);
 
                 ////////////////////////////////////////////////////////////////
                 Notification.Builder builder = new Notification.Builder(getBaseContext())
@@ -128,8 +126,7 @@ public class SyncServiceIntent extends IntentService {
 
                         byte msgType    = Utils.getBytesPart(data,0,1)[0];
                         int sigLength   = Ints.fromByteArray(Utils.getBytesPart(data,1,4));
-                        byte[] sig      = Utils.getBytesPart(data,5, sigLength);
-                        byte[] payload  = Utils.getBytesPart(data, 5+sigLength, data.length-5+sigLength);
+                        byte[] sig      = Utils.getBytesPart(data,5, sigLength), payload  = Utils.getBytesPart(data, 5+sigLength, data.length-5+sigLength);
                         //todo check sig
                         try {
                             if(!Utils.chekSigMsg(pubKey, sig, msgType, payload))
@@ -182,10 +179,10 @@ public class SyncServiceIntent extends IntentService {
 
     // called to send data to Activity
     public void broadcastActionMsg(String master, String cmd, String answer) {
-        Intent intent = new Intent(BROADCAST_ACTION_ANSWER);
-        intent.putExtra(EXTRA_MASTER, master);
-        intent.putExtra(EXTRA_CMD, cmd);
-        intent.putExtra(EXTRA_ANSWER, answer);
+        Intent intent = new Intent(BROADCAST_ACTION_ANSWER)
+            .putExtra(EXTRA_MASTER, master)
+            .putExtra(EXTRA_CMD, cmd)
+            .putExtra(EXTRA_ANSWER, answer);
         sendBroadcast(intent);
     }
 }

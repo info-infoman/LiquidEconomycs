@@ -55,19 +55,18 @@ import static com.infoman.liquideconomycs.Utils.BROADCAST_ACTION_ANSWER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_ANSWER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_CMD;
 import static com.infoman.liquideconomycs.Utils.EXTRA_MASTER;
+import static com.infoman.liquideconomycs.Utils.ageToBytes;
 import static com.infoman.liquideconomycs.Utils.hexToByte;
 
 public class MainActivity extends AppCompatActivity implements ActivityCompat.OnRequestPermissionsResultCallback , QRCodeReaderView.OnQRCodeReadListener, NfcAdapter.CreateNdefMessageCallback {
 
-    private static final int MY_PERMISSION_REQUEST_INTERNET = 0;
-    private static final int MY_PERMISSION_REQUEST_CAMERA = 0;
-    private static final int MY_PERMISSION_REQUEST_NFC = 0;
+    private static final int MY_PERMISSION_REQUEST_INTERNET = 0, MY_PERMISSION_REQUEST_CAMERA = 0, MY_PERMISSION_REQUEST_NFC = 0;
 
     private Core                app;
     private ViewGroup           mainLayout;
     private ToggleButton        tbResive, tbMade, tbwNFC, tbQR;
     private Button              startBtn;
-    public TextView            resultTextView, notation, role_capture, scan_gen;
+    public TextView             resultTextView, notation, role_capture, scan_gen;
     private QRCodeReaderView    qrCodeReaderView;
     private boolean             provideService;
 
@@ -75,8 +74,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     private final BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
         @Override public void onReceive(Context context, Intent intent) {
             if (intent.getAction().equals(BROADCAST_ACTION_ANSWER)) {
-                final String master = intent.getStringExtra(EXTRA_MASTER);
-                final String cmd = intent.getStringExtra(EXTRA_CMD);
+                final String master = intent.getStringExtra(EXTRA_MASTER), cmd = intent.getStringExtra(EXTRA_CMD);
                 if(master.equals("Main")){
                     if(cmd.equals("Find")){
                         final byte[] answer = intent.getByteArrayExtra(EXTRA_ANSWER);
@@ -84,6 +82,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                             shakeIt(300,10);
                             if(answer!=null) {
                                 Toast.makeText(getApplicationContext(), getResources().getString(R.string.pubKeyFound),Toast.LENGTH_LONG).show();
+                                startActionInsert(getApplicationContext(), "Main", Utils.hexToByte(resultTextView.getText().toString()), ageToBytes());
                                 startActionSync(getApplicationContext(), "Main", "", Utils.hexToByte(resultTextView.getText().toString()), "", true);
                             }else{
                                 DialogsFragment alert = new DialogsFragment(getApplicationContext(), "MainActivity", 0);
@@ -103,9 +102,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         }
     };
 
-
     //Overrides/////////////////////////////////////////////////////////////////////////////////////
-
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
@@ -308,7 +305,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////
-
     private void requestINTERNETPermission() {
         if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.INTERNET)) {
             Snackbar.make(mainLayout, getResources().getText(R.string.getINTERNETPermission),
@@ -391,10 +387,10 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         resultTextView.setText(text);
         if(provideService){
             byte[] accepterPubKey = Utils.hexToByte(resultTextView.getText().toString());
-            if(accepterPubKey.length!=20){
+            if(accepterPubKey.length!=20)
                 Toast.makeText(getApplicationContext(), getResources().getString(R.string.ErrorReceivingPartnerData),Toast.LENGTH_LONG).show();
-            }
-            startActionFind(getApplicationContext(),"Main", accepterPubKey,0L);
+            else
+                startActionFind(getApplicationContext(),"Main", accepterPubKey,0L);
         }else{
             shakeIt(300,10);
             String[] fields = Utils.parseQRString(text);
@@ -402,7 +398,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             if(fields.length < 3 || fields[1].equals("") || fields[2].equals("") || hexToByte(fields[0]).length!=20){
                Toast.makeText(getApplicationContext(), getResources().getString(R.string.ErrorReceivingPartnerData),Toast.LENGTH_LONG).show();
             }else{
-                startActionInsert(this, "Main", hexToByte(fields[0]), Utils.ageToBytes());
+                startActionInsert(this, "Main", hexToByte(fields[0]), ageToBytes());
                 startActionSync(getApplicationContext(), "Main", fields[1], hexToByte(fields[0]), fields[2],false);
             }
 
@@ -438,21 +434,16 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         ImageView img = (ImageView) findViewById(R.id.image);
         assert app.myKey.first != null;
         String msg = Utils.byteToHex((byte[]) app.myKey.first);
-
         if(tbQR.isChecked()) {
             if (provideService) {
                 SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
-                String signalServer = sharedPref.getString("Signal_server_URL", "");
-                String token = sharedPref.getString("Signal_server_Token", "");
-
+                String signalServer = sharedPref.getString("Signal_server_URL", ""), token = sharedPref.getString("Signal_server_Token", "");
                 msg = msg + (signalServer != null ? " " + signalServer + " " + token : "");
             }
-
             QRCodeWriter writer = new QRCodeWriter();
             try {
                 BitMatrix bitMatrix = writer.encode(msg, BarcodeFormat.QR_CODE, 512, 512);
-                int width = bitMatrix.getWidth();
-                int height = bitMatrix.getHeight();
+                int width = bitMatrix.getWidth(), height = bitMatrix.getHeight();
                 Bitmap bmp = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565);
                 for (int x = 0; x < width; x++) {
                     for (int y = 0; y < height; y++) {
