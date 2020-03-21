@@ -60,7 +60,7 @@ import static com.infoman.liquideconomycs.Utils.hexToByte;
 
 public class MainActivity extends AppCompatActivity implements ActivityCompat.OnRequestPermissionsResultCallback , QRCodeReaderView.OnQRCodeReadListener, NfcAdapter.CreateNdefMessageCallback {
 
-    private static final int MY_PERMISSION_REQUEST_INTERNET = 0, MY_PERMISSION_REQUEST_CAMERA = 0, MY_PERMISSION_REQUEST_NFC = 0;
+    private static final int MY_PERMISSION_REQUEST_INTERNET = 0, MY_PERMISSION_REQUEST_CAMERA = 0, MY_PERMISSION_REQUEST_NFC = 0, MY_PERMISSION_REQUEST_FOREGROUND_SERVICE=0;
 
     private Core                app;
     private ViewGroup           mainLayout;
@@ -114,6 +114,10 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.INTERNET) == PackageManager.PERMISSION_GRANTED) {} else {
             requestINTERNETPermission();
+        }
+
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.FOREGROUND_SERVICE) == PackageManager.PERMISSION_GRANTED) {} else {
+            requestFOREGROUND_SERVICEPermission();
         }
 
         registerReceiver(mBroadcastReceiver, new IntentFilter(BROADCAST_ACTION_ANSWER));
@@ -242,6 +246,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         if (requestCode == MY_PERMISSION_REQUEST_NFC) {
             ret.set(false);
         }
+        if (requestCode == MY_PERMISSION_REQUEST_FOREGROUND_SERVICE) {
+            ret.set(false);
+        }
         if(ret.get()){
             return;
         }
@@ -321,6 +328,25 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             ActivityCompat.requestPermissions(this, new String[] {
                     Manifest.permission.INTERNET
             }, MY_PERMISSION_REQUEST_INTERNET);
+        }
+    }
+
+    private void requestFOREGROUND_SERVICEPermission() {
+        if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.FOREGROUND_SERVICE)) {
+            Snackbar.make(mainLayout, getResources().getText(R.string.getFOREGROUND_SERVICEPermission),
+                    Snackbar.LENGTH_INDEFINITE).setAction(getResources().getString(android.R.string.ok), new View.OnClickListener() {
+                @Override public void onClick(View view) {
+                    ActivityCompat.requestPermissions(MainActivity.this, new String[] {
+                            Manifest.permission.FOREGROUND_SERVICE
+                    }, MY_PERMISSION_REQUEST_FOREGROUND_SERVICE);
+                }
+            }).show();
+        } else {
+            Snackbar.make(mainLayout, getResources().getText(R.string.permission_is_not_available_FOREGROUND_SERVICE),
+                    Snackbar.LENGTH_SHORT).show();
+            ActivityCompat.requestPermissions(this, new String[] {
+                    Manifest.permission.FOREGROUND_SERVICE
+            }, MY_PERMISSION_REQUEST_FOREGROUND_SERVICE);
         }
     }
 
