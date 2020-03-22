@@ -116,7 +116,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             requestINTERNETPermission();
         }
 
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.FOREGROUND_SERVICE) == PackageManager.PERMISSION_GRANTED) {} else {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.FOREGROUND_SERVICE) == PackageManager.PERMISSION_GRANTED || Build.VERSION.SDK_INT < Build.VERSION_CODES.O ) {} else {
             requestFOREGROUND_SERVICEPermission();
         }
 

@@ -1,10 +1,15 @@
 package com.infoman.liquideconomycs;
 
+import android.annotation.TargetApi;
 import android.app.IntentService;
 import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.Color;
+import android.os.Build;
 import android.preference.PreferenceManager;
 import android.util.Log;
 
@@ -19,6 +24,10 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 
+import androidx.annotation.NonNull;
+import androidx.core.app.NotificationCompat;
+
+import static androidx.core.app.NotificationCompat.PRIORITY_LOW;
 import static com.infoman.liquideconomycs.TrieServiceIntent.startActionGenerateAnswer;
 import static com.infoman.liquideconomycs.Utils.ACTION_START;
 import static com.infoman.liquideconomycs.Utils.BROADCAST_ACTION_ANSWER;
@@ -79,11 +88,20 @@ public class SyncServiceIntent extends IntentService {
                 final boolean Provide_service = intent.getBooleanExtra(EXTRA_PROVIDE_SERVICE,true);
 
                 ////////////////////////////////////////////////////////////////
-                Notification.Builder builder = new Notification.Builder(getBaseContext())
+                String channel;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                    channel = createChannel();
+                else {
+                    channel = "";
+                }
+
+                NotificationCompat.Builder builder = new NotificationCompat.Builder(getBaseContext(), channel)
                         .setTicker("SyncServiceIntent") // use something from something from R.string
                         .setContentTitle("liquid economycs") // use something from something from
                         .setContentText("Sync liquid base") // use something from something from
-                        .setProgress(0, 0, true); // display indeterminate progress
+                        .setProgress(0, 0, true)
+                        .setPriority(PRIORITY_LOW)
+                        .setCategory(Notification.CATEGORY_SERVICE); // display indeterminate progress
 
                 startForeground(9991, builder.build());
                 //todo sync processor
@@ -126,7 +144,7 @@ public class SyncServiceIntent extends IntentService {
 
                         byte msgType    = Utils.getBytesPart(data,0,1)[0];
                         int sigLength   = Ints.fromByteArray(Utils.getBytesPart(data,1,4));
-                        byte[] sig      = Utils.getBytesPart(data,5, sigLength), payload  = Utils.getBytesPart(data, 5+sigLength, data.length-5+sigLength);
+                        byte[] sig      = Utils.getBytesPart(data,5, sigLength), payload  = Utils.getBytesPart(data, 5+sigLength, data.length-(5+sigLength));
                         //todo check sig
                         try {
                             if(!Utils.chekSigMsg(pubKey, sig, msgType, payload))
@@ -177,6 +195,25 @@ public class SyncServiceIntent extends IntentService {
         }
     }
 
+    @NonNull
+    @TargetApi(26)
+    private synchronized String createChannel() {
+        NotificationManager mNotificationManager = (NotificationManager) this.getSystemService(Context.NOTIFICATION_SERVICE);
+
+        String name = "Service: liquideconomycs SyncServiceIntent ";
+        int importance = NotificationManager.IMPORTANCE_LOW;
+
+        NotificationChannel mChannel = new NotificationChannel("Service: liquideconomycs SyncServiceIntent", name, importance);
+
+        mChannel.enableLights(true);
+        mChannel.setLightColor(Color.BLUE);
+        if (mNotificationManager != null) {
+            mNotificationManager.createNotificationChannel(mChannel);
+        } else {
+            stopSelf();
+        }
+        return "Service: liquideconomycs SyncServiceIntent";
+    }
     // called to send data to Activity
     public void broadcastActionMsg(String master, String cmd, String answer) {
         Intent intent = new Intent(BROADCAST_ACTION_ANSWER)
