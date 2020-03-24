@@ -21,6 +21,7 @@ import android.os.Parcelable;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.preference.PreferenceManager;
+import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.AnimationUtils;
@@ -40,6 +41,9 @@ import com.google.zxing.WriterException;
 import com.google.zxing.common.BitMatrix;
 import com.google.zxing.qrcode.QRCodeWriter;
 
+import org.bitcoinj.core.ECKey;
+import org.bitcoinj.core.Sha256Hash;
+
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import androidx.annotation.NonNull;
@@ -48,6 +52,7 @@ import androidx.core.app.ActivityCompat;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
 
+import static androidx.constraintlayout.widget.Constraints.TAG;
 import static com.infoman.liquideconomycs.SyncServiceIntent.startActionSync;
 import static com.infoman.liquideconomycs.TrieServiceIntent.startActionFind;
 import static com.infoman.liquideconomycs.TrieServiceIntent.startActionInsert;
@@ -57,6 +62,7 @@ import static com.infoman.liquideconomycs.Utils.EXTRA_CMD;
 import static com.infoman.liquideconomycs.Utils.EXTRA_MASTER;
 import static com.infoman.liquideconomycs.Utils.ageToBytes;
 import static com.infoman.liquideconomycs.Utils.hexToByte;
+import static com.infoman.liquideconomycs.Utils.sigMsg;
 
 public class MainActivity extends AppCompatActivity implements ActivityCompat.OnRequestPermissionsResultCallback , QRCodeReaderView.OnQRCodeReadListener, NfcAdapter.CreateNdefMessageCallback {
 
@@ -82,7 +88,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                             shakeIt(300,10);
                             if(answer!=null) {
                                 Toast.makeText(getApplicationContext(), getResources().getString(R.string.pubKeyFound),Toast.LENGTH_LONG).show();
-                                startActionInsert(getApplicationContext(), "Main", Utils.hexToByte(resultTextView.getText().toString()), ageToBytes());
+                                startActionInsert(getApplicationContext(), "Main", ECKey.fromPublicOnly(Utils.hexToByte(resultTextView.getText().toString())).getPubKeyHash(), ageToBytes());
                                 startActionSync(getApplicationContext(), "Main", "", Utils.hexToByte(resultTextView.getText().toString()), "", true);
                             }else{
                                 DialogsFragment alert = new DialogsFragment(getApplicationContext(), "MainActivity", 0);
@@ -413,18 +419,19 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         resultTextView.setText(text);
         if(provideService){
             byte[] accepterPubKey = Utils.hexToByte(resultTextView.getText().toString());
-            if(accepterPubKey.length!=20)
+            Log.d(TAG, accepterPubKey.toString());
+            if(accepterPubKey.length!=65)
                 Toast.makeText(getApplicationContext(), getResources().getString(R.string.ErrorReceivingPartnerData),Toast.LENGTH_LONG).show();
             else
-                startActionFind(getApplicationContext(),"Main", accepterPubKey,0L);
+                startActionFind(getApplicationContext(),"Main", ECKey.fromPublicOnly(accepterPubKey).getPubKeyHash(),0L);
         }else{
             shakeIt(300,10);
             String[] fields = Utils.parseQRString(text);
 
-            if(fields.length < 3 || fields[1].equals("") || fields[2].equals("") || hexToByte(fields[0]).length!=20){
+            if(fields.length < 3 || fields[1].equals("") || fields[2].equals("") || hexToByte(fields[0]).length!=65){
                Toast.makeText(getApplicationContext(), getResources().getString(R.string.ErrorReceivingPartnerData),Toast.LENGTH_LONG).show();
             }else{
-                startActionInsert(this, "Main", hexToByte(fields[0]), ageToBytes());
+                startActionInsert(this, "Main", ECKey.fromPublicOnly(hexToByte(fields[0])).getPubKeyHash(), ageToBytes());
                 startActionSync(getApplicationContext(), "Main", fields[1], hexToByte(fields[0]), fields[2],false);
             }
 
@@ -459,29 +466,37 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     public void generatePairingMsg() {
         ImageView img = (ImageView) findViewById(R.id.image);
         assert app.myKey.first != null;
-        String msg = Utils.byteToHex((byte[]) app.myKey.first);
+        String msg ="";
+        if(!provideService && hexToByte(resultTextView.getText().toString()).length==65) {
+
+            msg = Utils.byteToHex((byte[]) app.myKey.first)+" "+Utils.byteToHex(ECKey.fromPrivate((byte[]) app.myKey.second).sign(Sha256Hash.wrap(Sha256Hash.hash(hexToByte(resultTextView.getText().toString())))).encodeToDER());
+
+        }
         if(tbQR.isChecked()) {
             if (provideService) {
                 SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
                 String signalServer = sharedPref.getString("Signal_server_URL", ""), token = sharedPref.getString("Signal_server_Token", "");
                 msg = msg + (signalServer != null ? " " + signalServer + " " + token : "");
             }
-            QRCodeWriter writer = new QRCodeWriter();
-            try {
-                BitMatrix bitMatrix = writer.encode(msg, BarcodeFormat.QR_CODE, 512, 512);
-                int width = bitMatrix.getWidth(), height = bitMatrix.getHeight();
-                Bitmap bmp = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565);
-                for (int x = 0; x < width; x++) {
-                    for (int y = 0; y < height; y++) {
-                        bmp.setPixel(x, y, bitMatrix.get(x, y) ? Color.BLACK : Color.WHITE);
+            if(msg!="") {
+                QRCodeWriter writer = new QRCodeWriter();
+                try {
+                    BitMatrix bitMatrix = writer.encode(msg, BarcodeFormat.QR_CODE, 512, 512);
+                    int width = bitMatrix.getWidth(), height = bitMatrix.getHeight();
+                    Bitmap bmp = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565);
+                    for (int x = 0; x < width; x++) {
+                        for (int y = 0; y < height; y++) {
+                            bmp.setPixel(x, y, bitMatrix.get(x, y) ? Color.BLACK : Color.WHITE);
+                        }
                     }
+                    img.setImageBitmap(bmp);
+
+                } catch (WriterException e) {
+                    e.printStackTrace();
                 }
-                img.setImageBitmap(bmp);
-
-            } catch (WriterException e) {
-                e.printStackTrace();
+            }else{
+                scan_gen.setText(getResources().getString(R.string.QR_generator_consumer));
             }
-
 
             scan_gen.setVisibility(View.VISIBLE);
             startBtn.setVisibility(View.VISIBLE);

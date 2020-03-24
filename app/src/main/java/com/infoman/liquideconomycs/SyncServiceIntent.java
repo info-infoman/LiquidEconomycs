@@ -27,6 +27,7 @@ import java.util.List;
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
 
+import static androidx.constraintlayout.widget.Constraints.TAG;
 import static androidx.core.app.NotificationCompat.PRIORITY_LOW;
 import static com.infoman.liquideconomycs.TrieServiceIntent.startActionGenerateAnswer;
 import static com.infoman.liquideconomycs.Utils.ACTION_START;
@@ -57,6 +58,7 @@ public class SyncServiceIntent extends IntentService {
             .putExtra(EXTRA_PUBKEY, pubKey)
             .putExtra(EXTRA_TOKEN, token)
             .putExtra(EXTRA_MASTER, master);
+        Log.d(TAG, pubKey.toString());
         context.startService(intent);
     }
 

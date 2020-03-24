@@ -6,6 +6,8 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.os.Bundle;
 
+import org.bitcoinj.core.ECKey;
+
 import java.util.Objects;
 
 import androidx.annotation.NonNull;
@@ -47,7 +49,7 @@ public class DialogsFragment extends AppCompatDialogFragment {
                             if (dialogActivity.equals("MainActivity")) {
 
                                 startActionInsert(((MainActivity) getActivity()),
-                                        "Main", Utils.hexToByte(((MainActivity) Objects.requireNonNull(getActivity())).resultTextView.getText().toString()),
+                                        "Main", ECKey.fromPublicOnly(Utils.hexToByte(((MainActivity) Objects.requireNonNull(getActivity())).resultTextView.getText().toString())).getPubKeyHash(),
                                         ageToBytes());
 
                                 startActionSync(((MainActivity) getActivity()),

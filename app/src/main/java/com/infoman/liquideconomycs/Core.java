@@ -88,7 +88,7 @@ public class Core extends Application {
             query.close();
         }else{
             ECKey myECKey=new ECKey();
-            byte[] myPrivKey = myECKey.getPrivKeyBytes(), myPubKey = myECKey.getPubKeyHash();
+            byte[] myPrivKey = myECKey.getPrivKeyBytes(), myPubKey = myECKey.getPubKey();
             //todo ask manifest
             cv.put("pubKey", myPubKey);
             cv.put("privKey", myPrivKey);
