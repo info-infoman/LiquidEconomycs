@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/Liquid Economycs.iml" filepath="$PROJECT_DIR$/Liquid Economycs.iml" group="Liquid Economycs" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/Liquid_Economycs.iml" filepath="$PROJECT_DIR$/.idea/modules/Liquid_Economycs.iml" group="Liquid_Economycs" />
       <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" group="Liquid Economycs/app" />
     </modules>
   </component>

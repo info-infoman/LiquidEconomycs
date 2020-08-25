@@ -154,6 +154,11 @@ public class Utils {
         return publicKey.verify(digest,sig);
     }
 
+    public static boolean chekSigPubKey(byte[] pubKey, byte[] sig, byte[] payload) throws SignatureDecodeException {
+        ECKey publicKey = ECKey.fromPublicOnly(pubKey);
+        return publicKey.verify(Sha256Hash.hash(payload),sig);
+    }
+
     public static boolean copyAssetFolder(AssetManager assetManager, String fromAssetPath, String toPath) {
         try {
             String[] files = assetManager.list(fromAssetPath);

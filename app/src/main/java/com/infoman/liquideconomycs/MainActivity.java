@@ -43,6 +43,7 @@ import com.google.zxing.qrcode.QRCodeWriter;
 
 import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.Sha256Hash;
+import org.bitcoinj.core.SignatureDecodeException;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -61,6 +62,7 @@ import static com.infoman.liquideconomycs.Utils.EXTRA_ANSWER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_CMD;
 import static com.infoman.liquideconomycs.Utils.EXTRA_MASTER;
 import static com.infoman.liquideconomycs.Utils.ageToBytes;
+import static com.infoman.liquideconomycs.Utils.chekSigPubKey;
 import static com.infoman.liquideconomycs.Utils.hexToByte;
 import static com.infoman.liquideconomycs.Utils.sigMsg;
 
@@ -88,7 +90,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                             shakeIt(300,10);
                             if(answer!=null) {
                                 Toast.makeText(getApplicationContext(), getResources().getString(R.string.pubKeyFound),Toast.LENGTH_LONG).show();
-                                startActionInsert(getApplicationContext(), "Main", ECKey.fromPublicOnly(Utils.hexToByte(resultTextView.getText().toString())).getPubKeyHash(), ageToBytes());
+                                //startActionInsert(getApplicationContext(), "Main", ECKey.fromPublicOnly(Utils.hexToByte(resultTextView.getText().toString())).getPubKeyHash(), ageToBytes());
                                 startActionSync(getApplicationContext(), "Main", "", Utils.hexToByte(resultTextView.getText().toString()), "", true);
                             }else{
                                 DialogsFragment alert = new DialogsFragment(getApplicationContext(), "MainActivity", 0);
@@ -235,7 +237,11 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         stopScanner();
 
         if (NfcAdapter.ACTION_NDEF_DISCOVERED.equals(getIntent().getAction())) {
-            handleNfcIntent(getIntent());
+            try {
+                handleNfcIntent(getIntent());
+            } catch (SignatureDecodeException e) {
+                e.printStackTrace();
+            }
         }
 
         //}
@@ -277,7 +283,11 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
     @Override public void onQRCodeRead(String text, PointF[] points) {
         stopScanner();
-        codeReadTrigger(text);
+        try {
+            codeReadTrigger(text);
+        } catch (SignatureDecodeException e) {
+            e.printStackTrace();
+        }
         //pointsOverlayView.setPoints(points);
     }
 
@@ -415,18 +425,23 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         //relativeLayout.setLayoutParams(lp);
     }
 
-    public void codeReadTrigger(String text){
+    public void codeReadTrigger(String text) throws SignatureDecodeException {
         resultTextView.setText(text);
+        String[] fields = Utils.parseQRString(text);
         if(provideService){
-            byte[] accepterPubKey = Utils.hexToByte(resultTextView.getText().toString());
-            Log.d(TAG, accepterPubKey.toString());
-            if(accepterPubKey.length!=65)
-                Toast.makeText(getApplicationContext(), getResources().getString(R.string.ErrorReceivingPartnerData),Toast.LENGTH_LONG).show();
-            else
-                startActionFind(getApplicationContext(),"Main", ECKey.fromPublicOnly(accepterPubKey).getPubKeyHash(),0L);
+            if(fields.length == 2) {
+                byte[] accepterPubKey = Utils.hexToByte(fields[0]);
+                Log.d(TAG, accepterPubKey.toString());
+                //TODO add check signature
+                if (accepterPubKey.length != 20)
+                    Toast.makeText(getApplicationContext(), getResources().getString(R.string.ErrorReceivingPartnerData), Toast.LENGTH_LONG).show();
+                else
+                    if(chekSigPubKey(accepterPubKey, Utils.hexToByte(fields[1]), accepterPubKey)) {
+                        startActionFind(getApplicationContext(), "Main", ECKey.fromPublicOnly(accepterPubKey).getPubKeyHash(), 0L);
+                    }
+            }
         }else{
             shakeIt(300,10);
-            String[] fields = Utils.parseQRString(text);
 
             if(fields.length < 3 || fields[1].equals("") || fields[2].equals("") || hexToByte(fields[0]).length!=65){
                Toast.makeText(getApplicationContext(), getResources().getString(R.string.ErrorReceivingPartnerData),Toast.LENGTH_LONG).show();
@@ -467,9 +482,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         ImageView img = (ImageView) findViewById(R.id.image);
         assert app.myKey.first != null;
         String msg ="";
-        if(!provideService && hexToByte(resultTextView.getText().toString()).length==65) {
-
-            msg = Utils.byteToHex((byte[]) app.myKey.first)+" "+Utils.byteToHex(ECKey.fromPrivate((byte[]) app.myKey.second).sign(Sha256Hash.wrap(Sha256Hash.hash(hexToByte(resultTextView.getText().toString())))).encodeToDER());
+        if(!provideService) {
+            //generate QR or NFC msg = pubKey & sig digest from pubKey
+            msg = Utils.byteToHex((byte[]) app.myKey.first)+" "+Utils.byteToHex(ECKey.fromPrivate((byte[]) app.myKey.second).sign(Sha256Hash.wrap(Sha256Hash.hash((byte[]) app.myKey.first))).encodeToDER());
 
         }
         if(tbQR.isChecked()) {
@@ -546,7 +561,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         }
     }
 
-    private void handleNfcIntent(Intent NfcIntent) {
+    private void handleNfcIntent(Intent NfcIntent) throws SignatureDecodeException {
         Parcelable[] receivedArray =
                     NfcIntent.getParcelableArrayExtra(NfcAdapter.EXTRA_NDEF_MESSAGES);
 
