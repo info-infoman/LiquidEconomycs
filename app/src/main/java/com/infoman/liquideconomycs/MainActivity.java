@@ -62,9 +62,9 @@ import static com.infoman.liquideconomycs.Utils.EXTRA_ANSWER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_CMD;
 import static com.infoman.liquideconomycs.Utils.EXTRA_MASTER;
 import static com.infoman.liquideconomycs.Utils.ageToBytes;
-import static com.infoman.liquideconomycs.Utils.chekSigPubKey;
+import static com.infoman.liquideconomycs.Utils.chekSig;
 import static com.infoman.liquideconomycs.Utils.hexToByte;
-import static com.infoman.liquideconomycs.Utils.sigMsg;
+import static org.bitcoinj.core.ECKey.ECDSASignature.decodeFromDER;
 
 public class MainActivity extends AppCompatActivity implements ActivityCompat.OnRequestPermissionsResultCallback , QRCodeReaderView.OnQRCodeReadListener, NfcAdapter.CreateNdefMessageCallback {
 
@@ -432,11 +432,10 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             if(fields.length == 2) {
                 byte[] accepterPubKey = Utils.hexToByte(fields[0]);
                 Log.d(TAG, accepterPubKey.toString());
-                //TODO add check signature
                 if (accepterPubKey.length != 20)
                     Toast.makeText(getApplicationContext(), getResources().getString(R.string.ErrorReceivingPartnerData), Toast.LENGTH_LONG).show();
                 else
-                    if(chekSigPubKey(accepterPubKey, Utils.hexToByte(fields[1]), accepterPubKey)) {
+                    if(chekSig(accepterPubKey, decodeFromDER(Utils.hexToByte(fields[1])), accepterPubKey)) {
                         startActionFind(getApplicationContext(), "Main", ECKey.fromPublicOnly(accepterPubKey).getPubKeyHash(), 0L);
                     }
             }

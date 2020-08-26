@@ -14,6 +14,7 @@ import org.apache.http.StatusLine;
 import org.apache.http.client.HttpResponseException;
 import org.apache.http.message.BasicLineParser;
 import org.apache.http.message.BasicNameValuePair;
+import org.bitcoinj.core.SignatureDecodeException;
 
 import java.io.EOFException;
 import java.io.IOException;
@@ -268,7 +269,7 @@ public class WebSocketClient {
 
     public interface Listener {
         public void onConnect();
-        public void onMessage(String message);
+        public void onMessage(String message) throws SignatureDecodeException;
         public void onMessage(byte[] data);
         public void onDisconnect(int code, String reason);
         public void onError(Exception error);

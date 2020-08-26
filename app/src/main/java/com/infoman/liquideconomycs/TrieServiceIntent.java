@@ -41,6 +41,7 @@ import static com.infoman.liquideconomycs.Utils.getChildsCountInMap;
 import static com.infoman.liquideconomycs.Utils.getCommonKey;
 import static org.bitcoinj.core.Utils.sha256hash160;
 
+//TODO add max age field in leaf and branch node = max age in childs, for automate delete to old pubKey
 
 public class TrieServiceIntent extends IntentService {
 

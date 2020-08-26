@@ -13,9 +13,11 @@ import android.os.Build;
 import android.preference.PreferenceManager;
 import android.util.Log;
 
+import com.google.common.primitives.Bytes;
 import com.google.common.primitives.Ints;
 
 import org.apache.http.message.BasicNameValuePair;
+import org.bitcoinj.core.Sha256Hash;
 import org.bitcoinj.core.SignatureDecodeException;
 
 import java.io.FileNotFoundException;
@@ -39,6 +41,7 @@ import static com.infoman.liquideconomycs.Utils.EXTRA_PUBKEY;
 import static com.infoman.liquideconomycs.Utils.EXTRA_PROVIDE_SERVICE;
 import static com.infoman.liquideconomycs.Utils.EXTRA_SIGNAL_SERVER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_TOKEN;
+import static org.bitcoinj.core.ECKey.ECDSASignature.decodeFromDER;
 
 public class SyncServiceIntent extends IntentService {
 
@@ -121,7 +124,7 @@ public class SyncServiceIntent extends IntentService {
                     }
 
                     @Override
-                    public void onMessage(String message) {
+                    public void onMessage(String message) throws SignatureDecodeException {
                         Log.d(TAG, String.format("Got string message! %s", message));
                         if(message.equals("Completed")){
                             broadcastActionMsg(master, "Sync", getResources().getString(R.string.onCheckToken));
@@ -149,7 +152,10 @@ public class SyncServiceIntent extends IntentService {
                         byte[] sig      = Utils.getBytesPart(data,5, sigLength), payload  = Utils.getBytesPart(data, 5+sigLength, data.length-(5+sigLength));
                         //todo check sig
                         try {
-                            if(!Utils.chekSigMsg(pubKey, sig, msgType, payload))
+                            byte[] digest = new byte[1];
+                            digest[0] = msgType;
+                            digest = Sha256Hash.hash(Bytes.concat(digest, payload));
+                            if(!Utils.chekSig(pubKey, decodeFromDER(sig), digest))
                                 app.mClient.disconnect();
                         } catch (SignatureDecodeException e) {
                             app.mClient.disconnect();

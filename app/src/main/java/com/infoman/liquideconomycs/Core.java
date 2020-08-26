@@ -10,6 +10,8 @@ import com.google.common.primitives.Bytes;
 import com.google.common.primitives.Ints;
 
 import org.bitcoinj.core.ECKey;
+import org.bitcoinj.core.Sha256Hash;
+import org.bitcoinj.core.SignatureDecodeException;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -102,11 +104,11 @@ public class Core extends Application {
     }
 
     /////////Sync/////////////////////////////////////////////////////////////////////////////////
-    public void sendMsg(byte msgType, byte[] payload) {
+    public void sendMsg(byte msgType, byte[] payload) throws SignatureDecodeException {
         if(mClient != null && mClient.isConnected() && payload.length>0) {
             byte[] type = new byte[1];
             type[0] = (msgType == Utils.getHashs ? Utils.hashs : Utils.getHashs);
-            byte[] sig = Utils.sigMsg((byte[]) getMyKey().second, type[0], payload);
+            byte[] sig = Utils.Sig((byte[]) getMyKey().second, Sha256Hash.hash(Bytes.concat(type, payload)));
             mClient.send(Bytes.concat(type, Ints.toByteArray(sig.length), sig, payload));
         }
     }

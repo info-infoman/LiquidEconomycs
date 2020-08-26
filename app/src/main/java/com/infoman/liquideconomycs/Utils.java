@@ -20,6 +20,8 @@ import java.util.BitSet;
 import java.util.Date;
 import java.util.concurrent.TimeUnit;
 
+import static org.bitcoinj.core.ECKey.ECDSASignature.decodeFromDER;
+
 
 public class Utils {
     public static byte
@@ -136,27 +138,12 @@ public class Utils {
         return childsMap;//result.array();
     }
 
-    public static byte[] sigMsg(byte[] privKey, byte msgType, byte[] payload) {
-        //flip type
-        byte[] digest = new byte[1];
-        digest[0] = msgType;
-        digest = Sha256Hash.hash(Bytes.concat(digest, payload));
-        ECKey key = ECKey.fromPrivate(privKey);
-        ECKey.ECDSASignature sig = key.sign(Sha256Hash.wrap(digest));
-        return sig.encodeToDER();
+    public static byte[] Sig(byte[] privKey, byte[] digest) throws SignatureDecodeException {
+        return ECKey.fromPrivate((byte[]) privKey).sign(Sha256Hash.wrap(Sha256Hash.hash((byte[]) digest))).encodeToDER();
     }
 
-    public static boolean chekSigMsg(byte[] pubKey, byte[] sig, byte msgType, byte[] payload) throws SignatureDecodeException {
-        byte[] digest = new byte[1];
-        digest[0] = msgType;
-        digest = Sha256Hash.hash(Bytes.concat(digest, payload));
-        ECKey publicKey = ECKey.fromPublicOnly(pubKey);
-        return publicKey.verify(digest,sig);
-    }
-
-    public static boolean chekSigPubKey(byte[] pubKey, byte[] sig, byte[] payload) throws SignatureDecodeException {
-        ECKey publicKey = ECKey.fromPublicOnly(pubKey);
-        return publicKey.verify(Sha256Hash.hash(payload),sig);
+    public static boolean chekSig(byte[] pubKey, ECKey.ECDSASignature sig, byte[] payload) throws SignatureDecodeException {
+        return ECKey.verify(Sha256Hash.hash(payload), sig, pubKey);
     }
 
     public static boolean copyAssetFolder(AssetManager assetManager, String fromAssetPath, String toPath) {
