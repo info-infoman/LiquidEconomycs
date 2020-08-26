@@ -48,14 +48,10 @@ public class DialogsFragment extends AppCompatDialogFragment {
                         public void onClick(DialogInterface dialog, int id) {
                             if (dialogActivity.equals("MainActivity")) {
 
-                                startActionInsert(((MainActivity) getActivity()),
-                                        "Main", ECKey.fromPublicOnly(Utils.hexToByte(((MainActivity) Objects.requireNonNull(getActivity())).resultTextView.getText().toString())).getPubKeyHash(),
-                                        ageToBytes());
-
                                 startActionSync(((MainActivity) getActivity()),
                                         "Main",
                                         "",
-                                        Utils.hexToByte(((MainActivity) Objects.requireNonNull(getActivity())).resultTextView.getText().toString()),
+                                        Utils.hexToByte(Utils.parseQRString(((MainActivity) Objects.requireNonNull(getActivity())).resultTextView.getText().toString())[0]),
                                         "",
                                         true);
 

@@ -429,20 +429,19 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         resultTextView.setText(text);
         String[] fields = Utils.parseQRString(text);
         if(provideService){
-            if(fields.length == 2) {
+            if(fields.length != 2 || fields[1].equals("") || fields[0].equals("")) {
+                Toast.makeText(getApplicationContext(), getResources().getString(R.string.ErrorReceivingPartnerData), Toast.LENGTH_LONG).show();}
+            else{
                 byte[] accepterPubKey = Utils.hexToByte(fields[0]);
-                Log.d(TAG, accepterPubKey.toString());
-                if (accepterPubKey.length != 20)
-                    Toast.makeText(getApplicationContext(), getResources().getString(R.string.ErrorReceivingPartnerData), Toast.LENGTH_LONG).show();
-                else
-                    if(chekSig(accepterPubKey, decodeFromDER(Utils.hexToByte(fields[1])), accepterPubKey)) {
+                if(chekSig(accepterPubKey, decodeFromDER(Utils.hexToByte(fields[1])), accepterPubKey)) {
                         startActionFind(getApplicationContext(), "Main", ECKey.fromPublicOnly(accepterPubKey).getPubKeyHash(), 0L);
-                    }
+                }
+                //TODO add uncheck msg
             }
         }else{
             shakeIt(300,10);
 
-            if(fields.length < 3 || fields[1].equals("") || fields[2].equals("") || hexToByte(fields[0]).length!=65){
+            if(fields.length < 3 || fields[1].equals("") || fields[2].equals("") || fields[0].equals("")){
                Toast.makeText(getApplicationContext(), getResources().getString(R.string.ErrorReceivingPartnerData),Toast.LENGTH_LONG).show();
             }else{
                 startActionInsert(this, "Main", ECKey.fromPublicOnly(hexToByte(fields[0])).getPubKeyHash(), ageToBytes());
@@ -480,17 +479,17 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     public void generatePairingMsg() {
         ImageView img = (ImageView) findViewById(R.id.image);
         assert app.myKey.first != null;
-        String msg ="";
+        String msg = Utils.byteToHex((byte[]) app.myKey.first)+" ";
         if(!provideService) {
             //generate QR or NFC msg = pubKey & sig digest from pubKey
-            msg = Utils.byteToHex((byte[]) app.myKey.first)+" "+Utils.byteToHex(ECKey.fromPrivate((byte[]) app.myKey.second).sign(Sha256Hash.wrap(Sha256Hash.hash((byte[]) app.myKey.first))).encodeToDER());
+            msg = msg + Utils.byteToHex(ECKey.fromPrivate((byte[]) app.myKey.second).sign(Sha256Hash.wrap(Sha256Hash.hash((byte[]) app.myKey.first))).encodeToDER());
 
         }
         if(tbQR.isChecked()) {
             if (provideService) {
                 SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
                 String signalServer = sharedPref.getString("Signal_server_URL", ""), token = sharedPref.getString("Signal_server_Token", "");
-                msg = msg + (signalServer != null ? " " + signalServer + " " + token : "");
+                msg = msg + (signalServer != null ? signalServer + " " + token : "");
             }
             if(msg!="") {
                 QRCodeWriter writer = new QRCodeWriter();

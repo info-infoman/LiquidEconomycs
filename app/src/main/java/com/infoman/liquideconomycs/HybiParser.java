@@ -32,6 +32,8 @@ package com.infoman.liquideconomycs;
 
 import android.util.Log;
 
+import org.bitcoinj.core.SignatureDecodeException;
+
 import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.IOException;
@@ -108,7 +110,7 @@ public class HybiParser {
         return payload;
     }
 
-    public void start(HappyDataInputStream stream) throws IOException {
+    public void start(HappyDataInputStream stream) throws IOException, SignatureDecodeException {
         while (true) {
             if (stream.available() == -1) break;
             switch (mStage) {
@@ -254,7 +256,7 @@ public class HybiParser {
         mClosed = true;
     }
 
-    private void emitFrame() throws IOException {
+    private void emitFrame() throws IOException, SignatureDecodeException {
         byte[] payload = mask(mPayload, mMask, 0);
         int opcode = mOpcode;
 

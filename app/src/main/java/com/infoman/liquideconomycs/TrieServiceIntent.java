@@ -11,6 +11,8 @@ import android.util.Log;
 import com.google.common.primitives.Bytes;
 import com.google.common.primitives.Longs;
 
+import org.bitcoinj.core.SignatureDecodeException;
+
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Date;
@@ -167,7 +169,7 @@ public class TrieServiceIntent extends IntentService {
                 ////////////////////////////////////////////////////////////////
                 try {
                     generateAnswer(msgType, payload);
-                } catch (IOException e) {
+                } catch (IOException | SignatureDecodeException e) {
                     e.printStackTrace();
                 }
                 ////////////////////////////////////////////////////////////////
@@ -175,7 +177,7 @@ public class TrieServiceIntent extends IntentService {
         }
     }
 
-    private void generateAnswer(byte msgType, byte[] payload) throws IOException {
+    private void generateAnswer(byte msgType, byte[] payload) throws IOException, SignatureDecodeException {
         Context context = app.getApplicationContext();
         //todo
         if(msgType == Utils.getHashs){
