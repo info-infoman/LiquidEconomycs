@@ -276,7 +276,7 @@ public class TrieServiceIntent extends IntentService {
         byte[] childsMap = new byte[32];
         byte[] typeAndKeySize = new byte[2];
         long pos = Longs.fromByteArray(selfNodePos);
-        app.trie.seek(pos);
+        app.trie.seek(pos+2);
         app.trie.read(typeAndKeySize, 2,2);
         byte[] keyNode = new byte[typeAndKeySize[1]];
         app.trie.read(keyNode, 0, typeAndKeySize[1]);
@@ -770,12 +770,12 @@ public class TrieServiceIntent extends IntentService {
 
         byte[] hash = new byte[20];
         if (pos == 0L) {
-            app.trie.seek(pos);
+            app.trie.seek(pos+2);
             app.trie.read(hash, 0, 20);
         } else {
-            app.trie.seek(pos+1);
+            app.trie.seek(pos+3);
             byte keySize = app.trie.readByte();
-            app.trie.seek(pos+ 2 + keySize);
+            app.trie.seek(pos+ 4 + keySize);
             app.trie.read(hash, 0, 20);
         }
         return hash;
