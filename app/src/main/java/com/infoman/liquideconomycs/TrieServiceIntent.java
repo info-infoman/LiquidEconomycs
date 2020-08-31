@@ -735,7 +735,7 @@ public class TrieServiceIntent extends IntentService {
                 byte keyNodeSize = app.trie.readByte();
                 byte[] keyNode = new byte[keyNodeSize];
                 app.trie.read(keyNode, 0, keyNodeSize);
-                app.trie.seek(pos + 2 + keyNodeSize + 20); //skip hash
+                app.trie.seek(pos + 4 + keyNodeSize + 20); //skip hash
                 byte[] childsMap = new byte[32];
                 app.trie.read(childsMap, 0, 32);
                 //Получим префикс и суффикс искомого ключа
@@ -749,13 +749,13 @@ public class TrieServiceIntent extends IntentService {
                     byte[] result;
                     if(type==BRANCH) {//ret pos
                         childPosInMap = getChildPosInMap(childsMap, (suffixKey[0] & 0xFF));
-                        app.trie.seek(2 + pos + 2 + keyNodeSize + 20 + 32 + ((childPosInMap * 8) - 8));
+                        app.trie.seek(pos + 4 + keyNodeSize + 20 + 32 + ((childPosInMap * 8) - 8));
                         result = new byte[8];
                         app.trie.read(result, 0, 8);
 
                     }else {                  //ret age
                         childPosInMap = getChildPosInMap(childsMap, (suffixKey[0] & 0xFF));
-                        app.trie.seek(2 + pos + 2 + keyNodeSize + 20 + 32 + ((childPosInMap * 2) - 2));
+                        app.trie.seek(pos + 4 + keyNodeSize + 20 + 32 + ((childPosInMap * 2) - 2));
                         result = new byte[2];
                         app.trie.read(result, 0, 2);
                     }
