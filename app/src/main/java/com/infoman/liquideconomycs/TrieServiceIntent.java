@@ -713,11 +713,14 @@ public class TrieServiceIntent extends IntentService {
         Cursor query = app.getFreeSpace(record.length);
         app.trie.seek(app.trie.length());
         long pos = app.trie.getFilePointer();
-        if (query.moveToFirst()) {
+        if (query.getCount() > 0 && query.moveToFirst()) {
             int posColIndex = query.getColumnIndex("pos");
-            pos = query.getLong(posColIndex);
-            app.deleteFreeSpace(pos);
-            app.trie.seek(pos);
+            Long p = query.getLong(posColIndex);
+            if( p > 0 ) {
+                app.deleteFreeSpace(p);
+                app.trie.seek(p);
+                pos=p;
+            }
         }
         query.close();
 

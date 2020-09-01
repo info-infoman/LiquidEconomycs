@@ -71,7 +71,7 @@ public class Core extends Application {
 
     public void addPosInFreeSpaceMap(long pos, int keyNodeSize, int selfChildArraySize){
         cv.put("pos", pos);
-        cv.put("space", 2+keyNodeSize+20+32+selfChildArraySize);
+        cv.put("space", 4+keyNodeSize+20+32+selfChildArraySize);
         db.insert("freeSpace", null, cv);
         cv.clear();
     }
