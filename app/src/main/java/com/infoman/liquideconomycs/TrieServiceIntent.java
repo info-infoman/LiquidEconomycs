@@ -107,6 +107,17 @@ public class TrieServiceIntent extends IntentService {
         //android.os.Debug.waitForDebugger();
         app = (Core) getApplicationContext();
 
+        //ROOT(content BRANCHs & LEAFs)
+        //age(2)/hash sha256hash160(20) /child point array(1-256*8)
+        //0000  /00*20                  /0000000000000000 max 2070 byte
+        //BRANCH(content child BRANCHs & LEAFs)
+        //age(2)/type(1)/key size(1)/key(0-18)/hash sha256hash160(20)/childsMap(32)  /nodePointArray(1-256*8)
+        //0000  /00     /00         /00*18    /00*20                 /00*32         /00*8               max 2104 byte (ideal ‭153 185(branchs) =~307Mb)
+        //LEAF(content accounts key suffix & age)
+        //age(2)/type(1)/key size(1)/key(0-18)/hash sha256hash160(20)/childsMap(32)  /age Array(1-256*2)/
+        //0000  /00     /00         /00*18    /00*20                 /00*32          /00*2               max 568 byte (ideal ‭39 062 500‬(leafs)=20GB)
+        //total 21GB(ideal trie for 10 000 000 000 accounts)
+        //
     }
 
     @Override
