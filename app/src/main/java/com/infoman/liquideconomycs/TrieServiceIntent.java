@@ -644,10 +644,7 @@ public class TrieServiceIntent extends IntentService {
                     typeAndKeySize[1] = (byte)oldLeafKey_.length;
                     hash=calcHash(type, selfChildArray);
 
-                    //if node-age is younger inserted age then insert age
-                    long posOldLeaf = addRecordInFile(
-                            (Utils.compareDate(Utils.reconstructAgeFromBytes(nodeAge), Utils.reconstructAgeFromBytes(age))>0 ? age : nodeAge),
-                            typeAndKeySize, oldLeafKey_, hash, childsMap, selfChildArray);
+                    long posOldLeaf = addRecordInFile(nodeAge, typeAndKeySize, oldLeafKey_, hash, childsMap, selfChildArray);
 
                     //CREATE NEW BRANCH WITCH COMMON KEY AND CONTENT = NEW LEAF POSITION + OLD NODE POSITION
                     typeAndKeySize[0] = BRANCH;
@@ -703,6 +700,7 @@ public class TrieServiceIntent extends IntentService {
         }
     }
 
+    //todo add compress in freespase
     private long addRecordInFile(byte[] age, byte[] typeAndKeySize, byte[] key, byte[] hash, byte[] childsMap, byte[] childArray) throws IOException {
         byte[] record;
         if(typeAndKeySize[1]==0){
@@ -715,9 +713,11 @@ public class TrieServiceIntent extends IntentService {
         long pos = app.trie.getFilePointer();
         if (query.getCount() > 0 && query.moveToFirst()) {
             int posColIndex = query.getColumnIndex("pos");
+            int spaceColIndex = query.getColumnIndex("space");
             Long p = query.getLong(posColIndex);
+            int s = query.getInt(spaceColIndex);
             if( p > 0 ) {
-                app.deleteFreeSpace(p);
+                app.deleteFreeSpace(p, record.length, s);
                 app.trie.seek(p);
                 pos=p;
             }

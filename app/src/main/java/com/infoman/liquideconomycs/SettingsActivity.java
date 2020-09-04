@@ -6,6 +6,9 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 
+import com.google.common.primitives.Bytes;
+import com.google.common.primitives.Longs;
+
 import org.bitcoinj.core.ECKey;
 
 import androidx.annotation.NonNull;
@@ -14,6 +17,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.preference.PreferenceFragmentCompat;
 
 import static com.infoman.liquideconomycs.TrieServiceIntent.startActionInsert;
+import static com.infoman.liquideconomycs.Utils.getBytesPart;
 
 public class SettingsActivity extends AppCompatActivity {
 
@@ -58,10 +62,11 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     private void insertDemoInTrie(){
-        for(int i=0;i<10512;i++){
+        for(int i=0;i<1010512;i++){
             ECKey myECKey=new ECKey();
             byte[] myPubKey = myECKey.getPubKeyHash(), age = Utils.ageToBytes();
             startActionInsert(getApplicationContext(), "Main", myPubKey, age);
+
         }
     }
 }

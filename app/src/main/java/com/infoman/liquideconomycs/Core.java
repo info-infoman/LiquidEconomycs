@@ -62,20 +62,51 @@ public class Core extends Application {
 
     /////////TRIE//////////////////////////////////////////////////////////////////////////////////
     public Cursor getFreeSpace(int recordlength) {
-        return db.rawQuery("SELECT * FROM freeSpace where space="+recordlength, null);
+        return db.rawQuery("SELECT * FROM freeSpace where space>="+recordlength, null);
     }
 
-    public void deleteFreeSpace(long pos) {
-        db.delete("freeSpace",  "pos = ?", new String[] { String.valueOf(pos) });
+    public void deleteFreeSpace(long pos, int recordLength, int space) {
+        db.delete("freeSpace", "pos = ?", new String[]{String.valueOf(pos)});
+        if(recordLength<space) {
+            insertFreeSpaceWitchCompressTrieFile(pos + recordLength + 1, space - recordLength);
+        }
     }
 
     public void addPosInFreeSpaceMap(long pos, int keyNodeSize, int selfChildArraySize){
+        insertFreeSpaceWitchCompressTrieFile(pos, 4+keyNodeSize+20+32+selfChildArraySize);
+    }
+
+    public void insertFreeSpaceWitchCompressTrieFile(long pos, int space){
+        long p;
+        int posColIndex, spaceColIndex, s;
+        Cursor startQ = db.rawQuery("SELECT * FROM freeSpace WHERE pos+space+1="+pos, null);
+        Cursor endQ = db.rawQuery("SELECT * FROM freeSpace WHERE pos="+pos+1, null);
+        if (startQ.getCount() > 0 && startQ.moveToFirst()) {
+            posColIndex = startQ.getColumnIndex("pos");
+            spaceColIndex = startQ.getColumnIndex("space");
+            p = startQ.getLong(posColIndex);
+            s = startQ.getInt(spaceColIndex);
+            deleteFreeSpace(p, s, s);
+            pos = p;
+            space = space+s;
+        }
+        startQ.close();
+
+        if (endQ.getCount() > 0 && endQ.moveToFirst()) {
+            posColIndex = endQ.getColumnIndex("pos");
+            spaceColIndex = endQ.getColumnIndex("space");
+            p = endQ.getLong(posColIndex);
+            s = endQ.getInt(spaceColIndex);
+            deleteFreeSpace(p, s, s);
+            space = space+s;
+        }
+        endQ.close();
+
         cv.put("pos", pos);
-        cv.put("space", 4+keyNodeSize+20+32+selfChildArraySize);
+        cv.put("space", space);
         db.insert("freeSpace", null, cv);
         cv.clear();
     }
-
     /////////MyKey/////////////////////////////////////////////////////////////////////////////////
     public Pair getMyKey() {
         return myKey;
