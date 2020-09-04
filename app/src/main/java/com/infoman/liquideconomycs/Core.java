@@ -80,7 +80,7 @@ public class Core extends Application {
         long p;
         int posColIndex, spaceColIndex, s;
         Cursor startQ = db.rawQuery("SELECT * FROM freeSpace WHERE pos+space+1="+pos, null);
-        Cursor endQ = db.rawQuery("SELECT * FROM freeSpace WHERE pos="+pos+1, null);
+        Cursor endQ = db.rawQuery("SELECT * FROM freeSpace WHERE pos="+pos+space+1, null);
         if (startQ.getCount() > 0 && startQ.moveToFirst()) {
             posColIndex = startQ.getColumnIndex("pos");
             spaceColIndex = startQ.getColumnIndex("space");
