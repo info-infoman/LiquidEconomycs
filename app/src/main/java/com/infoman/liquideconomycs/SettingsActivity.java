@@ -62,7 +62,7 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     private void insertDemoInTrie(){
-        for(int i=0;i<1010512;i++){
+        for(int i=0;i<510512;i++){
             ECKey myECKey=new ECKey();
             byte[] myPubKey = myECKey.getPubKeyHash(), age = Utils.ageToBytes();
             startActionInsert(getApplicationContext(), "Main", myPubKey, age);

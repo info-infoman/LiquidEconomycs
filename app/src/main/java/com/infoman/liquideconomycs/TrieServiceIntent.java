@@ -188,6 +188,15 @@ public class TrieServiceIntent extends IntentService {
         }
     }
 
+    // called to send data to Activity
+    public void broadcastActionMsg(String master, String cmd, byte[] answer) {
+        Intent intent = new Intent(BROADCAST_ACTION_ANSWER)
+                .putExtra(EXTRA_MASTER, master)
+                .putExtra(EXTRA_CMD, cmd)
+                .putExtra(EXTRA_ANSWER, answer);
+        sendBroadcast(intent);
+    }
+
     private void generateAnswer(byte msgType, byte[] payload) throws IOException, SignatureDecodeException {
         Context context = app.getApplicationContext();
         //todo
@@ -340,15 +349,6 @@ public class TrieServiceIntent extends IntentService {
         return oldestNodeAge;
     }
 
-    // called to send data to Activity
-    public void broadcastActionMsg(String master, String cmd, byte[] answer) {
-        Intent intent = new Intent(BROADCAST_ACTION_ANSWER)
-            .putExtra(EXTRA_MASTER, master)
-            .putExtra(EXTRA_CMD, cmd)
-            .putExtra(EXTRA_ANSWER, answer);
-        sendBroadcast(intent);
-    }
-
     //return null if not found or (pos or age) if found
     private byte[] find(byte[] key, long pos) throws IOException {
         byte[] s=search(key, pos);
@@ -360,6 +360,58 @@ public class TrieServiceIntent extends IntentService {
         }else{
             return null;
         }
+    }
+
+    //return pos or age or null - if not found
+    private byte[] search(byte[] key, long pos) throws IOException {
+        //Если размер файла == 0  то вернем null
+        if(app.trie.length()>0) {
+            //если это корень то переместим курсор на позицию в массиве детей = первый байт ключа * 8 - 8
+            //если содержимое != 0 то  начинаем искать там и вернем то что нашли + корень, иначе вернем корень
+            if (pos == 0L) {
+                app.trie.seek(22 + getChildPosInArray((key[0]&0xFF), BRANCH));
+                byte[] childPos = new byte[8];
+                app.trie.read(childPos, 0, 8);
+                if (Longs.fromByteArray(childPos) != 0) {
+                    return childPos;
+                }
+            } else {
+                //иначе переместимся на позицию pos пропустим возраст
+                app.trie.seek(2 + pos);
+                //прочитаем ключ, карту дочерей, число дочерей, суфикс вносимого ключа
+                byte type = app.trie.readByte();
+                byte keyNodeSize = app.trie.readByte();
+                byte[] keyNode = new byte[keyNodeSize];
+                app.trie.read(keyNode, 0, keyNodeSize);
+                app.trie.seek(pos + 4 + keyNodeSize + 20); //skip hash
+                byte[] childsMap = new byte[32];
+                app.trie.read(childsMap, 0, 32);
+                //Получим префикс и суффикс искомого ключа
+
+                byte[] preffixKey = getBytesPart(key, 0, keyNodeSize);
+                byte[] suffixKey = getBytesPart(key, keyNodeSize, key.length - keyNodeSize);
+
+                //found Если искомый ключ(его часть =  длинне ключа узла) = ключу узла и первый байт суффикса имеется в массиве дочерей то
+                if(Arrays.equals(preffixKey, keyNode) && checkExistChildInMap(childsMap, (suffixKey[0] & 0xFF))) {
+                    int childPosInMap = 0;
+                    byte[] result;
+                    if(type==BRANCH) {//ret pos
+                        childPosInMap = getChildPosInMap(childsMap, (suffixKey[0] & 0xFF));
+                        app.trie.seek(pos + 4 + keyNodeSize + 20 + 32 + ((childPosInMap * 8) - 8));
+                        result = new byte[8];
+                        app.trie.read(result, 0, 8);
+
+                    }else {                  //ret age
+                        childPosInMap = getChildPosInMap(childsMap, (suffixKey[0] & 0xFF));
+                        app.trie.seek(pos + 4 + keyNodeSize + 20 + 32 + ((childPosInMap * 2) - 2));
+                        result = new byte[2];
+                        app.trie.read(result, 0, 2);
+                    }
+                    return result;
+                }
+            }
+        }
+        return null;
     }
 
     //return null if not change(not found) or pos in file if change or hash if root
@@ -700,86 +752,6 @@ public class TrieServiceIntent extends IntentService {
         }
     }
 
-    //todo add compress in freespase
-    private long addRecordInFile(byte[] age, byte[] typeAndKeySize, byte[] key, byte[] hash, byte[] childsMap, byte[] childArray) throws IOException {
-        byte[] record;
-        if(typeAndKeySize[1]==0){
-            record = Bytes.concat(age, typeAndKeySize, hash, childsMap, childArray);
-        }else{
-            record = Bytes.concat(age, typeAndKeySize, key, hash, childsMap, childArray);
-        }
-        Cursor query = app.getFreeSpace(record.length);
-        app.trie.seek(app.trie.length());
-        long pos = app.trie.getFilePointer();
-        if (query.getCount() > 0 && query.moveToFirst()) {
-            int posColIndex = query.getColumnIndex("pos");
-            int spaceColIndex = query.getColumnIndex("space");
-            Long p = query.getLong(posColIndex);
-            int s = query.getInt(spaceColIndex);
-            if( p > 0 ) {
-                app.deleteFreeSpace(p, record.length, s);
-                app.trie.seek(p);
-                pos=p;
-            }
-        }
-        query.close();
-
-        app.trie.write(record);
-        return pos;
-    }
-
-    //return pos or age or null - if not found
-    private byte[] search(byte[] key, long pos) throws IOException {
-        //Если размер файла == 0  то вернем null
-        if(app.trie.length()>0) {
-            //если это корень то переместим курсор на позицию в массиве детей = первый байт ключа * 8 - 8
-            //если содержимое != 0 то  начинаем искать там и вернем то что нашли + корень, иначе вернем корень
-            if (pos == 0L) {
-                app.trie.seek(22 + getChildPosInArray((key[0]&0xFF), BRANCH));
-                byte[] childPos = new byte[8];
-                app.trie.read(childPos, 0, 8);
-                if (Longs.fromByteArray(childPos) != 0) {
-                    return childPos;
-                }
-            } else {
-                //иначе переместимся на позицию pos пропустим возраст
-                app.trie.seek(2 + pos);
-                //прочитаем ключ, карту дочерей, число дочерей, суфикс вносимого ключа
-                byte type = app.trie.readByte();
-                byte keyNodeSize = app.trie.readByte();
-                byte[] keyNode = new byte[keyNodeSize];
-                app.trie.read(keyNode, 0, keyNodeSize);
-                app.trie.seek(pos + 4 + keyNodeSize + 20); //skip hash
-                byte[] childsMap = new byte[32];
-                app.trie.read(childsMap, 0, 32);
-                //Получим префикс и суффикс искомого ключа
-
-                byte[] preffixKey = getBytesPart(key, 0, keyNodeSize);
-                byte[] suffixKey = getBytesPart(key, keyNodeSize, key.length - keyNodeSize);
-
-                //found Если искомый ключ(его часть =  длинне ключа узла) = ключу узла и первый байт суффикса имеется в массиве дочерей то
-                if(Arrays.equals(preffixKey, keyNode) && checkExistChildInMap(childsMap, (suffixKey[0] & 0xFF))) {
-                    int childPosInMap = 0;
-                    byte[] result;
-                    if(type==BRANCH) {//ret pos
-                        childPosInMap = getChildPosInMap(childsMap, (suffixKey[0] & 0xFF));
-                        app.trie.seek(pos + 4 + keyNodeSize + 20 + 32 + ((childPosInMap * 8) - 8));
-                        result = new byte[8];
-                        app.trie.read(result, 0, 8);
-
-                    }else {                  //ret age
-                        childPosInMap = getChildPosInMap(childsMap, (suffixKey[0] & 0xFF));
-                        app.trie.seek(pos + 4 + keyNodeSize + 20 + 32 + ((childPosInMap * 2) - 2));
-                        result = new byte[2];
-                        app.trie.read(result, 0, 2);
-                    }
-                    return result;
-                }
-            }
-        }
-        return null;
-    }
-
     private byte[] getHash(long pos) throws IOException {
 
         byte[] hash = new byte[20];
@@ -809,5 +781,32 @@ public class TrieServiceIntent extends IntentService {
             return sha256hash160(digest);
         }
         return sha256hash160(childArray);
+    }
+
+    private long addRecordInFile(byte[] age, byte[] typeAndKeySize, byte[] key, byte[] hash, byte[] childsMap, byte[] childArray) throws IOException {
+        byte[] record;
+        if(typeAndKeySize[1]==0){
+            record = Bytes.concat(age, typeAndKeySize, hash, childsMap, childArray);
+        }else{
+            record = Bytes.concat(age, typeAndKeySize, key, hash, childsMap, childArray);
+        }
+        Cursor query = app.getFreeSpace(record.length);
+        app.trie.seek(app.trie.length());
+        long pos = app.trie.getFilePointer();
+        if (query.getCount() > 0 && query.moveToFirst()) {
+            int posColIndex = query.getColumnIndex("pos");
+            int spaceColIndex = query.getColumnIndex("space");
+            Long p = query.getLong(posColIndex);
+            int s = query.getInt(spaceColIndex);
+            if( p > 0 ) {
+                app.deleteFreeSpace(p, record.length, s);
+                app.trie.seek(p);
+                pos=p;
+            }
+        }
+        query.close();
+
+        app.trie.write(record);
+        return pos;
     }
 }

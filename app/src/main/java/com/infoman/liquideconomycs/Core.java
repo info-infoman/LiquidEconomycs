@@ -62,13 +62,13 @@ public class Core extends Application {
 
     /////////TRIE//////////////////////////////////////////////////////////////////////////////////
     public Cursor getFreeSpace(int recordlength) {
-        return db.rawQuery("SELECT * FROM freeSpace where space>="+recordlength, null);
+        return db.rawQuery("SELECT * FROM freeSpace where space>="+recordlength+" ORDER BY space ASC", null);
     }
 
     public void deleteFreeSpace(long pos, int recordLength, int space) {
         db.delete("freeSpace", "pos = ?", new String[]{String.valueOf(pos)});
         if(recordLength<space) {
-            insertFreeSpaceWitchCompressTrieFile(pos + recordLength + 1, space - recordLength);
+            insertFreeSpaceWitchCompressTrieFile(pos + recordLength, space - recordLength);
         }
     }
 
@@ -77,10 +77,11 @@ public class Core extends Application {
     }
 
     public void insertFreeSpaceWitchCompressTrieFile(long pos, int space){
+        boolean continueCompress=false;
         long p;
         int posColIndex, spaceColIndex, s;
-        Cursor startQ = db.rawQuery("SELECT * FROM freeSpace WHERE pos+space+1="+pos, null);
-        Cursor endQ = db.rawQuery("SELECT * FROM freeSpace WHERE pos="+pos+space+1, null);
+        Cursor startQ = db.rawQuery("SELECT * FROM freeSpace WHERE pos+space="+pos, null);
+        Cursor endQ = db.rawQuery("SELECT * FROM freeSpace WHERE pos="+pos+space, null);
         if (startQ.getCount() > 0 && startQ.moveToFirst()) {
             posColIndex = startQ.getColumnIndex("pos");
             spaceColIndex = startQ.getColumnIndex("space");
@@ -89,6 +90,7 @@ public class Core extends Application {
             deleteFreeSpace(p, s, s);
             pos = p;
             space = space+s;
+            continueCompress=true;
         }
         startQ.close();
 
@@ -99,13 +101,18 @@ public class Core extends Application {
             s = endQ.getInt(spaceColIndex);
             deleteFreeSpace(p, s, s);
             space = space+s;
+            continueCompress=true;
         }
         endQ.close();
 
-        cv.put("pos", pos);
-        cv.put("space", space);
-        db.insert("freeSpace", null, cv);
-        cv.clear();
+        if (continueCompress){
+            insertFreeSpaceWitchCompressTrieFile(pos, space);
+        }else {
+            cv.put("pos", pos);
+            cv.put("space", space);
+            db.insert("freeSpace", null, cv);
+            cv.clear();
+        }
     }
     /////////MyKey/////////////////////////////////////////////////////////////////////////////////
     public Pair getMyKey() {
