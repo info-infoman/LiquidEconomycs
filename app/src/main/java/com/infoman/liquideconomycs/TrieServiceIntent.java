@@ -571,7 +571,7 @@ public class TrieServiceIntent extends IntentService {
                 typeAndKeySize[0] = LEAF;
                 typeAndKeySize[1] = (lKey==null ? (byte)0 : (byte)lKey.length);
                 childsMap = changeChildInMap(new byte[32], (key[key.length-1]&0xFF), true);//add age
-                hash=calcHash(typeAndKeySize[0], age);
+                hash=calcHash(typeAndKeySize[0], childsMap);
                 pos = addRecordInFile(age, typeAndKeySize, lKey, hash, childsMap, age);
             }else{//insert in child & save in root
                 lKey = getBytesPart(key, 1, key.length - 1);
@@ -640,7 +640,7 @@ public class TrieServiceIntent extends IntentService {
                 app.trie.seek(pos + 4 + keyNodeSize + 20 + 32);
                 byte[] childArray = new byte[selfChildArraySize];
                 app.trie.read(childArray, 0, selfChildArraySize);
-                hash = calcHash(type, childArray);
+                hash = calcHash(type, type==LEAF ? childsMap : childArray);
                 app.trie.seek(pos + 4 + keyNodeSize);
                 app.trie.write(hash);
                 return Longs.toByteArray(pos);
@@ -686,7 +686,7 @@ public class TrieServiceIntent extends IntentService {
                     typeAndKeySize[0] = LEAF;
                     typeAndKeySize[1] = (byte)leafKey_.length;
                     childsMapNew = changeChildInMap(new byte[32], (key[key.length-1]&0xFF),true);
-                    hash=calcHash(typeAndKeySize[0], age);
+                    hash=calcHash(typeAndKeySize[0], childsMapNew);
                     long posLeaf = addRecordInFile(age, typeAndKeySize, leafKey_, hash, childsMapNew, age);
 
                     //COPY OLD NODE WITCH CORP(keyNode - common) KEY
@@ -694,7 +694,7 @@ public class TrieServiceIntent extends IntentService {
                     byte[] oldLeafKey_ = getBytesPart(oldLeafKey, 1 , oldLeafKey.length - 1);
                     typeAndKeySize[0] = type;
                     typeAndKeySize[1] = (byte)oldLeafKey_.length;
-                    hash=calcHash(type, selfChildArray);
+                    hash=calcHash(type, type==LEAF ? childsMap : selfChildArray);
 
                     long posOldLeaf = addRecordInFile(nodeAge, typeAndKeySize, oldLeafKey_, hash, childsMap, selfChildArray);
 
@@ -727,7 +727,7 @@ public class TrieServiceIntent extends IntentService {
                         insByte = (suffixKey[0]&0xFF);
                         typeAndKeySize[1] = (byte)leafKey.length;
                         childsMapNew = changeChildInMap(new byte[32], (key[key.length-1]&0xFF),true);
-                        hash=calcHash(LEAF, age);
+                        hash=calcHash(LEAF, childsMapNew);
                         posLeaf = addRecordInFile(age, typeAndKeySize, leafKey, hash, childsMapNew, age);
                     }else{
                         insByte = (key[key.length-1]&0xFF);
@@ -740,7 +740,7 @@ public class TrieServiceIntent extends IntentService {
                     byte[] before=(chp == 0 ? new byte[0] : getBytesPart(selfChildArray,0,  (chp-1)*(type==LEAF ? 2 : 8)));
                     childArray = Bytes.concat(before, (type==LEAF ? age : Longs.toByteArray(posLeaf)), getBytesPart(selfChildArray, before.length, selfChildArray.length-before.length));
                     // пересчитываем хеш и рекурсивно вносим позицию в вышестоящие узлы
-                    hash=calcHash(type, childArray);
+                    hash=calcHash(type, type==LEAF ? childsMap : childArray);
 
                     retPos = Longs.toByteArray(addRecordInFile(
                             (Utils.compareDate(Utils.reconstructAgeFromBytes(nodeAge), Utils.reconstructAgeFromBytes(age))>0 ? age : nodeAge),
