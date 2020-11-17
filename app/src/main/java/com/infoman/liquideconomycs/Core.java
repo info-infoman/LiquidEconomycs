@@ -65,54 +65,41 @@ public class Core extends Application {
         return db.rawQuery("SELECT * FROM freeSpace where space>="+recordlength+" ORDER BY space ASC", null);
     }
 
+    public Cursor getFreeSpaceWitchCompress() {
+        return db.rawQuery("SELECT freeSpaceFirst.id, freeSpaceFirst.pos, freeSpaceFirst.space, freeSpaceSecond.id AS Second_id, freeSpaceSecond.pos AS Second_pos, freeSpaceSecond.space AS Second_space " +
+                "FROM freeSpace AS freeSpaceFirst LEFT JOIN freeSpace AS freeSpaceSecond " +
+                        "ON freeSpaceSecond.pos + freeSpaceSecond.space = freeSpaceFirst.pos " +
+                        "or freeSpaceFirst.pos+freeSpaceFirst.space = freeSpaceSecond.pos" +
+                " WHERE freeSpaceSecond.id IS NOT null LIMIT 1", null);
+    }
+
     public void deleteFreeSpace(long pos, int recordLength, int space) {
         db.delete("freeSpace", "pos = ?", new String[]{String.valueOf(pos)});
         if(recordLength<space) {
-            insertFreeSpaceWitchCompressTrieFile(pos + recordLength, space - recordLength);
+            insertFreeSpaceWitchOutCompressTrieFile(pos + recordLength, space - recordLength);
         }
     }
 
     public void addPosInFreeSpaceMap(long pos, int keyNodeSize, int selfChildArraySize){
-        insertFreeSpaceWitchCompressTrieFile(pos, 4+keyNodeSize+20+32+selfChildArraySize);
+        insertFreeSpaceWitchOutCompressTrieFile(pos, 4+keyNodeSize+20+32+selfChildArraySize);
     }
 
-    public void insertFreeSpaceWitchCompressTrieFile(long pos, int space){
-        boolean continueCompress=false;
-        long p;
-        int posColIndex, spaceColIndex, s;
-        Cursor startQ = db.rawQuery("SELECT * FROM freeSpace WHERE pos+space="+pos, null);
-        Cursor endQ = db.rawQuery("SELECT * FROM freeSpace WHERE pos="+pos+space, null);
-        if (startQ.getCount() > 0 && startQ.moveToFirst()) {
-            posColIndex = startQ.getColumnIndex("pos");
-            spaceColIndex = startQ.getColumnIndex("space");
-            p = startQ.getLong(posColIndex);
-            s = startQ.getInt(spaceColIndex);
-            deleteFreeSpace(p, s, s);
-            pos = p;
-            space = space+s;
-            continueCompress=true;
-        }
-        startQ.close();
+    public void insertFreeSpaceWitchOutCompressTrieFile(long pos, int space){
+        cv.put("pos", pos);
+        cv.put("space", space);
+        db.insert("freeSpace", null, cv);
+        cv.clear();
+    }
 
-        if (endQ.getCount() > 0 && endQ.moveToFirst()) {
-            posColIndex = endQ.getColumnIndex("pos");
-            spaceColIndex = endQ.getColumnIndex("space");
-            p = endQ.getLong(posColIndex);
-            s = endQ.getInt(spaceColIndex);
-            deleteFreeSpace(p, s, s);
-            space = space+s;
-            continueCompress=true;
+    public void insertFreeSpaceWitchCompressTrieFile(long pos, int space, long secondPos, int secondSpace){
+        if (pos > secondPos) {
+            deleteFreeSpace(pos, space, space);
+            pos = secondPos;
+        }else{
+            deleteFreeSpace(secondPos, secondSpace, secondSpace);
         }
-        endQ.close();
-
-        if (continueCompress){
-            insertFreeSpaceWitchCompressTrieFile(pos, space);
-        }else {
-            cv.put("pos", pos);
-            cv.put("space", space);
-            db.insert("freeSpace", null, cv);
-            cv.clear();
-        }
+        space = space + secondSpace;
+        insertFreeSpaceWitchOutCompressTrieFile(pos, space);
     }
     /////////MyKey/////////////////////////////////////////////////////////////////////////////////
     public Pair getMyKey() {

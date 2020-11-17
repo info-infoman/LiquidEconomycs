@@ -1,5 +1,6 @@
 package com.infoman.liquideconomycs;
 
+import android.content.Context;
 import android.os.Bundle;
 import android.text.InputType;
 import android.view.View;
@@ -16,6 +17,7 @@ import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.preference.PreferenceFragmentCompat;
 
+import static com.infoman.liquideconomycs.DBOptimizeServiceIntent.startActionOptimise;
 import static com.infoman.liquideconomycs.TrieServiceIntent.startActionInsert;
 import static com.infoman.liquideconomycs.Utils.getBytesPart;
 
@@ -62,11 +64,13 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     private void insertDemoInTrie(){
-        for(int i=0;i<510512;i++){
+        Context c = getApplicationContext();
+        for(int i=0;i<10000;i++){
             ECKey myECKey=new ECKey();
             byte[] myPubKey = myECKey.getPubKeyHash(), age = Utils.ageToBytes();
-            startActionInsert(getApplicationContext(), "Main", myPubKey, age);
+            startActionInsert(c, "Main", myPubKey, age);
 
         }
+        startActionOptimise(c);
     }
 }

@@ -197,9 +197,9 @@ public class TrieServiceIntent extends IntentService {
         sendBroadcast(intent);
     }
 
+    //todo add age sort for sync priority
     private void generateAnswer(byte msgType, byte[] payload) throws IOException, SignatureDecodeException {
         Context context = app.getApplicationContext();
-        //todo
         if(msgType == Utils.getHashs){
             byte[] answer = new byte[0];
             for(int i=0;i < payload.length/8;i++){
@@ -537,9 +537,9 @@ public class TrieServiceIntent extends IntentService {
                         int chp= getChildPosInMap(childsMap, insByte);
                         //delete in map
                         childsMap = changeChildInMap(childsMap, insByte, false);
-                        byte[] before=(chp == 0 ? new byte[0] : getBytesPart(childArray,0,  (chp-1)*(type==LEAF ? 2 : 8)));
+                        byte[] before=(chp == 0 ? new byte[0] : getBytesPart(childArray,0,  (chp-1)*2));
                         childArray = Bytes.concat(before, getBytesPart(childArray, before.length, childArray.length-before.length));
-                        hash=calcHash(type, childArray);
+                        hash=calcHash(type, childsMap);
                         byte[] oldestNodeAge = getOldestNodeAge(nodeAge, LEAF, childArray);
                         app.addPosInFreeSpaceMap(pos, keyNodeSize, selfChildArraySize);
                         return Longs.toByteArray(addRecordInFile(oldestNodeAge, typeAndKeySize, keyNode, hash, childsMap, childArray));
