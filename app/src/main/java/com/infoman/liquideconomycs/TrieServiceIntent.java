@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Date;
 
+import static com.infoman.liquideconomycs.DBOptimizeServiceIntent.startActionOptimise;
 import static com.infoman.liquideconomycs.Utils.ACTION_DELETE;
 import static com.infoman.liquideconomycs.Utils.ACTION_FIND;
 import static com.infoman.liquideconomycs.Utils.ACTION_GENERATE_ANSWER;
@@ -46,7 +47,7 @@ import static org.bitcoinj.core.Utils.sha256hash160;
 //TODO add max age field in leaf and branch node = max age in childs, for automate delete to old pubKey
 
 public class TrieServiceIntent extends IntentService {
-
+    private int waitingIntentCount = 0;
     private Core app;
 
     public TrieServiceIntent() {
@@ -121,8 +122,15 @@ public class TrieServiceIntent extends IntentService {
     }
 
     @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        waitingIntentCount++;
+        return super.onStartCommand(intent, flags, startId);
+    }
+
+    @Override
     protected void onHandleIntent(Intent intent) {
         if (intent != null) {
+            waitingIntentCount--;
             final String action = intent.getAction();
             if (ACTION_GET_HASH.equals(action)) {
                 final String master = intent.getStringExtra(EXTRA_MASTER), cmd = "GetHash";
@@ -185,7 +193,13 @@ public class TrieServiceIntent extends IntentService {
                 }
                 ////////////////////////////////////////////////////////////////
             }
+            if(waitingIntentCount==0) {
+                startActionOptimise(getApplicationContext());
+            }
         }
+        //final String m = intent.getStringExtra(EXTRA_MASTER), c = "TrieOperationIsComplited";
+        //broadcastActionMsg(m, c, new byte[0]);
+
     }
 
     // called to send data to Activity

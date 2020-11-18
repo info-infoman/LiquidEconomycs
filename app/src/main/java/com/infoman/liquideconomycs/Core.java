@@ -65,6 +65,7 @@ public class Core extends Application {
         return db.rawQuery("SELECT * FROM freeSpace where space>="+recordlength+" ORDER BY space ASC", null);
     }
 
+    //TODO optimize for paralell(limit>1)
     public Cursor getFreeSpaceWitchCompress() {
         return db.rawQuery("SELECT freeSpaceFirst.id, freeSpaceFirst.pos, freeSpaceFirst.space, freeSpaceSecond.id AS Second_id, freeSpaceSecond.pos AS Second_pos, freeSpaceSecond.space AS Second_space " +
                 "FROM freeSpace AS freeSpaceFirst LEFT JOIN freeSpace AS freeSpaceSecond " +
@@ -92,12 +93,14 @@ public class Core extends Application {
     }
 
     public void insertFreeSpaceWitchCompressTrieFile(long pos, int space, long secondPos, int secondSpace){
+        deleteFreeSpace(pos, space, space);
+        deleteFreeSpace(secondPos, secondSpace, secondSpace);
         if (pos > secondPos) {
-            deleteFreeSpace(pos, space, space);
+            //deleteFreeSpace(pos, space, space);
             pos = secondPos;
-        }else{
-            deleteFreeSpace(secondPos, secondSpace, secondSpace);
-        }
+        }//else{
+            //deleteFreeSpace(secondPos, secondSpace, secondSpace);
+        //}
         space = space + secondSpace;
         insertFreeSpaceWitchOutCompressTrieFile(pos, space);
     }

@@ -1,6 +1,7 @@
 package com.infoman.liquideconomycs;
 
 import android.content.Context;
+import android.content.Intent;
 import android.os.Bundle;
 import android.text.InputType;
 import android.view.View;
@@ -17,9 +18,10 @@ import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.preference.PreferenceFragmentCompat;
 
-import static com.infoman.liquideconomycs.DBOptimizeServiceIntent.startActionOptimise;
-import static com.infoman.liquideconomycs.TrieServiceIntent.startActionInsert;
-import static com.infoman.liquideconomycs.Utils.getBytesPart;
+import static com.infoman.liquideconomycs.Utils.ACTION_INSERT;
+import static com.infoman.liquideconomycs.Utils.EXTRA_AGE;
+import static com.infoman.liquideconomycs.Utils.EXTRA_MASTER;
+import static com.infoman.liquideconomycs.Utils.EXTRA_PUBKEY;
 
 public class SettingsActivity extends AppCompatActivity {
 
@@ -43,9 +45,6 @@ public class SettingsActivity extends AppCompatActivity {
         if (actionBar != null) {
             actionBar.setDisplayHomeAsUpEnabled(true);
         }
-
-
-
     }
 
     public static class SettingsFragment extends PreferenceFragmentCompat {
@@ -65,12 +64,23 @@ public class SettingsActivity extends AppCompatActivity {
 
     private void insertDemoInTrie(){
         Context c = getApplicationContext();
-        for(int i=0;i<10000;i++){
-            ECKey myECKey=new ECKey();
-            byte[] myPubKey = myECKey.getPubKeyHash(), age = Utils.ageToBytes();
-            startActionInsert(c, "Main", myPubKey, age);
+        ECKey myECKey = new ECKey();
+        byte[] myPubKey = myECKey.getPubKeyHash(), age = Utils.ageToBytes();
 
+        Intent intent = new Intent(c, TrieServiceIntent.class)
+                .setAction(ACTION_INSERT)
+                .putExtra(EXTRA_MASTER, "Main")
+                .putExtra(EXTRA_PUBKEY, myPubKey)
+                .putExtra(EXTRA_AGE, age);
+        c.startService(intent);
+        for(int i=0;i<10000;i++) {
+            myECKey = new ECKey();
+            myPubKey = myECKey.getPubKeyHash();
+            age = Utils.ageToBytes();
+            c.startService(intent.setAction(ACTION_INSERT)
+                    .putExtra(EXTRA_MASTER, "Main")
+                    .putExtra(EXTRA_PUBKEY, myPubKey)
+                    .putExtra(EXTRA_AGE, age));
         }
-        startActionOptimise(c);
     }
 }

@@ -54,6 +54,7 @@ import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
 
 import static androidx.constraintlayout.widget.Constraints.TAG;
+import static com.infoman.liquideconomycs.DBOptimizeServiceIntent.startActionOptimise;
 import static com.infoman.liquideconomycs.SyncServiceIntent.startActionSync;
 import static com.infoman.liquideconomycs.TrieServiceIntent.startActionFind;
 import static com.infoman.liquideconomycs.TrieServiceIntent.startActionInsert;
