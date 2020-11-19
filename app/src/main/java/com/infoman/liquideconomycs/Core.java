@@ -65,13 +65,24 @@ public class Core extends Application {
         return db.rawQuery("SELECT * FROM freeSpace where space>="+recordlength+" ORDER BY space ASC", null);
     }
 
+    public Cursor checkExistFreeSpace(long pos) {
+        return db.rawQuery("SELECT * FROM freeSpace where pos="+pos, null);
+    }
+
     //TODO optimize for paralell(limit>1)
     public Cursor getFreeSpaceWitchCompress() {
-        return db.rawQuery("SELECT freeSpaceFirst.id, freeSpaceFirst.pos, freeSpaceFirst.space, freeSpaceSecond.id AS Second_id, freeSpaceSecond.pos AS Second_pos, freeSpaceSecond.space AS Second_space " +
-                "FROM freeSpace AS freeSpaceFirst LEFT JOIN freeSpace AS freeSpaceSecond " +
+        return db.rawQuery("SELECT " +
+                "freeSpaceFirst.id, " +
+                "freeSpaceFirst.pos, " +
+                "freeSpaceFirst.space, " +
+                "freeSpaceSecond.id AS Second_id, " +
+                "freeSpaceSecond.pos AS Second_pos, " +
+                "freeSpaceSecond.space AS Second_space " +
+                "FROM freeSpace AS freeSpaceFirst " +
+                    "LEFT JOIN freeSpace AS freeSpaceSecond " +
                         "ON freeSpaceSecond.pos + freeSpaceSecond.space = freeSpaceFirst.pos " +
                         "or freeSpaceFirst.pos+freeSpaceFirst.space = freeSpaceSecond.pos" +
-                " WHERE freeSpaceSecond.id IS NOT null LIMIT 1", null);
+                " WHERE freeSpaceSecond.id IS NOT null", null);
     }
 
     public void deleteFreeSpace(long pos, int recordLength, int space) {
@@ -96,11 +107,8 @@ public class Core extends Application {
         deleteFreeSpace(pos, space, space);
         deleteFreeSpace(secondPos, secondSpace, secondSpace);
         if (pos > secondPos) {
-            //deleteFreeSpace(pos, space, space);
             pos = secondPos;
-        }//else{
-            //deleteFreeSpace(secondPos, secondSpace, secondSpace);
-        //}
+        }
         space = space + secondSpace;
         insertFreeSpaceWitchOutCompressTrieFile(pos, space);
     }

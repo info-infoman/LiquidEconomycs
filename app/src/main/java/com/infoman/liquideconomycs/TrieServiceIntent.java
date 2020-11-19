@@ -17,7 +17,6 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Date;
 
-import static com.infoman.liquideconomycs.DBOptimizeServiceIntent.startActionOptimise;
 import static com.infoman.liquideconomycs.Utils.ACTION_DELETE;
 import static com.infoman.liquideconomycs.Utils.ACTION_FIND;
 import static com.infoman.liquideconomycs.Utils.ACTION_GENERATE_ANSWER;
@@ -194,12 +193,10 @@ public class TrieServiceIntent extends IntentService {
                 ////////////////////////////////////////////////////////////////
             }
             if(waitingIntentCount==0) {
-                startActionOptimise(getApplicationContext());
+                //optimize free space in db
+                optimize();
             }
         }
-        //final String m = intent.getStringExtra(EXTRA_MASTER), c = "TrieOperationIsComplited";
-        //broadcastActionMsg(m, c, new byte[0]);
-
     }
 
     // called to send data to Activity
@@ -823,4 +820,27 @@ public class TrieServiceIntent extends IntentService {
         app.trie.write(record);
         return pos;
     }
+
+    private void optimize() {
+        Cursor query = app.getFreeSpaceWitchCompress();
+        int s, ss;
+        long p, sp;
+        if (query.getCount() > 0) {
+            while (query.moveToNext()) {
+                p = query.getLong(query.getColumnIndex("pos"));
+                s = query.getInt(query.getColumnIndex("space"));
+                sp = query.getLong(query.getColumnIndex("Second_pos"));
+                ss = query.getInt(query.getColumnIndex("Second_space"));
+                Cursor checkExistQueryP = app.checkExistFreeSpace(p);
+                Cursor checkExistQuerySP = app.checkExistFreeSpace(sp);
+                if (checkExistQueryP.getCount() > 0 && checkExistQuerySP.getCount() > 0) {
+                    app.insertFreeSpaceWitchCompressTrieFile(p, s, sp, ss);
+                }
+            }
+            query.close();
+            optimize();
+        }
+        query.close();
+    }
+
 }

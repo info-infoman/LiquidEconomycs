@@ -51,10 +51,5 @@
             android:enabled="true"
             android:exported="true"
             android:process=".liquideconomycs_trieServiceIntent" />
-        <service
-            android:name=".DBOptimizeServiceIntent"
-            android:enabled="true"
-            android:exported="true"
-            android:process=".liquideconomycs_dbOptimizeServiceIntent" />
     </application>
 </manifest>
