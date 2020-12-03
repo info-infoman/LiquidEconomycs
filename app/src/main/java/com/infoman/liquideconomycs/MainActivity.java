@@ -56,10 +56,14 @@ import androidx.fragment.app.FragmentTransaction;
 import static com.infoman.liquideconomycs.SyncServiceIntent.startActionSync;
 import static com.infoman.liquideconomycs.TrieServiceIntent.startActionFind;
 import static com.infoman.liquideconomycs.TrieServiceIntent.startActionInsert;
+import static com.infoman.liquideconomycs.Utils.ACTION_DELETE_OLDEST;
+import static com.infoman.liquideconomycs.Utils.ACTION_INSERT;
 import static com.infoman.liquideconomycs.Utils.BROADCAST_ACTION_ANSWER;
+import static com.infoman.liquideconomycs.Utils.EXTRA_AGE;
 import static com.infoman.liquideconomycs.Utils.EXTRA_ANSWER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_CMD;
 import static com.infoman.liquideconomycs.Utils.EXTRA_MASTER;
+import static com.infoman.liquideconomycs.Utils.EXTRA_PUBKEY;
 import static com.infoman.liquideconomycs.Utils.ageToBytes;
 import static com.infoman.liquideconomycs.Utils.chekSig;
 import static com.infoman.liquideconomycs.Utils.hexToByte;
@@ -211,6 +215,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         } else {
             requestNFCPermission();
         }
+
+        startService(new Intent(getApplicationContext(), TrieServiceIntent.class).setAction(ACTION_DELETE_OLDEST));
     }
 
     @Override protected void onDestroy() {

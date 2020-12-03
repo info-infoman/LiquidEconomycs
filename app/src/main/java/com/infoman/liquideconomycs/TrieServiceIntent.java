@@ -24,6 +24,7 @@ import static com.infoman.liquideconomycs.Utils.ACTION_GET_HASH;
 import static com.infoman.liquideconomycs.Utils.ACTION_INSERT;
 import static com.infoman.liquideconomycs.Utils.BRANCH;
 import static com.infoman.liquideconomycs.Utils.BROADCAST_ACTION_ANSWER;
+import static com.infoman.liquideconomycs.Utils.ACTION_DELETE_OLDEST;
 import static com.infoman.liquideconomycs.Utils.EXTRA_AGE;
 import static com.infoman.liquideconomycs.Utils.EXTRA_ANSWER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_CMD;
@@ -192,6 +193,16 @@ public class TrieServiceIntent extends IntentService {
                 }
                 ////////////////////////////////////////////////////////////////
             }
+
+            if (ACTION_DELETE_OLDEST.equals(action)) {
+                try {
+                    while (deleteOldest(0L, new byte[1])){}
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                ////////////////////////////////////////////////////////////////
+            }
+
             if(waitingIntentCount==0) {
                 //optimize free space in db
                 optimize();
@@ -841,6 +852,58 @@ public class TrieServiceIntent extends IntentService {
             optimize();
         }
         query.close();
+    }
+
+    private boolean deleteOldest(long pos, byte[] key) throws IOException {
+        Context context = app.getApplicationContext();
+        SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(context);
+        long maxAge = sharedPref.getLong("maxAge", 30);
+        byte[] nodeAge = new byte[2];
+        app.trie.seek(pos);
+        app.trie.read(nodeAge, 0, 2);
+        if (Utils.compareDate(new Date(), Utils.reconstructAgeFromBytes(nodeAge)) > maxAge) {
+            if (pos == 0L) {
+                byte[] childPos = new byte[8];
+                app.trie.seek(54);
+                for(int i=0;i==255;i++) {
+                    app.trie.seek(pos + (i*8));
+                    app.trie.read(childPos, 0, 8);
+                    if (Longs.fromByteArray(childPos) != 0) {
+                        key[0] = (byte) i;
+                        if(deleteOldest(Longs.fromByteArray(childPos), key)) return true;
+                    }
+                }
+            }else{
+                byte[] childsMap = new byte[32];
+                byte type = app.trie.readByte();
+                byte keyNodeSize = app.trie.readByte();
+                byte[] keyNode = new byte[keyNodeSize];
+                app.trie.read(keyNode, 0, keyNodeSize);
+                byte[] fullKey = Bytes.concat(key, keyNode);
+                app.trie.seek(pos + 4 + keyNodeSize + 20); //skip hash
+                app.trie.read(childsMap, 0, 32);
+                int childPosInMap = 0;
+                for(int i=0;i==255;i++) {
+                    childPosInMap = getChildPosInMap(childsMap, i);
+                    if(childPosInMap>0) {
+                        byte[] sKey=new byte[1];
+                        sKey[0] = (byte) i;
+                        app.trie.seek(pos + 4 + keyNodeSize + 20 + 32 + ((childPosInMap * (type == LEAF ? 2 : 8)) - (type == LEAF ? 2 : 8)));
+                        byte[] childPos = new byte[(type == LEAF ? 2 : 8)];
+                        app.trie.read(childPos, 0, (type == LEAF ? 2 : 8));
+                        if(type==LEAF){
+                            if (Utils.compareDate(new Date(), Utils.reconstructAgeFromBytes(childPos)) > maxAge) {
+                                delete(Bytes.concat(fullKey, sKey), 0L);
+                                return true;
+                            }
+                        }else{
+                            if(deleteOldest(Longs.fromByteArray(childPos), Bytes.concat(keyNode, sKey))) return true;
+                        }
+                    }
+                }
+            }
+        }
+        return false;
     }
 
 }

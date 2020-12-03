@@ -42,7 +42,7 @@ public class Utils {
         ACTION_DELETE       = "com.infoman.liquideconomycs.action.delete",
         ACTION_GENERATE_ANSWER = "com.infoman.liquideconomycs.action.getAnswer",
         ACTION_START        = "com.infoman.liquideconomycs.action.start",
-        ACTION_OPTIMIZE     = "com.infoman.liquideconomycs.action.optimize",
+        ACTION_DELETE_OLDEST     = "com.infoman.liquideconomycs.action.delete_oldest",
 
     //input param
         EXTRA_SIGNAL_SERVER = "com.infoman.liquideconomycs.extra.signalServer",
