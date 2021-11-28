@@ -3,10 +3,7 @@ package com.infoman.liquideconomycs;
 import android.app.AlertDialog;
 import android.app.Dialog;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.os.Bundle;
-
-import org.bitcoinj.core.ECKey;
 
 import java.util.Objects;
 
@@ -14,12 +11,13 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatDialogFragment;
 
 import static com.infoman.liquideconomycs.SyncServiceIntent.startActionSync;
-import static com.infoman.liquideconomycs.TrieServiceIntent.startActionInsert;
-import static com.infoman.liquideconomycs.Utils.ageToBytes;
 
 public class DialogsFragment extends AppCompatDialogFragment {
-    private int dialogCmd, cantFindPubKey = 0;
-    private String  dialogHead, dialogMsg, dialogActivity;
+    private final int dialogCmd;
+    private final int cantFindPubKey = 0;
+    private String  dialogHead;
+    private String dialogMsg;
+    private final String dialogActivity;
 
     DialogsFragment(Context context, String activity, int cmd) {
 
@@ -44,27 +42,21 @@ public class DialogsFragment extends AppCompatDialogFragment {
 
                 //.setIcon(R.drawable.ic_launcher_cat)
                 if(dialogCmd==cantFindPubKey) {
-                    builder.setPositiveButton(getResources().getString(android.R.string.yes), new DialogInterface.OnClickListener() {
-                        public void onClick(DialogInterface dialog, int id) {
-                            if (dialogActivity.equals("MainActivity")) {
+                    builder.setPositiveButton(getResources().getString(android.R.string.yes), (dialog, id) -> {
+                        if (dialogActivity.equals("MainActivity")) {
 
-                                startActionSync(((MainActivity) getActivity()),
-                                        "Main",
-                                        "",
-                                        Utils.hexToByte(Utils.parseQRString(((MainActivity) Objects.requireNonNull(getActivity())).resultTextView.getText().toString())[0]),
-                                        "",
-                                        true);
+                            startActionSync(getActivity(),
+                                    "Main",
+                                    "",
+                                    Utils.hexToByte(Utils.parseQRString(((MainActivity) Objects.requireNonNull(getActivity())).resultTextView.getText().toString())[0]),
+                                    "",
+                                    true);
 
-                                dialog.cancel();
+                            dialog.cancel();
 
-                            }
                         }
                     })
-                    .setNegativeButton(getResources().getString(android.R.string.no), new DialogInterface.OnClickListener() {
-                        public void onClick(DialogInterface dialog, int id) {
-                            dialog.cancel();
-                        }
-                    });
+                    .setNegativeButton(getResources().getString(android.R.string.no), (dialog, id) -> dialog.cancel());
                 }
         return builder.create();
     }

@@ -21,7 +21,6 @@ import android.os.Parcelable;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.preference.PreferenceManager;
-import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.AnimationUtils;
@@ -45,6 +44,7 @@ import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.Sha256Hash;
 import org.bitcoinj.core.SignatureDecodeException;
 
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import androidx.annotation.NonNull;
@@ -57,13 +57,10 @@ import static com.infoman.liquideconomycs.SyncServiceIntent.startActionSync;
 import static com.infoman.liquideconomycs.TrieServiceIntent.startActionFind;
 import static com.infoman.liquideconomycs.TrieServiceIntent.startActionInsert;
 import static com.infoman.liquideconomycs.Utils.ACTION_DELETE_OLDEST;
-import static com.infoman.liquideconomycs.Utils.ACTION_INSERT;
 import static com.infoman.liquideconomycs.Utils.BROADCAST_ACTION_ANSWER;
-import static com.infoman.liquideconomycs.Utils.EXTRA_AGE;
 import static com.infoman.liquideconomycs.Utils.EXTRA_ANSWER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_CMD;
 import static com.infoman.liquideconomycs.Utils.EXTRA_MASTER;
-import static com.infoman.liquideconomycs.Utils.EXTRA_PUBKEY;
 import static com.infoman.liquideconomycs.Utils.ageToBytes;
 import static com.infoman.liquideconomycs.Utils.chekSig;
 import static com.infoman.liquideconomycs.Utils.hexToByte;
@@ -79,22 +76,24 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     private Button              startBtn;
     public TextView             resultTextView, notation, role_capture, scan_gen;
     private QRCodeReaderView    qrCodeReaderView;
-    private boolean             provideService;
+    private boolean             provideService;//источник новых данных(тот кто предоставляет услугу\работу)
 
-    // handler for received data from service///////////////////////////////////////////////////////
+    // Перехватывает события от фоновых сервисов
     private final BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
         @Override public void onReceive(Context context, Intent intent) {
-            if (intent.getAction().equals(BROADCAST_ACTION_ANSWER)) {
+            if (Objects.equals(intent.getAction(), BROADCAST_ACTION_ANSWER)) {
                 final String master = intent.getStringExtra(EXTRA_MASTER), cmd = intent.getStringExtra(EXTRA_CMD);
                 if(master.equals("Main")){
                     if(cmd.equals("Find")){
                         final byte[] answer = intent.getByteArrayExtra(EXTRA_ANSWER);
                         if(provideService){
-                            shakeIt(300,10);
+                            shakeIt();
                             if(answer!=null) {
                                 Toast.makeText(getApplicationContext(), getResources().getString(R.string.pubKeyFound),Toast.LENGTH_LONG).show();
                                 //startActionInsert(getApplicationContext(), "Main", ECKey.fromPublicOnly(Utils.hexToByte(resultTextView.getText().toString())).getPubKeyHash(), ageToBytes());
-                                startActionSync(getApplicationContext(), "Main", "", Utils.hexToByte(resultTextView.getText().toString()), "", true);
+                                String[] fields = Utils.parseQRString(resultTextView.getText().toString());
+                                byte[] accepterPubKey = Utils.hexToByte(fields[0]);
+                                startActionSync(getApplicationContext(), "Main", "", accepterPubKey, "", true);
                             }else{
                                 DialogsFragment alert = new DialogsFragment(getApplicationContext(), "MainActivity", 0);
                                 FragmentManager manager = getSupportFragmentManager();
@@ -120,8 +119,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         Context context = getApplicationContext();
         app = (Core) context;
         setContentView(R.layout.activity_main);
-        mainLayout = (ViewGroup) findViewById(R.id.main_layout);
-        notation = (TextView) findViewById(R.id.notation);
+        mainLayout = findViewById(R.id.main_layout);
+        notation = findViewById(R.id.notation);
 
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.INTERNET) == PackageManager.PERMISSION_GRANTED) {} else {
             requestINTERNETPermission();
@@ -147,59 +146,46 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
         Button settings = findViewById(R.id.settings);
 
-        bSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
-            @Override
-            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                if(isChecked){
-                    tbwNFC.setChecked(true);
-                    tbQR.setChecked(false);
-                }else{
-                    tbwNFC.setChecked(false);
-                    tbQR.setChecked(true);
-                }
+        bSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if(isChecked){
+                tbwNFC.setChecked(true);
+                tbQR.setChecked(false);
+            }else{
+                tbwNFC.setChecked(false);
+                tbQR.setChecked(true);
+            }
+            stopScanner();
+
+        });
+
+        aSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if(isChecked){
+                tbResive.setChecked(false);
+                tbMade.setChecked(true);
+                provideService = true;
+                role_capture.setText(getResources().getString(R.string.Provide_service));
+            }else{
+                tbResive.setChecked(true);
+                tbMade.setChecked(false);
+                provideService = false;
+                role_capture.setText(getResources().getString(R.string.Accept_service));
+            }
+            role_capture.startAnimation(AnimationUtils.loadAnimation(getApplicationContext(),
+                    R.anim.zoom_in));
+            stopScanner();
+        });
+
+        settings.setOnClickListener(v -> {
+            Intent intent;
+            intent = new Intent(getApplicationContext(), SettingsActivity.class);
+            startActivity(intent);
+        });
+
+        startBtn.setOnClickListener(v -> {
+            if(qrCodeReaderView == null) {
+                startScanner();
+            }else{
                 stopScanner();
-
-            }
-        });
-
-        aSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
-            @Override
-            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-                if(isChecked){
-                    tbResive.setChecked(false);
-                    tbMade.setChecked(true);
-                    provideService = true;
-                    role_capture.setText(getResources().getString(R.string.Provide_service));
-                    role_capture.startAnimation(AnimationUtils.loadAnimation(getApplicationContext(),
-                            R.anim.zoom_in));
-                }else{
-                    tbResive.setChecked(true);
-                    tbMade.setChecked(false);
-                    provideService = false;
-                    role_capture.setText(getResources().getString(R.string.Accept_service));
-                    role_capture.startAnimation(AnimationUtils.loadAnimation(getApplicationContext(),
-                            R.anim.zoom_in));
-                }
-                stopScanner();
-            }
-        });
-
-        settings.setOnClickListener(new CompoundButton.OnClickListener() {
-            @Override public void onClick(View v) {
-                Intent intent;
-                intent = new Intent(getApplicationContext(), SettingsActivity.class);
-                startActivity(intent);
-            }
-        });
-
-        startBtn.setOnClickListener(new CompoundButton.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                if(qrCodeReaderView == null) {
-                    startScanner();
-                }else{
-                    stopScanner();
-                }
             }
         });
 
@@ -296,11 +282,11 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         //pointsOverlayView.setPoints(points);
     }
 
-    @SuppressLint("MissingPermission") private void shakeIt(int s, int i) {
+    @SuppressLint("MissingPermission") private void shakeIt() {
         if (Build.VERSION.SDK_INT >= 26) {
-            ((Vibrator) getSystemService(VIBRATOR_SERVICE)).vibrate(VibrationEffect.createOneShot(s,i));
+            ((Vibrator) getSystemService(VIBRATOR_SERVICE)).vibrate(VibrationEffect.createOneShot(300, 10));
         } else {
-            ((Vibrator) getSystemService(VIBRATOR_SERVICE)).vibrate(s);
+            ((Vibrator) getSystemService(VIBRATOR_SERVICE)).vibrate(300);
         }
     }
 
@@ -336,13 +322,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     private void requestINTERNETPermission() {
         if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.INTERNET)) {
             Snackbar.make(mainLayout, getResources().getText(R.string.getINTERNETPermission),
-                    Snackbar.LENGTH_INDEFINITE).setAction(getResources().getString(android.R.string.ok), new View.OnClickListener() {
-                @Override public void onClick(View view) {
-                    ActivityCompat.requestPermissions(MainActivity.this, new String[] {
+                    Snackbar.LENGTH_INDEFINITE).setAction(getResources().getString(android.R.string.ok), view -> ActivityCompat.requestPermissions(MainActivity.this, new String[] {
                             Manifest.permission.INTERNET
-                    }, MY_PERMISSION_REQUEST_INTERNET);
-                }
-            }).show();
+                    }, MY_PERMISSION_REQUEST_INTERNET)).show();
         } else {
             Snackbar.make(mainLayout, getResources().getText(R.string.permission_is_not_available_INTERNET),
                     Snackbar.LENGTH_SHORT).show();
@@ -354,33 +336,29 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
     private void requestFOREGROUND_SERVICEPermission() {
         if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.FOREGROUND_SERVICE)) {
-            Snackbar.make(mainLayout, getResources().getText(R.string.getFOREGROUND_SERVICEPermission),
-                    Snackbar.LENGTH_INDEFINITE).setAction(getResources().getString(android.R.string.ok), new View.OnClickListener() {
-                @Override public void onClick(View view) {
-                    ActivityCompat.requestPermissions(MainActivity.this, new String[] {
-                            Manifest.permission.FOREGROUND_SERVICE
-                    }, MY_PERMISSION_REQUEST_FOREGROUND_SERVICE);
-                }
-            }).show();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                Snackbar.make(mainLayout, getResources().getText(R.string.getFOREGROUND_SERVICEPermission),
+                        Snackbar.LENGTH_INDEFINITE).setAction(getResources().getString(android.R.string.ok), view -> ActivityCompat.requestPermissions(MainActivity.this, new String[] {
+                                Manifest.permission.FOREGROUND_SERVICE
+                        }, MY_PERMISSION_REQUEST_FOREGROUND_SERVICE)).show();
+            }
         } else {
             Snackbar.make(mainLayout, getResources().getText(R.string.permission_is_not_available_FOREGROUND_SERVICE),
                     Snackbar.LENGTH_SHORT).show();
-            ActivityCompat.requestPermissions(this, new String[] {
-                    Manifest.permission.FOREGROUND_SERVICE
-            }, MY_PERMISSION_REQUEST_FOREGROUND_SERVICE);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                ActivityCompat.requestPermissions(this, new String[] {
+                        Manifest.permission.FOREGROUND_SERVICE
+                }, MY_PERMISSION_REQUEST_FOREGROUND_SERVICE);
+            }
         }
     }
 
     private void requestCameraPermission() {
         if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.CAMERA)) {
             Snackbar.make(mainLayout, getResources().getText(R.string.getCAMERAPermission),
-                    Snackbar.LENGTH_INDEFINITE).setAction(getResources().getString(android.R.string.ok), new View.OnClickListener() {
-                @Override public void onClick(View view) {
-                    ActivityCompat.requestPermissions(MainActivity.this, new String[] {
+                    Snackbar.LENGTH_INDEFINITE).setAction(getResources().getString(android.R.string.ok), view -> ActivityCompat.requestPermissions(MainActivity.this, new String[] {
                             Manifest.permission.CAMERA
-                    }, MY_PERMISSION_REQUEST_CAMERA);
-                }
-            }).show();
+                    }, MY_PERMISSION_REQUEST_CAMERA)).show();
         } else {
             Snackbar.make(mainLayout, getResources().getText(R.string.permission_is_not_available_CAMERA),
                     Snackbar.LENGTH_SHORT).show();
@@ -393,13 +371,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     private void requestNFCPermission() {
         if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.NFC)) {
             Snackbar.make(mainLayout, getResources().getText(R.string.getNFCPermission),
-                    Snackbar.LENGTH_INDEFINITE).setAction(getResources().getString(android.R.string.ok), new View.OnClickListener() {
-                @Override public void onClick(View view) {
-                    ActivityCompat.requestPermissions(MainActivity.this, new String[] {
+                    Snackbar.LENGTH_INDEFINITE).setAction(getResources().getString(android.R.string.ok), view -> ActivityCompat.requestPermissions(MainActivity.this, new String[] {
                             Manifest.permission.NFC
-                    }, MY_PERMISSION_REQUEST_NFC);
-                }
-            }).show();
+                    }, MY_PERMISSION_REQUEST_NFC)).show();
         } else {
             Snackbar.make(mainLayout, getResources().getText(R.string.permission_is_not_available_NFC),
                     Snackbar.LENGTH_SHORT).show();
@@ -413,9 +387,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
         View content = getLayoutInflater().inflate(R.layout.content_decoder, mainLayout, true);
 
-        qrCodeReaderView = (QRCodeReaderView) findViewById(R.id.qrdecoderview);
-        resultTextView = (TextView) findViewById(R.id.result_text_view);
-        PointsOverlayView pointsOverlayView = (PointsOverlayView) findViewById(R.id.points_overlay_view);
+        qrCodeReaderView = findViewById(R.id.qrdecoderview);
+        resultTextView = findViewById(R.id.result_text_view);
+        PointsOverlayView pointsOverlayView = findViewById(R.id.points_overlay_view);
         qrCodeReaderView.setTorchEnabled(false);
         qrCodeReaderView.setQRDecodingEnabled(true);
 
@@ -430,6 +404,10 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         //relativeLayout.setLayoutParams(lp);
     }
 
+    //Тригер чтений QR кода
+    //В случае если provideService то запускается проверка партнера на наличие в реестре
+    //Иначе стартует сервис добавления\обновления идентификатора в дерево
+    //и сервис синхронизации(останавливается по таймеру если синхронизация не начата)
     public void codeReadTrigger(String text) throws SignatureDecodeException {
         resultTextView.setText(text);
         String[] fields = Utils.parseQRString(text);
@@ -444,8 +422,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 //TODO add uncheck msg
             }
         }else{
-            shakeIt(300,10);
-
+            shakeIt();
             if(fields.length < 3 || fields[1].equals("") || fields[2].equals("") || fields[0].equals("")){
                Toast.makeText(getApplicationContext(), getResources().getString(R.string.ErrorReceivingPartnerData),Toast.LENGTH_LONG).show();
             }else{
@@ -482,11 +459,12 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     }
 
     public void generatePairingMsg() {
-        ImageView img = (ImageView) findViewById(R.id.image);
+        ImageView img = findViewById(R.id.image);
         assert app.myKey.first != null;
         String msg = Utils.byteToHex((byte[]) app.myKey.first)+" ";
         if(!provideService) {
             //generate QR or NFC msg = pubKey & sig digest from pubKey
+            assert app.myKey.second != null;
             msg = msg + Utils.byteToHex(ECKey.fromPrivate((byte[]) app.myKey.second).sign(Sha256Hash.wrap(Sha256Hash.hash((byte[]) app.myKey.first))).encodeToDER());
 
         }
@@ -494,26 +472,23 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             if (provideService) {
                 SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
                 String signalServer = sharedPref.getString("Signal_server_URL", ""), token = sharedPref.getString("Signal_server_Token", "");
-                msg = msg + (signalServer != null ? signalServer + " " + token : "");
+                assert signalServer != null;
+                msg = msg + (!signalServer.equals("") ? signalServer + " " + token : "");
             }
-            if(msg!="") {
-                QRCodeWriter writer = new QRCodeWriter();
-                try {
-                    BitMatrix bitMatrix = writer.encode(msg, BarcodeFormat.QR_CODE, 512, 512);
-                    int width = bitMatrix.getWidth(), height = bitMatrix.getHeight();
-                    Bitmap bmp = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565);
-                    for (int x = 0; x < width; x++) {
-                        for (int y = 0; y < height; y++) {
-                            bmp.setPixel(x, y, bitMatrix.get(x, y) ? Color.BLACK : Color.WHITE);
-                        }
+            QRCodeWriter writer = new QRCodeWriter();
+            try {
+                BitMatrix bitMatrix = writer.encode(msg, BarcodeFormat.QR_CODE, 512, 512);
+                int width = bitMatrix.getWidth(), height = bitMatrix.getHeight();
+                Bitmap bmp = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565);
+                for (int x = 0; x < width; x++) {
+                    for (int y = 0; y < height; y++) {
+                        bmp.setPixel(x, y, bitMatrix.get(x, y) ? Color.BLACK : Color.WHITE);
                     }
-                    img.setImageBitmap(bmp);
-
-                } catch (WriterException e) {
-                    e.printStackTrace();
                 }
-            }else{
-                scan_gen.setText(getResources().getString(R.string.QR_generator_consumer));
+                img.setImageBitmap(bmp);
+
+            } catch (WriterException e) {
+                e.printStackTrace();
             }
 
             scan_gen.setVisibility(View.VISIBLE);

@@ -11,7 +11,6 @@ import com.google.common.primitives.Ints;
 
 import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.Sha256Hash;
-import org.bitcoinj.core.SignatureDecodeException;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -30,6 +29,7 @@ public class Core extends Application {
     public RandomAccessFile trie;
     public WebSocketClient mClient;
     public boolean isSynchronized;
+    public boolean isSynchronizedCompleted;
 
     @Override
     public void onCreate() {
@@ -126,7 +126,7 @@ public class Core extends Application {
             query.close();
         }else{
             ECKey myECKey=new ECKey();
-            byte[] myPrivKey = myECKey.getPrivKeyBytes(), myPubKey = ECKey.fromPrivate((byte[]) myPrivKey).getPubKey();
+            byte[] myPrivKey = myECKey.getPrivKeyBytes(), myPubKey = ECKey.fromPrivate(myPrivKey).getPubKey();
             //todo ask manifest
             cv.put("pubKey", myPubKey);
             cv.put("privKey", myPrivKey);
@@ -140,10 +140,10 @@ public class Core extends Application {
     }
 
     /////////Sync/////////////////////////////////////////////////////////////////////////////////
-    public void sendMsg(byte msgType, byte[] payload) throws SignatureDecodeException {
+    public void sendMsg(byte msgType, byte[] payload) {
         if(mClient != null && mClient.isConnected() && payload.length>0) {
             byte[] type = new byte[1];
-            type[0] = (msgType == Utils.getHashs ? Utils.hashs : Utils.getHashs);
+            type[0] = msgType;
             byte[] sig = Utils.Sig((byte[]) getMyKey().second, Sha256Hash.hash(Bytes.concat(type, payload)));
             mClient.send(Bytes.concat(type, Ints.toByteArray(sig.length), sig, payload));
         }

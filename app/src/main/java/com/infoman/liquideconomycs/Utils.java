@@ -14,13 +14,11 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Date;
 import java.util.concurrent.TimeUnit;
-
-import static org.bitcoinj.core.ECKey.ECDSASignature.decodeFromDER;
 
 
 public class Utils {
@@ -139,8 +137,8 @@ public class Utils {
         return childsMap;//result.array();
     }
 
-    public static byte[] Sig(byte[] privKey, byte[] digest) throws SignatureDecodeException {
-        return ECKey.fromPrivate((byte[]) privKey).sign(Sha256Hash.wrap(Sha256Hash.hash((byte[]) digest))).encodeToDER();
+    public static byte[] Sig(byte[] privKey, byte[] digest) {
+        return ECKey.fromPrivate(privKey).sign(Sha256Hash.wrap(Sha256Hash.hash(digest))).encodeToDER();
     }
 
     public static boolean chekSig(byte[] pubKey, ECKey.ECDSASignature sig, byte[] payload) throws SignatureDecodeException {
@@ -152,9 +150,10 @@ public class Utils {
             String[] files = assetManager.list(fromAssetPath);
             boolean res = true;
 
+            assert files != null;
             if (files.length==0) {
                 //If it's a file, it won't have any assets "inside" it.
-                res &= copyAsset(assetManager,
+                res = copyAsset(assetManager,
                         fromAssetPath,
                         toPath);
             } else {
@@ -172,18 +171,16 @@ public class Utils {
     }
 
     public static boolean copyAsset(AssetManager assetManager, String fromAssetPath, String toPath) {
-        InputStream in = null;
-        OutputStream out = null;
+        InputStream in;
+        OutputStream out;
         try {
             in = assetManager.open(fromAssetPath);
             new File(toPath).createNewFile();
             out = new FileOutputStream(toPath);
             copyFile(in, out);
             in.close();
-            in = null;
             out.flush();
             out.close();
-            out = null;
             return true;
         } catch(Exception e) {
             e.printStackTrace();
@@ -231,7 +228,7 @@ public class Utils {
 
         NdefRecord[] records = new NdefRecord[1];
 
-        byte[] payload = msg.getBytes(Charset.forName("UTF-8"));
+        byte[] payload = msg.getBytes(StandardCharsets.UTF_8);
 
         NdefRecord record = new NdefRecord(
                 NdefRecord.TNF_WELL_KNOWN,  //Our 3-bit Type name format
@@ -243,7 +240,5 @@ public class Utils {
 
         return records;
     }
-
-
 
 }

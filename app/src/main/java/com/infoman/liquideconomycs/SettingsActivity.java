@@ -4,16 +4,10 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.text.InputType;
-import android.view.View;
 import android.widget.Button;
-import android.widget.EditText;
-
-import com.google.common.primitives.Bytes;
-import com.google.common.primitives.Longs;
 
 import org.bitcoinj.core.ECKey;
 
-import androidx.annotation.NonNull;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.preference.PreferenceFragmentCompat;
@@ -31,11 +25,7 @@ public class SettingsActivity extends AppCompatActivity {
         setContentView(R.layout.settings_activity);
 
         final Button loadDemo = findViewById(R.id.loadDemoPubKeys);
-        loadDemo.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                insertDemoInTrie();
-            }
-        });
+        loadDemo.setOnClickListener(v -> insertDemoInTrie());
 
         getSupportFragmentManager()
                 .beginTransaction()
@@ -53,12 +43,8 @@ public class SettingsActivity extends AppCompatActivity {
             setPreferencesFromResource(R.xml.root_preferences, rootKey);
 
             androidx.preference.EditTextPreference editTextPreference = getPreferenceManager().findPreference("maxAge");
-            editTextPreference.setOnBindEditTextListener(new androidx.preference.EditTextPreference.OnBindEditTextListener() {
-                @Override
-                public void onBindEditText(@NonNull EditText editText) {
-                    editText.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_SIGNED);
-                }
-            });
+            assert editTextPreference != null;
+            editTextPreference.setOnBindEditTextListener(editText -> editText.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_SIGNED));
         }
     }
 

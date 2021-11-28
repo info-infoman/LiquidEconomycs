@@ -20,9 +20,9 @@ import org.apache.http.message.BasicNameValuePair;
 import org.bitcoinj.core.Sha256Hash;
 import org.bitcoinj.core.SignatureDecodeException;
 
-import java.io.FileNotFoundException;
 import java.net.URI;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 
@@ -61,17 +61,18 @@ public class SyncServiceIntent extends IntentService {
             .putExtra(EXTRA_PUBKEY, pubKey)
             .putExtra(EXTRA_TOKEN, token)
             .putExtra(EXTRA_MASTER, master);
-        Log.d(TAG, pubKey.toString());
+        Log.d(TAG, Arrays.toString(pubKey));
         context.startService(intent);
     }
 
-    public SyncServiceIntent() throws FileNotFoundException {
+    public SyncServiceIntent() {
         super("SyncServiceIntent");
     }
 
     @Override
     public void onCreate() {
         super.onCreate();
+        //android.os.Debug.waitForDebugger();
         //android.os.Debug.waitForDebugger();
         app = (Core) getApplicationContext();
         Log.i("liquideconomycs", "Service: SyncServiceIntent is create");
@@ -85,6 +86,7 @@ public class SyncServiceIntent extends IntentService {
             if (ACTION_START.equals(action) && !app.isSynchronized) {
                 app.clearPrefixTable();
                 app.isSynchronized = true;
+                app.isSynchronizedCompleted = false;
                 app.dateTimeLastSync=new Date().getTime();
                 final String    signalServer = intent.getStringExtra(EXTRA_SIGNAL_SERVER),
                                 token = intent.getStringExtra(EXTRA_TOKEN),
@@ -100,17 +102,21 @@ public class SyncServiceIntent extends IntentService {
                     channel = "";
                 }
 
-                NotificationCompat.Builder builder = new NotificationCompat.Builder(getBaseContext(), channel)
-                        .setTicker("SyncServiceIntent") // use something from something from R.string
-                        .setContentTitle("liquid economycs") // use something from something from
-                        .setContentText("Sync liquid base") // use something from something from
-                        .setProgress(0, 0, true)
-                        .setPriority(PRIORITY_LOW)
-                        .setCategory(Notification.CATEGORY_SERVICE); // display indeterminate progress
+                NotificationCompat.Builder builder = null; // display indeterminate progress
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+                    builder = new NotificationCompat.Builder(getBaseContext(), channel)
+                            .setTicker("SyncServiceIntent") // use something from something from R.string
+                            .setContentTitle("liquid economycs") // use something from something from
+                            .setContentText("Sync liquid base") // use something from something from
+                            .setProgress(0, 0, true)
+                            .setPriority(PRIORITY_LOW)
+                            .setCategory(Notification.CATEGORY_SERVICE);
+                }
 
+                assert builder != null;
                 startForeground(9991, builder.build());
                 //todo sync processor
-                List<BasicNameValuePair> mExtraHeaders = Arrays.asList(new BasicNameValuePair("Cookie", "session=abcd"));
+                List<BasicNameValuePair> mExtraHeaders = Collections.singletonList(new BasicNameValuePair("Cookie", "session=abcd"));
                 app.mClient = new WebSocketClient(new WebSocketClient.Listener() {
 
                     private static final String TAG = "WebSocketClient";
@@ -124,24 +130,25 @@ public class SyncServiceIntent extends IntentService {
                     }
 
                     @Override
-                    public void onMessage(String message) throws SignatureDecodeException {
+                    public void onMessage(String message) {
                         Log.d(TAG, String.format("Got string message! %s", message));
-                        if(message.equals("Completed")){
-                            broadcastActionMsg(master, "Sync", getResources().getString(R.string.onCheckToken));
-                            if(!Provide_service){
-                                app.sendMsg(Utils.getHashs, new byte[8]);
-                            }
-                            app.dateTimeLastSync = new Date().getTime();
-                        }else{
+                        //if(message.equals("Completed")){
+                        //    broadcastActionMsg(master, "Sync", getResources().getString(R.string.onCheckToken));
+                            //если получатель услуг то запросим хеш корня базы
+                        //    if(!Provide_service){
+                        //        app.sendMsg(Utils.getHashs, new byte[8]);
+                        //    }
+                        //    app.dateTimeLastSync = new Date().getTime();
+                        //}else{
                             broadcastActionMsg(master, "Sync", getResources().getString(R.string.onCheckTokenError));
                             app.mClient.disconnect();
-                        }
+                        //}
                     }
 
                     @Override
                     public void onMessage(byte[] data) {
-                        Log.d(TAG, String.format("Got binary message! %s", data.toString()));
-
+                        Log.d(TAG, String.format("Got binary message! %s", Arrays.toString(data)));
+                        app.isSynchronizedCompleted = true;
                         app.dateTimeLastSync = new Date().getTime();
 
                         if(data.length<7)
@@ -166,7 +173,7 @@ public class SyncServiceIntent extends IntentService {
                         if((Provide_service && msgType != Utils.getHashs) || (!Provide_service && msgType != Utils.hashs)){
                             app.mClient.disconnect();
                         }else {
-                            startActionGenerateAnswer(getApplicationContext(), "SyncServiceIntent", msgType, payload);
+                            startActionGenerateAnswer(getApplicationContext(), msgType, payload);
                         }
 
                     }
@@ -191,6 +198,9 @@ public class SyncServiceIntent extends IntentService {
 
 
                 while (app.isSynchronized && (new Date().getTime() - app.dateTimeLastSync) / 1000 < 300){
+                    if(!app.isSynchronizedCompleted && !Provide_service){
+                        app.sendMsg(Utils.getHashs, new byte[8]);
+                    }
                 }
 
                 app.isSynchronized=false;
