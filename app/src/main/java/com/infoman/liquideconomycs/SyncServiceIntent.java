@@ -73,10 +73,8 @@ public class SyncServiceIntent extends IntentService {
     public void onCreate() {
         super.onCreate();
         //android.os.Debug.waitForDebugger();
-        //android.os.Debug.waitForDebugger();
         app = (Core) getApplicationContext();
         Log.i("liquideconomycs", "Service: SyncServiceIntent is create");
-
     }
 
     @Override
@@ -129,20 +127,21 @@ public class SyncServiceIntent extends IntentService {
                         app.mClient.send(token);
                     }
 
+
                     @Override
                     public void onMessage(String message) {
-                        Log.d(TAG, String.format("Got string message! %s", message));
-                        //if(message.equals("Completed")){
-                        //    broadcastActionMsg(master, "Sync", getResources().getString(R.string.onCheckToken));
-                            //если получатель услуг то запросим хеш корня базы
-                        //    if(!Provide_service){
-                        //        app.sendMsg(Utils.getHashs, new byte[8]);
-                        //    }
-                        //    app.dateTimeLastSync = new Date().getTime();
-                        //}else{
-                            broadcastActionMsg(master, "Sync", getResources().getString(R.string.onCheckTokenError));
-                            app.mClient.disconnect();
-                        //}
+                        //  Log.d(TAG, String.format("Got string message! %s", message));
+                        // //if(message.equals("Completed")){
+                        // //    broadcastActionMsg(master, "Sync", getResources().getString(R.string.onCheckToken));
+                        //     //если получатель услуг то запросим хеш корня базы
+                        // //    if(!Provide_service){
+                        // //        app.sendMsg(Utils.getHashs, new byte[8]);
+                        // //    }
+                        // //    app.dateTimeLastSync = new Date().getTime();
+                        // //}else{
+                        //     broadcastActionMsg(master, "Sync", getResources().getString(R.string.onCheckTokenError));
+                        //     app.mClient.disconnect();
+                        // //}
                     }
 
                     @Override
@@ -157,7 +156,8 @@ public class SyncServiceIntent extends IntentService {
                         byte msgType    = Utils.getBytesPart(data,0,1)[0];
                         int sigLength   = Ints.fromByteArray(Utils.getBytesPart(data,1,4));
                         byte[] sig      = Utils.getBytesPart(data,5, sigLength), payload  = Utils.getBytesPart(data, 5+sigLength, data.length-(5+sigLength));
-                        //todo check sig
+
+                        //Проверка подписи
                         try {
                             byte[] digest = new byte[1];
                             digest[0] = msgType;
@@ -168,8 +168,7 @@ public class SyncServiceIntent extends IntentService {
                             app.mClient.disconnect();
                         }
 
-                        //Provide_service - if owner server - who give work
-                        //
+                        //Проверка типа сообщения
                         if((Provide_service && msgType != Utils.getHashs) || (!Provide_service && msgType != Utils.hashs)){
                             app.mClient.disconnect();
                         }else {
@@ -196,10 +195,13 @@ public class SyncServiceIntent extends IntentService {
                 //+(slave ? "/?myKey="+String.valueOf(myKey.first) : "/?slave="+String.valueOf(pubKey)))
                 app.mClient.connect(URI.create(signalServer));
 
-
+                //Таймер автоматического отключения связи
+                int counter = 0;
                 while (app.isSynchronized && (new Date().getTime() - app.dateTimeLastSync) / 1000 < 300){
-                    if(!app.isSynchronizedCompleted && !Provide_service){
+                    counter++;
+                    if(!app.isSynchronizedCompleted && !Provide_service && counter > 5000000){
                         app.sendMsg(Utils.getHashs, new byte[8]);
+                        counter = 0;
                     }
                 }
 

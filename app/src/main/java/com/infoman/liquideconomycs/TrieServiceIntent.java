@@ -105,7 +105,7 @@ public class TrieServiceIntent extends IntentService {
     @Override
     public void onCreate() {
         super.onCreate();
-        //android.os.Debug.waitForDebugger();
+        android.os.Debug.waitForDebugger();
         app = (Core) getApplicationContext();
         //android.os.Debug.waitForDebugger();
         //ROOT(content BRANCHs & LEAFs)
@@ -220,9 +220,12 @@ public class TrieServiceIntent extends IntentService {
     }
 
     //todo add age sort for sync priority
+
     private void generateAnswer(byte msgType, byte[] payload) throws IOException, SignatureDecodeException {
         Context context = app.getApplicationContext();
+        if (null == payload) payload = new byte[8];
         if(msgType == Utils.getHashs){
+            //payload = array[pos...]
             byte[] answer = new byte[0];
             for(int i=0;i < payload.length/8;i++){
                 // todo return pos & type & map & array(pos+hash if it is BRANCH or age if it is LEAF)
@@ -230,6 +233,9 @@ public class TrieServiceIntent extends IntentService {
             }
             app.sendMsg(Utils.hashs, answer);
         }else{
+            //payload = pos+map+array[pos+hash(BRANCH\ROOT)... or age(LEAF)...]
+            //если ранее запрашивался корень то сравним с хешем нашего корня и если совпадает то ничего не делаем
+            //если нет то построим карту своего корня и пройдемся по узлам как обычно
             //нам прислали рание запрошенные узлы, необходимо их расшифровать
             for(int i = 0; i < payload.length;) {
                 long pos                = Longs.fromByteArray(Utils.getBytesPart(payload, i, 8));
@@ -314,40 +320,59 @@ public class TrieServiceIntent extends IntentService {
     }
 
     private byte[] getNodeMapAndHashsOrAges(byte[] selfNodePos) throws IOException {
-
-        byte[] childsMap = new byte[32];
-        byte[] typeAndKeySize = new byte[2];
+        byte[] childsMap = new byte[32]      ,
+                typeAndKeySize  = new byte[2],
+                keyNode                      ,
+                selfChildArray  = new byte[0],
+                childPos        = new byte[8],
+                type            = new byte[1],
+                result;
         long pos = Longs.fromByteArray(selfNodePos);
         app.trie.seek(pos+2);
-        app.trie.read(typeAndKeySize, 2,2);
-        byte[] keyNode = new byte[typeAndKeySize[1]];
-        app.trie.read(keyNode, 0, typeAndKeySize[1]);
-        app.trie.seek(pos + 4 + typeAndKeySize[1] + 20); //skip hash
-        app.trie.read(childsMap, 0, 32);
-        int selfChildsCount = getChildsCountInMap(childsMap);
-        int selfChildArraySize = selfChildsCount * (typeAndKeySize[0]==LEAF ? 2 : 8);
-        byte[] selfChildArray = new byte[selfChildArraySize];
-        app.trie.read(selfChildArray, 0, selfChildArraySize);
-        byte[] type = new byte[1];
+        int selfChildsCount, selfChildArraySize;
+        if(pos == 0){
+            //создать корневые параметры
+            typeAndKeySize[0] = 1;//root
+            typeAndKeySize[1] = 0;
+            keyNode = new byte[0];
+            app.trie.seek(pos+2+20);
+            for (int i = 0; i < 256; i++) {
+                app.trie.read(childPos, 0, 8);
+                if(childPos!=new byte[8]){
+                    changeChildInMap(childsMap, (i&0xFF),true);
+                    selfChildArray = Bytes.concat(selfChildArray, childPos, getHash(Longs.fromByteArray(childPos)));
+                }
+
+            }
+        }else {
+            app.trie.read(typeAndKeySize, 0, 2);
+            keyNode = new byte[typeAndKeySize[1]];
+            app.trie.read(keyNode, 0, typeAndKeySize[1]);
+            app.trie.seek(pos + 4 + typeAndKeySize[1] + 20); //skip hash
+            app.trie.read(childsMap, 0, 32);
+            selfChildsCount = getChildsCountInMap(childsMap);
+            selfChildArraySize = selfChildsCount * (typeAndKeySize[0] == LEAF ? 2 : 8);
+            selfChildArray = new byte[selfChildArraySize];
+            app.trie.read(selfChildArray, 0, selfChildArraySize);
+        }
         type[0] = typeAndKeySize[0];
-        if(typeAndKeySize[0]==LEAF){
-            if(typeAndKeySize[1]>0)
-                return Bytes.concat(typeAndKeySize, keyNode, childsMap, selfChildArray);
-            else
-                return Bytes.concat(typeAndKeySize, childsMap, selfChildArray);
-        }else{
-            for(int i = 0; i < selfChildArray.length;) {
-                byte[] p = getBytesPart(selfChildArray, i, 8);
-                if(p.length > 0){
-                    childsMap = Bytes.concat(childsMap, getHash(Longs.fromByteArray(p)));
+        if (typeAndKeySize[0] == LEAF) {
+            result = Bytes.concat(childsMap, selfChildArray);
+        } else {
+            result = childsMap;
+            for (int i = 0; i < selfChildArray.length; ) {
+                childPos = getBytesPart(selfChildArray, i, 8);
+                if (childPos.length > 0) {
+                    //map+array[pos+hash]
+                    result = Bytes.concat(result, childPos, getHash(Longs.fromByteArray(childPos)));
                 }
                 i = i + 8;
             }
-            if(typeAndKeySize[1]>0)
-                return Bytes.concat(typeAndKeySize, keyNode, childsMap);
-            else
-                return Bytes.concat(typeAndKeySize, childsMap);
         }
+        if (typeAndKeySize[1] > 0)
+            return Bytes.concat(typeAndKeySize, keyNode, result);
+        else
+            return Bytes.concat(typeAndKeySize, result);
     }
 
     private byte[] getOldestNodeAge(byte[] oldestNodeAge, byte type, byte[] childArray) throws IOException {
