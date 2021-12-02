@@ -318,6 +318,7 @@ public class TrieServiceIntent extends IntentService {
                             ){
                                 //app.addPrefixByPos(0L, Bytes.concat(prefix,c_), childAge, false);
                                 //todo add list add/update (check age)
+                                //todo add check newPrefix length
                                 SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(context);
                                 long maxAge = sharedPref.getLong("maxAge", 30);
                                 if(Utils.compareDate(new Date(), Utils.reconstructAgeFromBytes(childAge))<maxAge && Utils.compareDate(new Date(), Utils.reconstructAgeFromBytes(childAge))>=0)
@@ -334,6 +335,8 @@ public class TrieServiceIntent extends IntentService {
 
     }
 
+    //Получает typeAndKeySize+keyNode+childMap+childArray[pos+hash(BRANCH\ROOT)... or age(LEAF)...]
+    // узла по позиции в файле дерева
     private byte[] getNodeMapAndHashsOrAges(byte[] selfNodePos) throws IOException {
         byte[] childsMap = new byte[32]      ,
                 typeAndKeySize  = new byte[2],
@@ -353,10 +356,11 @@ public class TrieServiceIntent extends IntentService {
             app.trie.seek(pos+2+20);
             for (int i = 0; i < 256; i++) {
                 app.trie.read(childPos, 0, 8);
-                if(childPos!=new byte[8]){
-                    changeChildInMap(childsMap, (i&0xFF),true);
-                    selfChildArray = Bytes.concat(selfChildArray, childPos, getHash(Longs.fromByteArray(childPos)));
+                if (Arrays.equals(childPos, new byte[8])) {
+                    continue;
                 }
+                changeChildInMap(childsMap, (i&0xFF),true);
+                selfChildArray = Bytes.concat(selfChildArray, childPos);
 
             }
         }else {

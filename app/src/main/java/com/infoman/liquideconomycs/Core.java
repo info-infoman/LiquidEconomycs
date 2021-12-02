@@ -29,7 +29,6 @@ public class Core extends Application {
     public RandomAccessFile trie;
     public WebSocketClient mClient;
     public boolean isSynchronized;
-    public boolean isSynchronizedCompleted;
 
     @Override
     public void onCreate() {

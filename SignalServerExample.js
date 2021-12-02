@@ -14,6 +14,11 @@ wss.on('connection', function connection(ws) {
 			});
 		}else{
 			//todo add check token
+			wss.clients.forEach(function each(client) {
+			  if (client == ws && client.readyState === WebSocket.OPEN) {
+				client.send('Completed', { binary: false });
+			  }
+			});
 			console.log('received: %s', data);
 			console.log('isNotBinary!');
 		}

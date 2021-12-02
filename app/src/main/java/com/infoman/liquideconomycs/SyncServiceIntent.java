@@ -84,7 +84,6 @@ public class SyncServiceIntent extends IntentService {
             if (ACTION_START.equals(action) && !app.isSynchronized) {
                 app.clearPrefixTable();
                 app.isSynchronized = true;
-                app.isSynchronizedCompleted = false;
                 app.dateTimeLastSync=new Date().getTime();
                 final String    signalServer = intent.getStringExtra(EXTRA_SIGNAL_SERVER),
                                 token = intent.getStringExtra(EXTRA_TOKEN),
@@ -131,23 +130,22 @@ public class SyncServiceIntent extends IntentService {
                     @Override
                     public void onMessage(String message) {
                         //  Log.d(TAG, String.format("Got string message! %s", message));
-                        // //if(message.equals("Completed")){
+                        if(message.equals("Completed")){
                         // //    broadcastActionMsg(master, "Sync", getResources().getString(R.string.onCheckToken));
                         //     //если получатель услуг то запросим хеш корня базы
-                        // //    if(!Provide_service){
-                        // //        app.sendMsg(Utils.getHashs, new byte[8]);
-                        // //    }
-                        // //    app.dateTimeLastSync = new Date().getTime();
-                        // //}else{
-                        //     broadcastActionMsg(master, "Sync", getResources().getString(R.string.onCheckTokenError));
-                        //     app.mClient.disconnect();
-                        // //}
+                            if(!Provide_service){
+                                app.sendMsg(Utils.getHashs, new byte[8]);
+                            }
+                            app.dateTimeLastSync = new Date().getTime();
+                        }else{
+                             broadcastActionMsg(master, "Sync", getResources().getString(R.string.onCheckTokenError));
+                             app.mClient.disconnect();
+                        }
                     }
 
                     @Override
                     public void onMessage(byte[] data) {
                         Log.d(TAG, String.format("Got binary message! %s", Arrays.toString(data)));
-                        app.isSynchronizedCompleted = true;
                         app.dateTimeLastSync = new Date().getTime();
 
                         if(data.length<7)
@@ -196,13 +194,13 @@ public class SyncServiceIntent extends IntentService {
                 app.mClient.connect(URI.create(signalServer));
 
                 //Таймер автоматического отключения связи
-                int counter = 0;
+                //int counter = 0;
                 while (app.isSynchronized && (new Date().getTime() - app.dateTimeLastSync) / 1000 < 300){
-                    counter++;
-                    if(!app.isSynchronizedCompleted && !Provide_service && counter > 5000000){
-                        app.sendMsg(Utils.getHashs, new byte[8]);
-                        counter = 0;
-                    }
+                    //counter++;
+                    //if(!app.isSynchronizedCompleted && !Provide_service && counter > 50000000){
+                    //    app.sendMsg(Utils.getHashs, new byte[8]);
+                    //    counter = 0;
+                    //}
                 }
 
                 app.isSynchronized=false;
