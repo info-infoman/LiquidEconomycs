@@ -233,41 +233,56 @@ public class TrieServiceIntent extends IntentService {
             }
             app.sendMsg(Utils.hashs, answer);
         }else{
-            //payload = pos+map+array[pos+hash(BRANCH\ROOT)... or age(LEAF)...]
+            //payload = pos+typeAndKeySize+keyNode+childMap+childArray[pos+hash(BRANCH\ROOT)... or age(LEAF)...]
             //если ранее запрашивался корень то сравним с хешем нашего корня и если совпадает то ничего не делаем
             //если нет то построим карту своего корня и пройдемся по узлам как обычно
             //нам прислали рание запрошенные узлы, необходимо их расшифровать
             for(int i = 0; i < payload.length;) {
-                long pos                = Longs.fromByteArray(Utils.getBytesPart(payload, i, 8));
-                //Получим полный префикс ключа в предидущем цикле перед запросом
-                byte[] prefix           = app.getPrefixByPos(pos);
-                //получить позицию узла в дереве по префиксу
-                byte[] selfNodePos      = find(prefix, 0L);
-                //если найден то получитм карту и хеши\возраста к ней
+                //node from payload
+                long pos                    = Longs.fromByteArray(Utils.getBytesPart(payload, i, 8));
+                byte[] nodeTypeAndKeySize   = Utils.getBytesPart(payload, i+8, 2);
+                int offLen                  = (nodeTypeAndKeySize[0]!=LEAF?20:2);
+                byte[] childsMap            = Utils.getBytesPart(payload, i + 10 + nodeTypeAndKeySize[1], 32);
+                int childsCountInMap        = Utils.getChildsCountInMap(childsMap);
+                int len                     = childsCountInMap * (nodeTypeAndKeySize[0]==Utils.LEAF ? 2 : 28);
+                byte[] childsArray          = Utils.getBytesPart(payload, i + 10 + nodeTypeAndKeySize[1] + 32, len);
+                i                           = i + 10 + nodeTypeAndKeySize[1] + 32 + len;
+                //self node
+                byte[] selfNodePos;
+                byte[] selfPrefix;
+                byte[] selfNodeMapAndHashOrAge;
+                byte[] selfTypeAndKeySize;
                 byte[] selfNodeMap;
-                byte[] selfNodeHashOrAge;
-                if(selfNodePos!=null){
-                    byte[] selfNodeMapAndHashOrAge  = getNodeMapAndHashsOrAges(selfNodePos);
-                    byte[] typeAndKeySize = Utils.getBytesPart(selfNodeMapAndHashOrAge, 0, 2);
-                    if(typeAndKeySize[1]>0){
-                        prefix              = Bytes.concat(prefix, Utils.getBytesPart(selfNodeMapAndHashOrAge, 2, typeAndKeySize[1])) ;
-                        selfNodeMap         = Utils.getBytesPart(selfNodeMapAndHashOrAge, 2 + typeAndKeySize[1], 32);
-                        selfNodeHashOrAge   = Utils.getBytesPart(selfNodeMapAndHashOrAge, 2 + typeAndKeySize[1] + 32 , selfNodeMapAndHashOrAge.length - (2 + typeAndKeySize[1] + 32));
-                    }else{
-                        selfNodeMap         = Utils.getBytesPart(selfNodeMapAndHashOrAge, 2 , 32);
-                        selfNodeHashOrAge   = Utils.getBytesPart(selfNodeMapAndHashOrAge, 2  + 32 , selfNodeMapAndHashOrAge.length - (2 + 32));
+                byte[] selfNodeHashsOrAges;
+                if (nodeTypeAndKeySize[0]== ROOT){
+                    selfPrefix = new byte[0];
+                    selfNodePos = new byte[8];
+                    selfNodeMapAndHashOrAge = getNodeMapAndHashsOrAges(selfNodePos);
+                    selfTypeAndKeySize = Utils.getBytesPart(selfNodeMapAndHashOrAge, 0, 2);
+                    selfNodeMap = Utils.getBytesPart(selfNodeMapAndHashOrAge, 2, 32);
+                    selfNodeHashsOrAges = Utils.getBytesPart(selfNodeMapAndHashOrAge, 2 + 32, selfNodeMapAndHashOrAge.length - (2 + 32));
+                }else {
+                    //Получим полный префикс ключа в предидущем цикле перед запросом
+                    //Префикс нарастает по мере движения в глюбь дерева
+                    selfPrefix = app.getPrefixByPos(pos);
+                    //todo delete old prefix
+                    //получить позицию узла в дереве по префиксу
+                    selfNodePos = find(selfPrefix, 0L);
+                    //если найден то получитм карту и хеши\возраста к ней
+                    if (selfNodePos != null) {
+                        selfNodeMapAndHashOrAge = getNodeMapAndHashsOrAges(selfNodePos);
+                        selfTypeAndKeySize = Utils.getBytesPart(selfNodeMapAndHashOrAge, 0, 2);
+                        if (selfTypeAndKeySize[1] > 0) {
+                            selfNodeMap = Utils.getBytesPart(selfNodeMapAndHashOrAge, 2 + selfTypeAndKeySize[1], 32);
+                            selfNodeHashsOrAges = Utils.getBytesPart(selfNodeMapAndHashOrAge, 2 + selfTypeAndKeySize[1] + 32, selfNodeMapAndHashOrAge.length - (2 + selfTypeAndKeySize[1] + 32));
+                        } else {
+                            selfNodeMap = Utils.getBytesPart(selfNodeMapAndHashOrAge, 2, 32);
+                            selfNodeHashsOrAges = Utils.getBytesPart(selfNodeMapAndHashOrAge, 2 + 32, selfNodeMapAndHashOrAge.length - (2 + 32));
+                        }
+                    } else {
+                        continue;
                     }
-                }else{
-                    continue;
                 }
-                byte nodeType           = Utils.getBytesPart(payload, i+8, 1)[0];
-                byte nodeKeySize        = Utils.getBytesPart(payload, i+8+1, 2)[0];
-                int offLen              = (nodeType==BRANCH?20:2);
-                byte[] childsMap        = Utils.getBytesPart(payload, i + 10 + nodeKeySize, 32);
-                int childsCountInMap    = Utils.getChildsCountInMap(childsMap);
-                int len                 = childsCountInMap * (nodeType==Utils.LEAF ? 2 : 28);
-                byte[] childsArray      = Utils.getBytesPart(payload, i + 10 + nodeKeySize + 32, len);
-                i                       = i + 10 + nodeKeySize + 32 + len;
                 //todo В цикле  от 0 - 255 мы должны
                 // 1) Если selfNodePos<>null и узел\возраст не найден в полученной карте, но есть в нашей, тогда ничего не делаем ибо оно есть у нас и не удалено автоматом по возрасту
                 // 2) Если узел\возраст найден:
@@ -279,34 +294,34 @@ public class TrieServiceIntent extends IntentService {
                 for(int c = 0; c < 255; c++){
                     byte[] c_ = new byte[1];
                     c_[0] = (byte)c;
+                    byte[] newPrefix =  selfTypeAndKeySize[0] != ROOT ? Bytes.concat(selfPrefix,c_):c_;
                     if(selfNodePos!=null && !checkExistChildInMap(childsMap, c) && checkExistChildInMap(selfNodeMap, c)){
                         //todo add to list delete
-                        app.addPrefixByPos(0L, Bytes.concat(prefix,c_), null);
+                        app.addPrefixByPos(0L, newPrefix, null);
                     }
                     if(checkExistChildInMap(childsMap, c)){
-                        if(nodeType==BRANCH){
+                        if(nodeTypeAndKeySize[0]==BRANCH){
                             if(selfNodePos == null || !Arrays.equals(
                                     Utils.getBytesPart(childsArray, (getChildPosInMap(childsMap, c) * 28) - offLen, offLen),
-                                    Utils.getBytesPart(selfNodeHashOrAge, (getChildPosInMap(selfNodeMap, c) * offLen) - offLen, offLen)
+                                    Utils.getBytesPart(selfNodeHashsOrAges, (getChildPosInMap(selfNodeMap, c) * 28) - offLen, offLen)
                             )){
                                 //todo add to table sync add to list new ask
                                 long pos_ = Longs.fromByteArray(Utils.getBytesPart(childsArray, (getChildPosInMap(childsMap, c) * 28) - 28, 8));
-                                app.addPrefixByPos(pos_, Bytes.concat(prefix,c_), null);
+                                app.addPrefixByPos(pos_, newPrefix, null);
                                 ask = Bytes.concat(ask, Longs.toByteArray(pos_));
                             }
                         }else{
                             byte[] childAge=Utils.getBytesPart(childsArray, (getChildPosInMap(childsMap, c) * offLen) - offLen, offLen);
                             if(selfNodePos == null ||
-                                    (!Arrays.equals(childAge, Utils.getBytesPart(selfNodeHashOrAge, (getChildPosInMap(selfNodeMap, c) * offLen) - offLen, offLen))
-                                            && Utils.compareDate(Utils.reconstructAgeFromBytes(childAge), Utils.reconstructAgeFromBytes(Utils.getBytesPart(selfNodeHashOrAge, (getChildPosInMap(selfNodeMap, c) * offLen) - offLen, offLen)))>0)
+                                    (!Arrays.equals(childAge, Utils.getBytesPart(selfNodeHashsOrAges, (getChildPosInMap(selfNodeMap, c) * offLen) - offLen, offLen))
+                                            && Utils.compareDate(Utils.reconstructAgeFromBytes(childAge), Utils.reconstructAgeFromBytes(Utils.getBytesPart(selfNodeHashsOrAges, (getChildPosInMap(selfNodeMap, c) * offLen) - offLen, offLen)))>0)
                             ){
-
                                 //app.addPrefixByPos(0L, Bytes.concat(prefix,c_), childAge, false);
                                 //todo add list add/update (check age)
                                 SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(context);
                                 long maxAge = sharedPref.getLong("maxAge", 30);
                                 if(Utils.compareDate(new Date(), Utils.reconstructAgeFromBytes(childAge))<maxAge && Utils.compareDate(new Date(), Utils.reconstructAgeFromBytes(childAge))>=0)
-                                    startActionInsert(context, "Main", Bytes.concat(prefix,c_), childAge);
+                                    startActionInsert(context, "Main", newPrefix, childAge);
 
                             }
                         }
@@ -326,7 +341,7 @@ public class TrieServiceIntent extends IntentService {
                 selfChildArray  = new byte[0],
                 childPos        = new byte[8],
                 type            = new byte[1],
-                result;
+                result          = new byte[0];
         long pos = Longs.fromByteArray(selfNodePos);
         app.trie.seek(pos+2);
         int selfChildsCount, selfChildArraySize;
@@ -357,9 +372,8 @@ public class TrieServiceIntent extends IntentService {
         }
         type[0] = typeAndKeySize[0];
         if (typeAndKeySize[0] == LEAF) {
-            result = Bytes.concat(childsMap, selfChildArray);
+            result = selfChildArray;
         } else {
-            result = childsMap;
             for (int i = 0; i < selfChildArray.length; ) {
                 childPos = getBytesPart(selfChildArray, i, 8);
                 if (childPos.length > 0) {
@@ -370,9 +384,9 @@ public class TrieServiceIntent extends IntentService {
             }
         }
         if (typeAndKeySize[1] > 0)
-            return Bytes.concat(typeAndKeySize, keyNode, result);
+            return Bytes.concat(typeAndKeySize, keyNode, childsMap, result);
         else
-            return Bytes.concat(typeAndKeySize, result);
+            return Bytes.concat(typeAndKeySize, childsMap, result);
     }
 
     private byte[] getOldestNodeAge(byte[] oldestNodeAge, byte type, byte[] childArray) throws IOException {
