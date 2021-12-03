@@ -32,11 +32,13 @@ import androidx.core.app.NotificationCompat;
 import static androidx.constraintlayout.widget.Constraints.TAG;
 import static androidx.core.app.NotificationCompat.PRIORITY_LOW;
 import static com.infoman.liquideconomycs.TrieServiceIntent.startActionGenerateAnswer;
+import static com.infoman.liquideconomycs.Utils.ACTION_GET_HASH;
 import static com.infoman.liquideconomycs.Utils.ACTION_START;
 import static com.infoman.liquideconomycs.Utils.BROADCAST_ACTION_ANSWER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_ANSWER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_CMD;
 import static com.infoman.liquideconomycs.Utils.EXTRA_MASTER;
+import static com.infoman.liquideconomycs.Utils.EXTRA_POS;
 import static com.infoman.liquideconomycs.Utils.EXTRA_PUBKEY;
 import static com.infoman.liquideconomycs.Utils.EXTRA_PROVIDE_SERVICE;
 import static com.infoman.liquideconomycs.Utils.EXTRA_SIGNAL_SERVER;
@@ -159,7 +161,7 @@ public class SyncServiceIntent extends IntentService {
                         try {
                             byte[] digest = new byte[1];
                             digest[0] = msgType;
-                            digest = Sha256Hash.hash(Bytes.concat(digest, payload));
+                            digest = Sha256Hash.hash(Bytes.concat(digest, Utils.getBytesPart(payload,0, 8)));
                             if(!Utils.chekSig(pubKey, decodeFromDER(sig), digest))
                                 app.mClient.disconnect();
                         } catch (SignatureDecodeException e) {
@@ -167,10 +169,10 @@ public class SyncServiceIntent extends IntentService {
                         }
 
                         //Проверка типа сообщения
-                        if((Provide_service && msgType != Utils.getHashs) || (!Provide_service && msgType != Utils.hashs)){
-                            app.mClient.disconnect();
-                        }else {
-                            startActionGenerateAnswer(getApplicationContext(), msgType, payload);
+                        if((Provide_service && msgType == Utils.getHashs) || (!Provide_service && msgType == Utils.hashs)){
+                            startActionGenerateAnswer(getApplicationContext(),
+                                    msgType,
+                                    payload);
                         }
 
                     }

@@ -105,7 +105,7 @@ public class TrieServiceIntent extends IntentService {
     @Override
     public void onCreate() {
         super.onCreate();
-        android.os.Debug.waitForDebugger();
+        //android.os.Debug.waitForDebugger();
         app = (Core) getApplicationContext();
         //android.os.Debug.waitForDebugger();
         //ROOT(content BRANCHs & LEAFs)
@@ -229,7 +229,7 @@ public class TrieServiceIntent extends IntentService {
             byte[] answer = new byte[0];
             for(int i=0;i < payload.length/8;i++){
                 // todo return pos & type & map & array(pos+hash if it is BRANCH or age if it is LEAF)
-                answer = Bytes.concat(answer, Utils.getBytesPart(payload,i*8, 8), getNodeMapAndHashsOrAges(Utils.getBytesPart(payload,i*8, 8)));
+                answer = Bytes.concat(answer, Utils.getBytesPart(payload,i*8, 8), getNodeMapAndHashesOrAges(Utils.getBytesPart(payload,i*8, 8)));
             }
             app.sendMsg(Utils.hashs, answer);
         }else{
@@ -248,16 +248,16 @@ public class TrieServiceIntent extends IntentService {
                 byte[] childsArray          = Utils.getBytesPart(payload, i + 10 + nodeTypeAndKeySize[1] + 32, len);
                 i                           = i + 10 + nodeTypeAndKeySize[1] + 32 + len;
                 //self node
-                byte[] selfNodePos;
-                byte[] selfPrefix;
-                byte[] selfNodeMapAndHashOrAge;
-                byte[] selfTypeAndKeySize;
-                byte[] selfNodeMap;
-                byte[] selfNodeHashsOrAges;
+                byte[] selfNodePos,
+                        selfPrefix,
+                        selfNodeMapAndHashOrAge,
+                        selfTypeAndKeySize,
+                        selfNodeMap,
+                        selfNodeHashsOrAges;
                 if (nodeTypeAndKeySize[0]== ROOT){
                     selfPrefix = new byte[0];
                     selfNodePos = new byte[8];
-                    selfNodeMapAndHashOrAge = getNodeMapAndHashsOrAges(selfNodePos);
+                    selfNodeMapAndHashOrAge = getNodeMapAndHashesOrAges(selfNodePos);
                     selfTypeAndKeySize = Utils.getBytesPart(selfNodeMapAndHashOrAge, 0, 2);
                     selfNodeMap = Utils.getBytesPart(selfNodeMapAndHashOrAge, 2, 32);
                     selfNodeHashsOrAges = Utils.getBytesPart(selfNodeMapAndHashOrAge, 2 + 32, selfNodeMapAndHashOrAge.length - (2 + 32));
@@ -270,7 +270,7 @@ public class TrieServiceIntent extends IntentService {
                     selfNodePos = find(selfPrefix, 0L);
                     //если найден то получитм карту и хеши\возраста к ней
                     if (selfNodePos != null) {
-                        selfNodeMapAndHashOrAge = getNodeMapAndHashsOrAges(selfNodePos);
+                        selfNodeMapAndHashOrAge = getNodeMapAndHashesOrAges(selfNodePos);
                         selfTypeAndKeySize = Utils.getBytesPart(selfNodeMapAndHashOrAge, 0, 2);
                         if (selfTypeAndKeySize[1] > 0) {
                             selfNodeMap = Utils.getBytesPart(selfNodeMapAndHashOrAge, 2 + selfTypeAndKeySize[1], 32);
@@ -337,44 +337,39 @@ public class TrieServiceIntent extends IntentService {
 
     //Получает typeAndKeySize+keyNode+childMap+childArray[pos+hash(BRANCH\ROOT)... or age(LEAF)...]
     // узла по позиции в файле дерева
-    private byte[] getNodeMapAndHashsOrAges(byte[] selfNodePos) throws IOException {
-        byte[] childsMap = new byte[32]      ,
+    private byte[] getNodeMapAndHashesOrAges(byte[] selfNodePos) throws IOException {
+        long pos = Longs.fromByteArray(selfNodePos);
+        byte[] childMap         = new byte[32],
                 typeAndKeySize  = new byte[2],
-                keyNode                      ,
+                keyNode,
                 selfChildArray  = new byte[0],
                 childPos        = new byte[8],
-                type            = new byte[1],
                 result          = new byte[0];
-        long pos = Longs.fromByteArray(selfNodePos);
-        app.trie.seek(pos+2);
-        int selfChildsCount, selfChildArraySize;
-        if(pos == 0){
+
+        typeAndKeySize[0] = (byte)1;
+        if(pos == 0L){
             //создать корневые параметры
-            typeAndKeySize[0] = 1;//root
-            typeAndKeySize[1] = 0;
             keyNode = new byte[0];
             app.trie.seek(pos+2+20);
             for (int i = 0; i < 256; i++) {
                 app.trie.read(childPos, 0, 8);
-                if (Arrays.equals(childPos, new byte[8])) {
-                    continue;
+                if (!Arrays.equals(childPos, new byte[8])) {
+                    childMap = changeChildInMap(childMap, (i&0xFF),true);
+                    selfChildArray = Bytes.concat(selfChildArray, childPos);
                 }
-                changeChildInMap(childsMap, (i&0xFF),true);
-                selfChildArray = Bytes.concat(selfChildArray, childPos);
-
             }
         }else {
+            app.trie.seek(pos+2);
             app.trie.read(typeAndKeySize, 0, 2);
             keyNode = new byte[typeAndKeySize[1]];
             app.trie.read(keyNode, 0, typeAndKeySize[1]);
             app.trie.seek(pos + 4 + typeAndKeySize[1] + 20); //skip hash
-            app.trie.read(childsMap, 0, 32);
-            selfChildsCount = getChildsCountInMap(childsMap);
-            selfChildArraySize = selfChildsCount * (typeAndKeySize[0] == LEAF ? 2 : 8);
+            app.trie.read(childMap, 0, 32);
+            int selfChildrenCount = getChildsCountInMap(childMap);
+            int selfChildArraySize = selfChildrenCount * (typeAndKeySize[0] == LEAF ? 2 : 8);
             selfChildArray = new byte[selfChildArraySize];
             app.trie.read(selfChildArray, 0, selfChildArraySize);
         }
-        type[0] = typeAndKeySize[0];
         if (typeAndKeySize[0] == LEAF) {
             result = selfChildArray;
         } else {
@@ -388,9 +383,9 @@ public class TrieServiceIntent extends IntentService {
             }
         }
         if (typeAndKeySize[1] > 0)
-            return Bytes.concat(typeAndKeySize, keyNode, childsMap, result);
+            return Bytes.concat(typeAndKeySize, keyNode, childMap, result);
         else
-            return Bytes.concat(typeAndKeySize, childsMap, result);
+            return Bytes.concat(typeAndKeySize, childMap, result);
     }
 
     private byte[] getOldestNodeAge(byte[] oldestNodeAge, byte type, byte[] childArray) throws IOException {

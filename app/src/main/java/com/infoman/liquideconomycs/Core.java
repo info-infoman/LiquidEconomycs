@@ -143,7 +143,10 @@ public class Core extends Application {
         if(mClient != null && mClient.isConnected() && payload.length>0) {
             byte[] type = new byte[1];
             type[0] = msgType;
-            byte[] sig = Utils.Sig((byte[]) getMyKey().second, Sha256Hash.hash(Bytes.concat(type, payload)));
+            byte[] sig = Utils.Sig(
+                    (byte[]) getMyKey().second,
+                    Sha256Hash.hash(Bytes.concat(type, Utils.getBytesPart(payload,0, 8)))
+            );
             mClient.send(Bytes.concat(type, Ints.toByteArray(sig.length), sig, payload));
         }
     }
