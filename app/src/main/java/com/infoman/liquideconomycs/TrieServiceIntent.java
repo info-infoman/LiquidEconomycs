@@ -256,7 +256,7 @@ public class TrieServiceIntent extends IntentService {
                         selfPrefix,
                         selfNodeMapAndHashOrAge,
                         selfTypeAndKeySize,
-                        selfNodeMap,
+                        selfNodeMap = new byte[32],
                         selfNodeHashsOrAges;
                 if (nodeTypeAndKeySize[0]== ROOT){
                     selfPrefix = new byte[0];
@@ -268,6 +268,7 @@ public class TrieServiceIntent extends IntentService {
                 }else {
                     //Получим полный префикс ключа в предидущем цикле перед запросом
                     //Префикс нарастает по мере движения в глюбь дерева
+                    //на основании префикса получим карту и детей узла с этим префиксом
                     selfPrefix = app.getPrefixByPos(pos);
                     //todo delete old prefix
                     //получить позицию узла в дереве по префиксу
@@ -287,36 +288,21 @@ public class TrieServiceIntent extends IntentService {
                         continue;
                     }
                 }
-                //todo В цикле  от 0 - 255 мы должны
-                // 1) Если selfNodePos<>null и узел\возраст не найден в полученной карте, но есть в нашей, тогда ничего не делаем ибо оно есть у нас и не удалено автоматом по возрасту
-                // 2) Если узел\возраст найден:
-                // 3) Если это тип BRANCH и (selfNodePos<>null и узел в карте имеет хеш не равный нашему или selfNodePos==null) то
-                // внести в базу (prefix + индекс позиции в карте) и позицию, добавить позицию в следующий запрос
-                // 4) Если это тип LEAF и ((selfNodePos<>null и узел в карте имеет возраст не равный нашему  и возраст моложе нашего ) или selfNodePos==null)
-                // то добавить в список на добавление(изменение) (prefix + индекс цикла) и возраст
+                //todo В цикле  от 0 - 255 мы должны обойти все дочерние узлы
+                // 1) Если узел\возраст есть в полученой карте:
+                // 1.1) Если это тип BRANCH\ROOT и (узел в карте имеет хеш не равный нашему или дочерний узел не найден в нашей карте) то
+                // внести в базу (prefix + индекс цикла - позиция в карте) и позицию, добавить позицию в следующий запрос
+                // 1.2) Если это тип LEAF и ((узел в карте имеет возраст не равный нашему  и возраст моложе нашего ) или возраст не найден в нашей карте)
+                // то добавить/изменить по(prefix + индекс цикла - позиция в карте) новый возраст
                 byte[] ask = new byte[0];
                 for(int c = 0; c < 255; c++){
                     byte[] c_ = new byte[1];
                     c_[0] = (byte)c;
                     byte[] newPrefix =  selfTypeAndKeySize[0] != ROOT ? Bytes.concat(selfPrefix,c_):c_;
-                    if(selfNodePos!=null && !checkExistChildInMap(childsMap, c) && checkExistChildInMap(selfNodeMap, c)){
-                        //todo add to list delete
-                        app.addPrefixByPos(0L, newPrefix, null);
-                    }
                     if(checkExistChildInMap(childsMap, c)){
-                        if(nodeTypeAndKeySize[0]==BRANCH){
-                            if(selfNodePos == null || !Arrays.equals(
-                                    Utils.getBytesPart(childsArray, (getChildPosInMap(childsMap, c) * 28) - offLen, offLen),
-                                    Utils.getBytesPart(selfNodeHashsOrAges, (getChildPosInMap(selfNodeMap, c) * 28) - offLen, offLen)
-                            )){
-                                //todo add to table sync add to list new ask
-                                long pos_ = Longs.fromByteArray(Utils.getBytesPart(childsArray, (getChildPosInMap(childsMap, c) * 28) - 28, 8));
-                                app.addPrefixByPos(pos_, newPrefix, null);
-                                ask = Bytes.concat(ask, Longs.toByteArray(pos_));
-                            }
-                        }else{
+                        if(nodeTypeAndKeySize[0]==LEAF){
                             byte[] childAge=Utils.getBytesPart(childsArray, (getChildPosInMap(childsMap, c) * offLen) - offLen, offLen);
-                            if(selfNodePos == null ||
+                            if(!checkExistChildInMap(selfNodeMap, c) ||
                                     (!Arrays.equals(childAge, Utils.getBytesPart(selfNodeHashsOrAges, (getChildPosInMap(selfNodeMap, c) * offLen) - offLen, offLen))
                                             && Utils.compareDate(Utils.reconstructAgeFromBytes(childAge), Utils.reconstructAgeFromBytes(Utils.getBytesPart(selfNodeHashsOrAges, (getChildPosInMap(selfNodeMap, c) * offLen) - offLen, offLen)))>0)
                             ){
@@ -328,6 +314,16 @@ public class TrieServiceIntent extends IntentService {
                                 if(Utils.compareDate(new Date(), Utils.reconstructAgeFromBytes(childAge))<maxAge && Utils.compareDate(new Date(), Utils.reconstructAgeFromBytes(childAge))>=0)
                                     startActionInsert(context, "Main", newPrefix, childAge);
 
+                            }
+                        }else{
+                            if(!checkExistChildInMap(selfNodeMap, c) || !Arrays.equals(
+                                    Utils.getBytesPart(childsArray, (getChildPosInMap(childsMap, c) * 28) - offLen, offLen),
+                                    Utils.getBytesPart(selfNodeHashsOrAges, (getChildPosInMap(selfNodeMap, c) * 28) - offLen, offLen)
+                            )){
+                                //todo add to table sync add to list new ask
+                                long pos_ = Longs.fromByteArray(Utils.getBytesPart(childsArray, (getChildPosInMap(childsMap, c) * 28) - 28, 8));
+                                app.addPrefixByPos(pos_, newPrefix, null);
+                                ask = Bytes.concat(ask, Longs.toByteArray(pos_));
                             }
                         }
                     }
