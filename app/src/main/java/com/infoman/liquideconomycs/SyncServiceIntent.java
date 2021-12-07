@@ -5,13 +5,17 @@ import android.app.IntentService;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.database.Cursor;
 import android.graphics.Color;
 import android.os.Build;
 import android.preference.PreferenceManager;
 import android.util.Log;
+import android.widget.Toast;
 
 import com.google.common.primitives.Bytes;
 import com.google.common.primitives.Ints;
@@ -25,9 +29,12 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
+import androidx.fragment.app.FragmentManager;
+import androidx.fragment.app.FragmentTransaction;
 
 import static androidx.constraintlayout.widget.Constraints.TAG;
 import static androidx.core.app.NotificationCompat.PRIORITY_LOW;
@@ -38,6 +45,8 @@ import static com.infoman.liquideconomycs.Utils.BROADCAST_ACTION_ANSWER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_ANSWER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_CMD;
 import static com.infoman.liquideconomycs.Utils.EXTRA_MASTER;
+import static com.infoman.liquideconomycs.Utils.EXTRA_MSG_TYPE;
+import static com.infoman.liquideconomycs.Utils.EXTRA_PAYLOAD;
 import static com.infoman.liquideconomycs.Utils.EXTRA_POS;
 import static com.infoman.liquideconomycs.Utils.EXTRA_PUBKEY;
 import static com.infoman.liquideconomycs.Utils.EXTRA_PROVIDE_SERVICE;
@@ -67,6 +76,21 @@ public class SyncServiceIntent extends IntentService {
         context.startService(intent);
     }
 
+    private final BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
+        @Override public void onReceive(Context context, Intent intent) {
+            if (Objects.equals(intent.getAction(), BROADCAST_ACTION_ANSWER)) {
+                final String master = intent.getStringExtra(EXTRA_MASTER), cmd = intent.getStringExtra(EXTRA_CMD);
+                if(master.equals("Trie")){
+                    if(cmd.equals("Answer")){
+                        final byte[] answer = intent.getByteArrayExtra(EXTRA_ANSWER);
+                        app.sendMsg(answer[0], Utils.getBytesPart(answer, 1, (answer.length)-1));
+                    }
+                    //resultTextView.setText(param);
+                }
+            }
+        }
+    };
+
     public SyncServiceIntent() {
         super("SyncServiceIntent");
     }
@@ -77,6 +101,7 @@ public class SyncServiceIntent extends IntentService {
         //android.os.Debug.waitForDebugger();
         app = (Core) getApplicationContext();
         Log.i("liquideconomycs", "Service: SyncServiceIntent is create");
+        registerReceiver(mBroadcastReceiver, new IntentFilter(BROADCAST_ACTION_ANSWER));
     }
 
     @Override
@@ -195,14 +220,25 @@ public class SyncServiceIntent extends IntentService {
                 //+(slave ? "/?myKey="+String.valueOf(myKey.first) : "/?slave="+String.valueOf(pubKey)))
                 app.mClient.connect(URI.create(signalServer));
 
-                //Таймер автоматического отключения связи
-                //int counter = 0;
+                //Таймер проверки ответов
+                int counter = 0;
                 while (app.isSynchronized && (new Date().getTime() - app.dateTimeLastSync) / 1000 < 300){
-                    //counter++;
-                    //if(!app.isSynchronizedCompleted && !Provide_service && counter > 50000000){
-                    //    app.sendMsg(Utils.getHashs, new byte[8]);
-                    //    counter = 0;
-                    //}
+                    /*counter++;
+                    if(counter > 5000){
+                        Cursor query = app.getSyncMsg();
+                        byte[] payload;
+                        if (query.getCount() > 0) {
+                            while (query.moveToNext()) {
+                                payload = query.getBlob(query.getColumnIndex("payload"));
+                                app.deleteSyncMsg(query.getInt(query.getColumnIndex("id")));
+                                app.sendMsg((Provide_service?Utils.hashs:Utils.getHashs), payload);
+                            }
+                        }
+                        query.close();
+                        counter = 0;
+                    }
+
+                     */
                 }
 
                 app.isSynchronized=false;

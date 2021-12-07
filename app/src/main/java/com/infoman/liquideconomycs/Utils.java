@@ -57,6 +57,7 @@ public class Utils {
         EXTRA_ANSWER        = "com.infoman.liquideconomycs.extra.answer";
 
 
+
     public static byte[] getBytesPart(byte[] src, int off, int len){
         byte[] result= new byte[len];
         System.arraycopy(src, off, result, 0, result.length);

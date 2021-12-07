@@ -184,10 +184,10 @@ public class TrieServiceIntent extends IntentService {
 
             if (ACTION_GENERATE_ANSWER.equals(action)) {
                 final byte msgType = intent.getByteExtra(EXTRA_MSG_TYPE, Utils.getHashs);
-                final byte[] payload = intent.getByteArrayExtra(EXTRA_AGE);
+                final byte[] payload = intent.getByteArrayExtra(EXTRA_PAYLOAD);
                 ////////////////////////////////////////////////////////////////
                 try {
-                    generateAnswer(msgType, payload);
+                    broadcastActionMsg("Trie", "Answer", generateAnswer(msgType, payload));
                 } catch (IOException | SignatureDecodeException e) {
                     e.printStackTrace();
                 }
@@ -221,17 +221,21 @@ public class TrieServiceIntent extends IntentService {
 
     //todo add age sort for sync priority
 
-    private void generateAnswer(byte msgType, byte[] payload) throws IOException, SignatureDecodeException {
+    private byte[] generateAnswer(byte msgType, byte[] payload) throws IOException, SignatureDecodeException {
         Context context = app.getApplicationContext();
+        byte[] answer = new byte[0];
         if (null == payload) payload = new byte[8];
         if(msgType == Utils.getHashs){
             //payload = array[pos...]
-            byte[] answer = new byte[0];
             for(int i=0;i < payload.length/8;i++){
                 // todo return pos & type & map & array(pos+hash if it is BRANCH or age if it is LEAF)
                 answer = Bytes.concat(answer, Utils.getBytesPart(payload,i*8, 8), getNodeMapAndHashesOrAges(Utils.getBytesPart(payload,i*8, 8)));
             }
-            app.sendMsg(Utils.hashs, answer);
+            byte[] type = new byte[1];
+            type[0] = Utils.hashs;
+            answer = Bytes.concat(type, answer);
+            //app.addSyncMsg(answer);
+            //app.sendMsg(Utils.hashs, answer);
         }else{
             //payload = pos+typeAndKeySize+keyNode+childMap+childArray[pos+hash(BRANCH\ROOT)... or age(LEAF)...]
             //если ранее запрашивался корень то сравним с хешем нашего корня и если совпадает то ничего не делаем
@@ -328,11 +332,14 @@ public class TrieServiceIntent extends IntentService {
                         }
                     }
                 }
-                app.sendMsg(msgType, ask);
+                //app.sendMsg(msgType, ask);
+                //app.addSyncMsg(ask);
+                byte[] type = new byte[1];
+                type[0] = Utils.getHashs;
+                answer = Bytes.concat(type, ask);
             }
         }
-
-
+        return Bytes.concat(answer);
     }
 
     //Получает typeAndKeySize+keyNode+childMap+childArray[pos+hash(BRANCH\ROOT)... or age(LEAF)...]
