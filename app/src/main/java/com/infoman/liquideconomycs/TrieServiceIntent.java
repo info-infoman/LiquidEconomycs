@@ -272,7 +272,10 @@ public class TrieServiceIntent extends IntentService {
                     selfPrefix = app.getPrefixByPos(pos);
                     //todo delete old prefix
                     //получить позицию узла в дереве по префиксу
-                    selfNodePos = find(selfPrefix, 0L);
+                    selfNodePos = new byte[8];
+                    for(int k = 0; k < selfPrefix.length; k++){
+                        selfNodePos = searchPos(selfPrefix[k], selfNodePos);
+                    }
                     //если найден то получитм карту и хеши\возраста к ней
                     if (selfNodePos != null) {
                         selfNodeMapAndHashOrAge = getNodeMapAndHashesOrAges(selfNodePos);
@@ -475,6 +478,42 @@ public class TrieServiceIntent extends IntentService {
             }
         }
         return null;
+    }
+
+    //return pos or age or null - if not found
+    private byte[] searchPos(byte key, byte[] sPos) throws IOException {
+        long pos = Longs.fromByteArray(sPos);
+        byte[] result = null;
+        //Если размер файла == 0  то вернем null
+        if(app.trie.length()>0) {
+            //если это корень то переместим курсор на позицию в массиве детей = первый байт ключа * 8 - 8
+            //если содержимое != 0 то  начинаем искать там и вернем то что нашли + корень, иначе вернем корень
+            byte[] childPos = new byte[8];
+            if (pos == 0L) {
+                app.trie.seek(22 + getChildPosInArray(key&0xFF, BRANCH));
+            } else {
+                //иначе переместимся на позицию pos пропустим возраст
+                app.trie.seek(2 + pos);
+                //прочитаем ключ, карту дочерей, число дочерей, суфикс вносимого ключа
+                byte type = app.trie.readByte();
+                byte keyNodeSize = app.trie.readByte();
+                byte[] keyNode = new byte[keyNodeSize];
+                app.trie.read(keyNode, 0, keyNodeSize);
+                app.trie.seek(pos + 4 + keyNodeSize + 20); //skip hash
+                byte[] childsMap = new byte[32];
+                app.trie.read(childsMap, 0, 32);
+                int childPosInMap = getChildPosInMap(childsMap, key&0xFF);
+
+                if(type==BRANCH) {//ret pos
+                    app.trie.seek(pos + 4 + keyNodeSize + 20 + 32 + ((childPosInMap * 8L) - 8));
+                }
+            }
+            app.trie.read(childPos, 0, 8);
+            if (Longs.fromByteArray(childPos) != 0) {
+                result = childPos;
+            }
+        }
+        return result;
     }
 
     //return null if not change(not found) or pos in file if change or hash if root
