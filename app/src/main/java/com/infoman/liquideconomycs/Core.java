@@ -18,6 +18,7 @@ import java.io.RandomAccessFile;
 
 import androidx.core.util.Pair;
 
+import static com.infoman.liquideconomycs.Utils.LEAF;
 import static com.infoman.liquideconomycs.Utils.copyAssetFolder;
 
 public class Core extends Application {
@@ -151,21 +152,15 @@ public class Core extends Application {
         }
     }
 
-    public byte[] getPrefixByPos(long pos) {
-        byte[] prefix = null;
-        Cursor query = db.rawQuery("SELECT * FROM sync where pos="+pos, null);
-        if (query.moveToFirst()) {
-            int pubKeyColIndex = query.getColumnIndex("pubKey");
-            prefix = query.getBlob(pubKeyColIndex);
-        }
-        query.close();
-        return prefix;
+    public Cursor getPrefixByPos(long pos) {
+        return db.rawQuery("SELECT * FROM sync where pos="+pos, null);
     }
 
-    public void addPrefixByPos(long pos, byte[] key, byte[] age){
+    public void addPrefixByPos(long pos, byte[] key, byte[] age, boolean exist){
         cv.put("pos", pos);
-        cv.put("pubKey", key);
+        cv.put("prefix", key);
         cv.put("age", age);
+        cv.put("exist", exist ? 1 : 0);
         db.insert("sync", null, cv);
         cv.clear();
     }

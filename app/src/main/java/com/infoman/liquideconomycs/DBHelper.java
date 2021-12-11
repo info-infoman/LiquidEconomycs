@@ -29,8 +29,9 @@ public class DBHelper extends SQLiteOpenHelper {
             db.execSQL("create table sync ("
                     + "id integer primary key autoincrement,"
                     + "pos LONG,"
-                    + "pubKey BLOB,"
-                    + "age BLOB" + ");");
+                    + "prefix BLOB,"
+                    + "age BLOB,"
+                    + "exist integer" + ");");
             db.execSQL("create table signalServers ("
                     + "id integer primary key autoincrement,"
                     + "host text,"

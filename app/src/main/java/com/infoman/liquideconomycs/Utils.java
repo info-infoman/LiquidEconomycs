@@ -22,6 +22,7 @@ import java.util.concurrent.TimeUnit;
 
 
 public class Utils {
+
     public static byte
             getHashs    = 0,
             hashs       = 1,
