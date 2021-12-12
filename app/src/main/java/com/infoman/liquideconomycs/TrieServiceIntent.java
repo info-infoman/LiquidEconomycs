@@ -223,8 +223,8 @@ public class TrieServiceIntent extends IntentService {
 
     private byte[] generateAnswer(byte msgType, byte[] payload) throws IOException, SignatureDecodeException {
         Context context = app.getApplicationContext();
+        boolean exist;
         byte[] answer = new byte[0];
-        boolean exist = false;
         if (null == payload) payload = new byte[8];
         if(msgType == Utils.getHashs){
             //payload = array[pos...]
@@ -244,6 +244,7 @@ public class TrieServiceIntent extends IntentService {
             //нам прислали рание запрошенные узлы, необходимо их расшифровать
             for(int i = 0; i < payload.length;) {
                 //node from payload
+                exist                       = false;
                 long pos                    = Longs.fromByteArray(Utils.getBytesPart(payload, i, 8));
                 byte[] nodeTypeAndKeySize   = Utils.getBytesPart(payload, i+8, 2);
                 int offLen                  = (nodeTypeAndKeySize[0]!=LEAF?20:2);
@@ -253,14 +254,13 @@ public class TrieServiceIntent extends IntentService {
                 byte[] childsArray          = Utils.getBytesPart(payload, i + 10 + nodeTypeAndKeySize[1] + 32, len);
                 i                           = i + 10 + nodeTypeAndKeySize[1] + 32 + len;
                 //self node
-                byte[] selfNodePos,
+                byte[] selfNodePos= new byte[8],
                         selfPrefix = new byte[0],
                         selfNodeMapAndHashOrAge,
                         selfTypeAndKeySize = new byte[2],
                         selfNodeMap = new byte[32],
                         selfNodeHashsOrAges = new byte[0];
                 if (nodeTypeAndKeySize[0]== ROOT){
-                    selfNodePos = new byte[8];
                     selfNodeMapAndHashOrAge = getNodeMapAndHashesOrAges(selfNodePos);
                     selfTypeAndKeySize = Utils.getBytesPart(selfNodeMapAndHashOrAge, 0, 2);
                     selfNodeMap = Utils.getBytesPart(selfNodeMapAndHashOrAge, 2, 32);
@@ -280,7 +280,6 @@ public class TrieServiceIntent extends IntentService {
                     // Если запрошеный узел у нас есть, то на основании префикса получим карту и детей узла с этим префиксом
                     //получить позицию узла в дереве по префиксу
                     if (exist) {
-                        selfNodePos = new byte[8];
                         for (int k = 0; k < selfPrefix.length; k++) {
                             selfNodePos = searchPos(selfPrefix[k], selfNodePos);
                         }
@@ -362,7 +361,7 @@ public class TrieServiceIntent extends IntentService {
                 answer = Bytes.concat(type, ask);
             }
         }
-        return Bytes.concat(answer);
+        return answer;
     }
 
     //Получает typeAndKeySize+keyNode+childMap+childArray[pos+hash(BRANCH\ROOT)... or age(LEAF)...]

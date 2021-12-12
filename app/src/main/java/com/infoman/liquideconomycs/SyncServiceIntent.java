@@ -83,7 +83,8 @@ public class SyncServiceIntent extends IntentService {
                 if(master.equals("Trie")){
                     if(cmd.equals("Answer")){
                         final byte[] answer = intent.getByteArrayExtra(EXTRA_ANSWER);
-                        app.sendMsg(answer[0], Utils.getBytesPart(answer, 1, (answer.length)-1));
+                        if (answer.length > 1)
+                            app.sendMsg(answer[0], Utils.getBytesPart(answer, 1, (answer.length)-1));
                     }
                     //resultTextView.setText(param);
                 }
