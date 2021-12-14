@@ -218,29 +218,10 @@ public class SyncServiceIntent extends IntentService {
                     }
 
                 }, mExtraHeaders);
-                //+(slave ? "/?myKey="+String.valueOf(myKey.first) : "/?slave="+String.valueOf(pubKey)))
                 app.mClient.connect(URI.create(signalServer));
 
                 //Таймер проверки ответов
-                int counter = 0;
-                while (app.isSynchronized && (new Date().getTime() - app.dateTimeLastSync) / 1000 < 300){
-                    /*counter++;
-                    if(counter > 5000){
-                        Cursor query = app.getSyncMsg();
-                        byte[] payload;
-                        if (query.getCount() > 0) {
-                            while (query.moveToNext()) {
-                                payload = query.getBlob(query.getColumnIndex("payload"));
-                                app.deleteSyncMsg(query.getInt(query.getColumnIndex("id")));
-                                app.sendMsg((Provide_service?Utils.hashs:Utils.getHashs), payload);
-                            }
-                        }
-                        query.close();
-                        counter = 0;
-                    }
-
-                     */
-                }
+                while (app.isSynchronized && (new Date().getTime() - app.dateTimeLastSync) / 1000 < 300){}
 
                 app.isSynchronized=false;
                 app.mClient.disconnect();

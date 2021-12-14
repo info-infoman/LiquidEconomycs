@@ -31,6 +31,7 @@ public class DBHelper extends SQLiteOpenHelper {
                     + "pos LONG,"
                     + "prefix BLOB,"
                     + "age BLOB,"
+                    + "history text,"
                     + "exist integer" + ");");
             db.execSQL("create table signalServers ("
                     + "id integer primary key autoincrement,"

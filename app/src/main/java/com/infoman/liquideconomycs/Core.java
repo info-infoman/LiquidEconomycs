@@ -156,10 +156,11 @@ public class Core extends Application {
         return db.rawQuery("SELECT * FROM sync where pos="+pos, null);
     }
 
-    public void addPrefixByPos(long pos, byte[] key, byte[] age, boolean exist){
+    public void addPrefixByPos(long pos, byte[] key, byte[] age, boolean exist, String history){
         cv.put("pos", pos);
         cv.put("prefix", key);
         cv.put("age", age);
+        cv.put("history", history);
         cv.put("exist", exist ? 1 : 0);
         db.insert("sync", null, cv);
         cv.clear();

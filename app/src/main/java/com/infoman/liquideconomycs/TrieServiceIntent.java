@@ -14,6 +14,7 @@ import com.google.common.primitives.Longs;
 import org.bitcoinj.core.SignatureDecodeException;
 
 import java.io.IOException;
+import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.Date;
 
@@ -43,7 +44,6 @@ import static com.infoman.liquideconomycs.Utils.getChildPosInMap;
 import static com.infoman.liquideconomycs.Utils.getChildsCountInMap;
 import static com.infoman.liquideconomycs.Utils.getCommonKey;
 import static org.bitcoinj.core.Utils.sha256hash160;
-
 //TODO add max age field in leaf and branch node = max age in childs, for automate delete to old pubKey
 
 public class TrieServiceIntent extends IntentService {
@@ -223,7 +223,7 @@ public class TrieServiceIntent extends IntentService {
 
     private byte[] generateAnswer(byte msgType, byte[] payload) throws IOException, SignatureDecodeException {
         Context context = app.getApplicationContext();
-        boolean exist;
+        boolean exist, existSelfChild;
         byte[] answer = new byte[0];
         if (null == payload) payload = new byte[8];
         if(msgType == Utils.getHashs){
@@ -235,8 +235,6 @@ public class TrieServiceIntent extends IntentService {
             byte[] type = new byte[1];
             type[0] = Utils.hashs;
             answer = Bytes.concat(type, answer);
-            //app.addSyncMsg(answer);
-            //app.sendMsg(Utils.hashs, answer);
         }else{
             //payload = pos+typeAndKeySize+keyNode+childMap+childArray[pos+hash(BRANCH\ROOT)... or age(LEAF)...]
             //если ранее запрашивался корень то сравним с хешем нашего корня и если совпадает то ничего не делаем
@@ -244,10 +242,12 @@ public class TrieServiceIntent extends IntentService {
             //нам прислали рание запрошенные узлы, необходимо их расшифровать
             for(int i = 0; i < payload.length;) {
                 //node from payload
+                String history = "";
                 exist                       = false;
                 long pos                    = Longs.fromByteArray(Utils.getBytesPart(payload, i, 8));
                 byte[] nodeTypeAndKeySize   = Utils.getBytesPart(payload, i+8, 2);
                 int offLen                  = (nodeTypeAndKeySize[0]!=LEAF?20:2);
+                byte[] key                  = Utils.getBytesPart(payload, i + 10, nodeTypeAndKeySize[1]);
                 byte[] childsMap            = Utils.getBytesPart(payload, i + 10 + nodeTypeAndKeySize[1], 32);
                 int childsCountInMap        = Utils.getChildsCountInMap(childsMap);
                 int len                     = childsCountInMap * (nodeTypeAndKeySize[0]==Utils.LEAF ? 2 : 28);
@@ -272,8 +272,9 @@ public class TrieServiceIntent extends IntentService {
                     Cursor query = app.getPrefixByPos(pos);
                     if (query.getCount() > 0) {
                         while (query.moveToNext()) {
+                            history = query.getString(query.getColumnIndex("history"));
                             selfPrefix = query.getBlob(query.getColumnIndex("prefix"));
-                            exist = query.getInt(query.getColumnIndex("exist"))==1?true:false;
+                            exist = query.getInt(query.getColumnIndex("exist")) == 1;
                         }
                     }
                     query.close();
@@ -306,59 +307,77 @@ public class TrieServiceIntent extends IntentService {
                 // 1.2) Если это тип LEAF и ((узел в карте имеет возраст не равный нашему  и возраст моложе нашего ) или возраст не найден в нашей карте)
                 // то добавить/изменить по(prefix + индекс цикла - позиция в карте) новый возраст
                 byte[] ask = new byte[0];
-                for(int c = 0; c < 255; c++){
+
+                for(int c = 0; c < 256; c++){
                     byte[] c_ = new byte[1];
                     c_[0] = (byte)c;
-                    if(exist) {
-                        byte[] newPrefix = selfTypeAndKeySize[0] != ROOT ? Bytes.concat(selfPrefix, c_) : c_;
-                        if (checkExistChildInMap(childsMap, c)) {
-                            exist = checkExistChildInMap(selfNodeMap, c);
-                            if (nodeTypeAndKeySize[0] == LEAF) {
-                                byte[] childAge = Utils.getBytesPart(childsArray, (getChildPosInMap(childsMap, c) * offLen) - offLen, offLen);
-                                if (!exist ||
-                                        (!Arrays.equals(childAge, Utils.getBytesPart(selfNodeHashsOrAges, (getChildPosInMap(selfNodeMap, c) * offLen) - offLen, offLen))
-                                                && Utils.compareDate(Utils.reconstructAgeFromBytes(childAge), Utils.reconstructAgeFromBytes(Utils.getBytesPart(selfNodeHashsOrAges, (getChildPosInMap(selfNodeMap, c) * offLen) - offLen, offLen))) > 0)
-                                ) {
-                                    //todo add check newPrefix length
-                                    SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(context);
-                                    long maxAge = sharedPref.getLong("maxAge", 30);
-                                    if (Utils.compareDate(new Date(), Utils.reconstructAgeFromBytes(childAge)) < maxAge && Utils.compareDate(new Date(), Utils.reconstructAgeFromBytes(childAge)) >= 0)
-                                        startActionInsert(context, "Main", newPrefix, childAge);
-
+                    if (!checkExistChildInMap(childsMap, c)) {
+                        continue;
+                    }
+                    byte[] newPrefix;
+                    if(exist || selfTypeAndKeySize[0] == ROOT) {
+                        newPrefix = selfTypeAndKeySize[0] != ROOT ? Bytes.concat(selfPrefix, key, c_) : c_;
+                        existSelfChild = checkExistChildInMap(selfNodeMap, c);
+                        if (nodeTypeAndKeySize[0] == LEAF) {
+                            byte[] childAge = Utils.getBytesPart(childsArray, (getChildPosInMap(childsMap, c) * offLen) - offLen, offLen);
+                            if (!existSelfChild ||
+                                    (!Arrays.equals(childAge, Utils.getBytesPart(selfNodeHashsOrAges, (getChildPosInMap(selfNodeMap, c) * offLen) - offLen, offLen))
+                                            && Utils.compareDate(Utils.reconstructAgeFromBytes(childAge), Utils.reconstructAgeFromBytes(Utils.getBytesPart(selfNodeHashsOrAges, (getChildPosInMap(selfNodeMap, c) * offLen) - offLen, offLen))) > 0)
+                            ) {
+                                //todo add check newPrefix length
+                                SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(context);
+                                long maxAge = Long.parseLong(sharedPref.getString("maxAge", "30"));
+                                if(newPrefix.length<20){
+                                    Log.d("app.trie", String.valueOf(newPrefix));
                                 }
-                            } else {
+                                if (Utils.compareDate(new Date(), Utils.reconstructAgeFromBytes(childAge)) < maxAge && Utils.compareDate(new Date(), Utils.reconstructAgeFromBytes(childAge)) >= 0)
+                                    startActionInsert(context, "Main", newPrefix, childAge);
 
-                                if (!exist || !Arrays.equals(
-                                        Utils.getBytesPart(childsArray, (getChildPosInMap(childsMap, c) * 28) - offLen, offLen),
-                                        Utils.getBytesPart(selfNodeHashsOrAges, (getChildPosInMap(selfNodeMap, c) * 28) - offLen, offLen)
-                                )) {
-                                    //todo add to table sync add to list new ask
-                                    long pos_ = Longs.fromByteArray(Utils.getBytesPart(childsArray, (getChildPosInMap(childsMap, c) * 28) - 28, 8));
-                                    app.addPrefixByPos(pos_, newPrefix, null, exist);
-                                    ask = Bytes.concat(ask, Longs.toByteArray(pos_));
-                                }
+                            }
+                        } else {
+                            if (!existSelfChild || !Arrays.equals(
+                                    Utils.getBytesPart(childsArray, (getChildPosInMap(childsMap, c) * 28) - offLen, offLen),
+                                    Utils.getBytesPart(selfNodeHashsOrAges, (getChildPosInMap(selfNodeMap, c) * 28) - offLen, offLen)
+                            )) {
+                                //todo add to table sync add to list new ask
+                                long pos_ = Longs.fromByteArray(Utils.getBytesPart(childsArray, (getChildPosInMap(childsMap, c) * 28) - 28, 8));
+                                app.addPrefixByPos(pos_, newPrefix, null, existSelfChild,
+                                        history+"-prefix"+new BigInteger(1, selfPrefix).toString(16)
+                                                +"pos"+String.valueOf(pos)
+                                                +"type"+String.valueOf(nodeTypeAndKeySize[0])
+                                                +"key"+new BigInteger(1, key).toString(16)
+                                                +"suffix"+String.valueOf(c));
+                                ask = Bytes.concat(ask, Longs.toByteArray(pos_));
                             }
                         }
                     }else{
                         //если это новый узел то если это ветвь то продолжаем запросы
-                        if(nodeTypeAndKeySize[0] == BRANCH) {
+                        if(nodeTypeAndKeySize[0] != LEAF) {
                             long pos_ = Longs.fromByteArray(Utils.getBytesPart(childsArray, (getChildPosInMap(childsMap, c) * 28) - 28, 8));
-                            app.addPrefixByPos(pos_, Bytes.concat(selfPrefix, c_), null, exist);
+                            app.addPrefixByPos(pos_, Bytes.concat(selfPrefix, key, c_), null, false,
+                                    history+"-prefix"+new BigInteger(1, selfPrefix).toString(16)
+                                            +"pos"+String.valueOf(pos)
+                                            +"type"+String.valueOf(nodeTypeAndKeySize[0])
+                                            +"key"+new BigInteger(1, key).toString(16)
+                                            +"suffix"+String.valueOf(c));
                             ask = Bytes.concat(ask, Longs.toByteArray(pos_));
                         }else{
                             // иначе добавляем новые ключи с возрастами
                             byte[] childAge = Utils.getBytesPart(childsArray, (getChildPosInMap(childsMap, c) * offLen) - offLen, offLen);
                             SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(context);
-                            long maxAge = sharedPref.getLong("maxAge", 30);
+                            long maxAge = Long.parseLong(sharedPref.getString("maxAge", "30"));
                             //todo add check newPrefix length
+                            if(Bytes.concat(selfPrefix, key, c_).length<20){
+                                Log.d("app.trie", String.valueOf(Bytes.concat(selfPrefix,key, c_)));
+                            }
                             if (Utils.compareDate(new Date(), Utils.reconstructAgeFromBytes(childAge)) < maxAge && Utils.compareDate(new Date(), Utils.reconstructAgeFromBytes(childAge)) >= 0)
-                                startActionInsert(context, "Main", Bytes.concat(selfPrefix, c_), childAge);
+                                startActionInsert(context, "Main", Bytes.concat(selfPrefix, key, c_), childAge);
                         }
                     }
                 }
                 byte[] type = new byte[1];
                 type[0] = Utils.getHashs;
-                answer = Bytes.concat(type, ask);
+                broadcastActionMsg("Trie", "Answer", Bytes.concat(type, ask));
             }
         }
         return answer;
@@ -444,11 +463,7 @@ public class TrieServiceIntent extends IntentService {
 
         if (s!=null && s.length>2 && key.length>1){
             return find(getBytesPart(key, 1, key.length - 1), Longs.fromByteArray(s));
-        }else if(s!=null){
-            return s;
-        }else{
-            return null;
-        }
+        }else return s;
     }
 
     //return pos or age or null - if not found
@@ -482,7 +497,7 @@ public class TrieServiceIntent extends IntentService {
 
                 //found Если искомый ключ(его часть =  длинне ключа узла) = ключу узла и первый байт суффикса имеется в массиве дочерей то
                 if(Arrays.equals(preffixKey, keyNode) && checkExistChildInMap(childsMap, (suffixKey[0] & 0xFF))) {
-                    int childPosInMap = 0;
+                    int childPosInMap;
                     byte[] result;
                     if(type==BRANCH) {//ret pos
                         childPosInMap = getChildPosInMap(childsMap, (suffixKey[0] & 0xFF));
@@ -694,7 +709,7 @@ public class TrieServiceIntent extends IntentService {
             if (sResult == null){//Create new LEAF witch age
                 lKey = getBytesPart(key, 1, key.length - 2);
                 typeAndKeySize[0] = LEAF;
-                typeAndKeySize[1] = (lKey==null ? (byte)0 : (byte)lKey.length);
+                typeAndKeySize[1] = (byte)lKey.length;
                 childsMap = changeChildInMap(new byte[32], (key[key.length-1]&0xFF), true);//add age
                 hash=calcHash(typeAndKeySize[0], Bytes.concat(childsMap, age));
                 pos = addRecordInFile(age, typeAndKeySize, lKey, hash, childsMap, age);
@@ -967,7 +982,7 @@ public class TrieServiceIntent extends IntentService {
             if (pos == 0L) {
                 byte[] childPos = new byte[8];
                 app.trie.seek(54);
-                for(int i=0;i==255;i++) {
+                for(int i=0; i < 256; i++) {
                     app.trie.seek(pos + (i*8));
                     app.trie.read(childPos, 0, 8);
                     if (Longs.fromByteArray(childPos) != 0) {
@@ -985,7 +1000,7 @@ public class TrieServiceIntent extends IntentService {
                 app.trie.seek(pos + 4 + keyNodeSize + 20); //skip hash
                 app.trie.read(childsMap, 0, 32);
                 int childPosInMap;
-                for(int i=0;i==255;i++) {
+                for(int i=0; i < 256; i++) {
                     childPosInMap = getChildPosInMap(childsMap, i);
                     if(childPosInMap>0) {
                         byte[] sKey=new byte[1];
