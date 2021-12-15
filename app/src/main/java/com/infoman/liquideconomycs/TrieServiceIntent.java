@@ -558,14 +558,13 @@ public class TrieServiceIntent extends IntentService {
                 if(Arrays.equals(preffixKey, keyNode) && checkExistChildInMap(childsMap, (suffixKey[0] & 0xFF))) {
                     int childPosInMap;
                     byte[] result;
+                    childPosInMap = getChildPosInMap(childsMap, (suffixKey[0] & 0xFF));
                     if(type==BRANCH) {//ret pos
-                        childPosInMap = getChildPosInMap(childsMap, (suffixKey[0] & 0xFF));
                         app.trie.seek(pos + 4 + keyNodeSize + 20 + 32 + ((childPosInMap * 8L) - 8));
                         result = new byte[8];
                         app.trie.read(result, 0, 8);
 
                     }else {                  //ret age
-                        childPosInMap = getChildPosInMap(childsMap, (suffixKey[0] & 0xFF));
                         app.trie.seek(pos + 4 + keyNodeSize + 20 + 32 + ((childPosInMap * 2L) - 2));
                         result = new byte[2];
                         app.trie.read(result, 0, 2);
@@ -633,7 +632,7 @@ public class TrieServiceIntent extends IntentService {
                     app.trie.seek(22);
                     byte[] childArray = new byte[2048];
                     app.trie.read(childArray, 0, 2048);
-                    hash = calcHash(ROOT, childArray);
+                    hash = calcHash(ROOT, new byte[0], childArray);
                     app.trie.seek(0);
                     byte[] oldestNodeAge = getOldestNodeAge(nodeAge, ROOT, childArray);
                     if(Utils.compareDate(Utils.reconstructAgeFromBytes(nodeAge), Utils.reconstructAgeFromBytes(oldestNodeAge)) > 0)
@@ -694,7 +693,7 @@ public class TrieServiceIntent extends IntentService {
                             byte[] before = (chp == 0 ? new byte[0] : getBytesPart(childArray, 0, (chp - 1) * 8));
                             childArray = Bytes.concat(before, getBytesPart(childArray, before.length, childArray.length - before.length));
                             // пересчитываем хеш и рекурсивно вносим позицию в вышестоящие узлы
-                            hash = calcHash(type, childArray);
+                            hash = calcHash(type, keyNode, childArray);
                             app.addPosInFreeSpaceMap(pos, keyNodeSize, selfChildArraySize);
                             if((selfChildsCount-1)==1 && childArray.length == 8){//recover key if one stay child
                                 pos = Longs.fromByteArray(childArray);
@@ -711,6 +710,9 @@ public class TrieServiceIntent extends IntentService {
                                 selfChildArraySize = selfChildsCount * (typeAndKeySize[0] == LEAF ? 2 : 8);
                                 byte[] newChildArray = new byte[selfChildArraySize];
                                 app.trie.read(newChildArray, 0, selfChildArraySize);
+                                hash = calcHash(typeAndKeySize[0],
+                                        (keyNode.length > 0 && oldKeyNode.length > 0 ? Bytes.concat(keyNode, oldKeyNode) : (keyNode.length > 0 ? keyNode : oldKeyNode)),
+                                        typeAndKeySize[0]==LEAF ? Bytes.concat(childsMap, newChildArray) : newChildArray);
                                 app.addPosInFreeSpaceMap(pos, oldKeySize, selfChildArraySize);
                                 byte[] oldestNodeAge = getOldestNodeAge(nodeAge, typeAndKeySize[0], newChildArray);
                                 return Longs.toByteArray(addRecordInFile(oldestNodeAge, typeAndKeySize, (keyNode.length > 0 && oldKeyNode.length > 0 ? Bytes.concat(keyNode, oldKeyNode) : (keyNode.length > 0 ? keyNode : oldKeyNode)), hash, childsMap, newChildArray));
@@ -724,7 +726,7 @@ public class TrieServiceIntent extends IntentService {
                             app.trie.seek(pos + 4 + keyNodeSize + 20 + 32);
                             childArray = new byte[selfChildArraySize];
                             app.trie.read(childArray, 0, selfChildArraySize);
-                            hash=calcHash(type, childArray);
+                            hash=calcHash(type, keyNode, childArray);
                             byte[] oldestNodeAge = getOldestNodeAge(nodeAge, BRANCH, childArray);
                             app.trie.seek(pos);
                             app.trie.write(oldestNodeAge);
@@ -738,7 +740,7 @@ public class TrieServiceIntent extends IntentService {
                         childsMap = changeChildInMap(childsMap, insByte, false);
                         byte[] before=(chp == 0 ? new byte[0] : getBytesPart(childArray,0,  (chp-1)*2));
                         childArray = Bytes.concat(before, getBytesPart(childArray, before.length, childArray.length-before.length));
-                        hash=calcHash(type, Bytes.concat(childsMap, childArray));
+                        hash=calcHash(type, keyNode, Bytes.concat(childsMap, childArray));
                         byte[] oldestNodeAge = getOldestNodeAge(nodeAge, LEAF, childArray);
                         app.addPosInFreeSpaceMap(pos, keyNodeSize, selfChildArraySize);
                         return Longs.toByteArray(addRecordInFile(oldestNodeAge, typeAndKeySize, keyNode, hash, childsMap, childArray));
@@ -770,7 +772,7 @@ public class TrieServiceIntent extends IntentService {
                 typeAndKeySize[0] = LEAF;
                 typeAndKeySize[1] = (byte)lKey.length;
                 childsMap = changeChildInMap(new byte[32], (key[key.length-1]&0xFF), true);//add age
-                hash=calcHash(typeAndKeySize[0], Bytes.concat(childsMap, age));
+                hash=calcHash(typeAndKeySize[0], lKey, Bytes.concat(childsMap, age));
                 pos = addRecordInFile(age, typeAndKeySize, lKey, hash, childsMap, age);
                 if(Bytes.concat(fullKey, new byte[]{key[0]}, lKey, new byte[]{key[key.length-1]}).length!=20){
                     Log.d("app.trie", new BigInteger(1, Bytes.concat(fullKey, new byte[]{key[0]} , lKey, new byte[]{key[key.length-1]})).toString(16));
@@ -793,7 +795,7 @@ public class TrieServiceIntent extends IntentService {
             app.trie.seek(22);
             byte[] childArray= new byte[2048];
             app.trie.read(childArray,0,2048);
-            hash=calcHash(ROOT, childArray);
+            hash=calcHash(ROOT, new byte[0], childArray);
             app.trie.seek(2);
             app.trie.write(hash);
             return hash;
@@ -844,7 +846,7 @@ public class TrieServiceIntent extends IntentService {
                 app.trie.seek(pos + 4 + keyNodeSize + 20 + 32);
                 byte[] childArray = new byte[selfChildArraySize];
                 app.trie.read(childArray, 0, selfChildArraySize);
-                hash = calcHash(type, type==LEAF ? Bytes.concat(childsMap, childArray) : childArray);
+                hash = calcHash(type, keyNode, type==LEAF ? Bytes.concat(childsMap, childArray) : childArray);
                 app.trie.seek(pos + 4 + keyNodeSize);
                 app.trie.write(hash);
                 return Longs.toByteArray(pos);
@@ -889,7 +891,7 @@ public class TrieServiceIntent extends IntentService {
                     typeAndKeySize[0] = LEAF;
                     typeAndKeySize[1] = (byte)leafKey_.length;
                     childsMapNew = changeChildInMap(new byte[32], (key[key.length-1]&0xFF),true);
-                    hash=calcHash(typeAndKeySize[0], Bytes.concat(childsMapNew, age));
+                    hash=calcHash(typeAndKeySize[0], leafKey_, Bytes.concat(childsMapNew, age));
                     long posLeaf = addRecordInFile(age, typeAndKeySize, leafKey_, hash, childsMapNew, age);
 
                     if(Bytes.concat(fullKey, key).length!=20){
@@ -901,7 +903,7 @@ public class TrieServiceIntent extends IntentService {
                     byte[] oldLeafKey_ = getBytesPart(oldLeafKey, 1 , oldLeafKey.length - 1);
                     typeAndKeySize[0] = type;
                     typeAndKeySize[1] = (byte)oldLeafKey_.length;
-                    hash=calcHash(type, type==LEAF ? Bytes.concat(childsMap, selfChildArray) : selfChildArray);
+                    hash=calcHash(type, oldLeafKey_, type==LEAF ? Bytes.concat(childsMap, selfChildArray) : selfChildArray);
 
                     long posOldLeaf = addRecordInFile(nodeAge, typeAndKeySize, oldLeafKey_, hash, childsMap, selfChildArray);
 
@@ -913,7 +915,7 @@ public class TrieServiceIntent extends IntentService {
                     }else{
                         childArray = Bytes.concat(Longs.toByteArray(posLeaf), Longs.toByteArray(posOldLeaf));
                     }
-                    hash=calcHash(BRANCH, childArray);
+                    hash=calcHash(BRANCH, commonKey, childArray);
 
                     retPos = Longs.toByteArray(addRecordInFile(
                             (Utils.compareDate(Utils.reconstructAgeFromBytes(nodeAge), Utils.reconstructAgeFromBytes(age))>0 ? age : nodeAge),
@@ -934,11 +936,11 @@ public class TrieServiceIntent extends IntentService {
                         insByte = (suffixKey[0]&0xFF);
                         typeAndKeySize[1] = (byte)leafKey.length;
                         childsMapNew = changeChildInMap(new byte[32], (key[key.length-1]&0xFF),true);
-                        hash=calcHash(LEAF, Bytes.concat(childsMapNew, age));
+                        hash=calcHash(LEAF, leafKey, Bytes.concat(childsMapNew, age));
                         posLeaf = addRecordInFile(age, typeAndKeySize, leafKey, hash, childsMapNew, age);
 
                         if(Bytes.concat(fullKey, preffixKey, new byte[]{suffixKey[0]}, leafKey, new byte[]{key[key.length-1]}).length!=20){
-                            Log.d("app.trie", new BigInteger(1, Bytes.concat(fullKey, preffixKey, leafKey, new byte[]{suffixKey[0]})).toString(16));
+                            Log.d("app.trie", new BigInteger(1, Bytes.concat(fullKey, preffixKey, new byte[]{suffixKey[0]}, leafKey, new byte[]{key[key.length-1]})).toString(16));
                         }
                     }else{
                         insByte = (key[key.length-1]&0xFF);
@@ -951,7 +953,7 @@ public class TrieServiceIntent extends IntentService {
                     byte[] before=(chp == 0 ? new byte[0] : getBytesPart(selfChildArray,0,  (chp-1)*(type==LEAF ? 2 : 8)));
                     childArray = Bytes.concat(before, (type==LEAF ? age : Longs.toByteArray(posLeaf)), getBytesPart(selfChildArray, before.length, selfChildArray.length-before.length));
                     // пересчитываем хеш и рекурсивно вносим позицию в вышестоящие узлы
-                    hash=calcHash(type, type==LEAF ? Bytes.concat(childsMap, childArray) : childArray);
+                    hash=calcHash(type, keyNode, type==LEAF ? Bytes.concat(childsMap, childArray) : childArray);
 
                     retPos = Longs.toByteArray(addRecordInFile(
                             (Utils.compareDate(Utils.reconstructAgeFromBytes(nodeAge), Utils.reconstructAgeFromBytes(age))>0 ? age : nodeAge),
@@ -977,8 +979,7 @@ public class TrieServiceIntent extends IntentService {
 
     }
 
-    private byte[] calcHash(byte type, byte[] childArray) throws IOException {
-        byte[] digest = new byte[0];
+    private byte[] calcHash(byte type, byte[] digest, byte[] childArray) throws IOException {
         if(type==BRANCH || type==ROOT) {
             for (int i = 0; i < childArray.length; ) {
                 byte[] pos = getBytesPart(childArray, i, 8);
@@ -989,7 +990,7 @@ public class TrieServiceIntent extends IntentService {
             }
             return sha256hash160(digest);
         }
-        return sha256hash160(childArray);
+        return sha256hash160(Bytes.concat(digest,childArray));
     }
 
     private long addRecordInFile(byte[] age, byte[] typeAndKeySize, byte[] key, byte[] hash, byte[] childsMap, byte[] childArray) throws IOException {
@@ -1056,7 +1057,7 @@ public class TrieServiceIntent extends IntentService {
                 byte[] childPos = new byte[8];
                 app.trie.seek(54);
                 for(int i=0; i < 256; i++) {
-                    app.trie.seek(pos + (i*8));
+                    app.trie.seek(pos + (i* 8L));
                     app.trie.read(childPos, 0, 8);
                     if (Longs.fromByteArray(childPos) != 0) {
                         key[0] = (byte) i;
