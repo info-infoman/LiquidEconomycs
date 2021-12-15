@@ -53,6 +53,7 @@ import androidx.core.app.ActivityCompat;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
 
+import static android.content.Intent.ACTION_BOOT_COMPLETED;
 import static com.infoman.liquideconomycs.SyncServiceIntent.startActionSync;
 import static com.infoman.liquideconomycs.TrieServiceIntent.startActionFind;
 import static com.infoman.liquideconomycs.TrieServiceIntent.startActionInsert;
@@ -202,7 +203,11 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             requestNFCPermission();
         }
 
-        startService(new Intent(getApplicationContext(), TrieServiceIntent.class).setAction(ACTION_DELETE_OLDEST));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(new Intent(getApplicationContext(), TrieServiceIntent.class).setAction(ACTION_DELETE_OLDEST));
+        }else{
+            startService(new Intent(getApplicationContext(), TrieServiceIntent.class).setAction(ACTION_DELETE_OLDEST));
+        }
     }
 
     @Override protected void onDestroy() {

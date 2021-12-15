@@ -57,6 +57,7 @@ import static org.bitcoinj.core.ECKey.ECDSASignature.decodeFromDER;
 public class SyncServiceIntent extends IntentService {
 
     private Core app;
+    boolean isServiceStarted = false;
 
     public static void startActionSync(Context context, String master, String signalServer, byte[] pubKey, String token, boolean Provide_service) {
 
@@ -73,6 +74,10 @@ public class SyncServiceIntent extends IntentService {
             .putExtra(EXTRA_TOKEN, token)
             .putExtra(EXTRA_MASTER, master);
         Log.d(TAG, Arrays.toString(pubKey));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.startForegroundService(intent);
+            return;
+        }
         context.startService(intent);
     }
 
@@ -100,9 +105,33 @@ public class SyncServiceIntent extends IntentService {
     public void onCreate() {
         super.onCreate();
         //android.os.Debug.waitForDebugger();
+        if(isServiceStarted) return;
+        isServiceStarted = true;
         app = (Core) getApplicationContext();
-        Log.i("liquideconomycs", "Service: SyncServiceIntent is create");
         registerReceiver(mBroadcastReceiver, new IntentFilter(BROADCAST_ACTION_ANSWER));
+
+        ////////////////////////////////////////////////////////////////
+        String channel;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+            channel = createChannel();
+        else {
+            channel = "";
+        }
+
+        NotificationCompat.Builder builder = null; // display indeterminate progress
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+            builder = new NotificationCompat.Builder(getBaseContext(), channel)
+                    .setTicker("SyncServiceIntent") // use something from something from R.string
+                    .setContentTitle("liquid economycs") // use something from something from
+                    .setContentText("Sync liquid base") // use something from something from
+                    .setProgress(0, 0, true)
+                    .setPriority(PRIORITY_LOW)
+                    .setCategory(Notification.CATEGORY_SERVICE);
+        }
+
+        assert builder != null;
+        startForeground(9991, builder.build());
+
     }
 
     @Override
@@ -119,27 +148,6 @@ public class SyncServiceIntent extends IntentService {
                 final byte[] pubKey = intent.getByteArrayExtra(EXTRA_PUBKEY);
                 final boolean Provide_service = intent.getBooleanExtra(EXTRA_PROVIDE_SERVICE,true);
 
-                ////////////////////////////////////////////////////////////////
-                String channel;
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-                    channel = createChannel();
-                else {
-                    channel = "";
-                }
-
-                NotificationCompat.Builder builder = null; // display indeterminate progress
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
-                    builder = new NotificationCompat.Builder(getBaseContext(), channel)
-                            .setTicker("SyncServiceIntent") // use something from something from R.string
-                            .setContentTitle("liquid economycs") // use something from something from
-                            .setContentText("Sync liquid base") // use something from something from
-                            .setProgress(0, 0, true)
-                            .setPriority(PRIORITY_LOW)
-                            .setCategory(Notification.CATEGORY_SERVICE);
-                }
-
-                assert builder != null;
-                startForeground(9991, builder.build());
                 //todo sync processor
                 List<BasicNameValuePair> mExtraHeaders = Collections.singletonList(new BasicNameValuePair("Cookie", "session=abcd"));
                 app.mClient = new WebSocketClient(new WebSocketClient.Listener() {
@@ -226,8 +234,9 @@ public class SyncServiceIntent extends IntentService {
                 app.isSynchronized=false;
                 app.mClient.disconnect();
                 //todo clear tmp register
-                stopForeground(true);
                 broadcastActionMsg("Main", "Sync", getResources().getString(R.string.SyncFinish));
+                stopForeground(true);
+                stopSelf();
                 ////////////////////////////////////////////////////////////////
             }
         }

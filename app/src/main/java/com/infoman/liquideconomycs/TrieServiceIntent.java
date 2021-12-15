@@ -1,10 +1,16 @@
 package com.infoman.liquideconomycs;
 
+import android.annotation.TargetApi;
 import android.app.IntentService;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.Cursor;
+import android.graphics.Color;
+import android.os.Build;
 import android.preference.PreferenceManager;
 import android.util.Log;
 
@@ -18,6 +24,10 @@ import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.Date;
 
+import androidx.annotation.NonNull;
+import androidx.core.app.NotificationCompat;
+
+import static androidx.core.app.NotificationCompat.PRIORITY_LOW;
 import static com.infoman.liquideconomycs.Utils.ACTION_DELETE;
 import static com.infoman.liquideconomycs.Utils.ACTION_FIND;
 import static com.infoman.liquideconomycs.Utils.ACTION_GENERATE_ANSWER;
@@ -48,6 +58,7 @@ import static org.bitcoinj.core.Utils.sha256hash160;
 
 public class TrieServiceIntent extends IntentService {
     private int waitingIntentCount = 0;
+    private boolean isServiceStarted = false;
     private Core app;
 
     public TrieServiceIntent() {
@@ -60,6 +71,10 @@ public class TrieServiceIntent extends IntentService {
             .setAction(ACTION_GET_HASH)
             .putExtra(EXTRA_MASTER, master)
             .putExtra(EXTRA_POS, pos);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.startForegroundService(intent);
+            return;
+        }
         context.startService(intent);
     }
 
@@ -70,6 +85,10 @@ public class TrieServiceIntent extends IntentService {
             .putExtra(EXTRA_MASTER, master)
             .putExtra(EXTRA_PUBKEY, pubKey)
             .putExtra(EXTRA_AGE, age);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.startForegroundService(intent);
+            return;
+        }
         context.startService(intent);
     }
 
@@ -80,6 +99,10 @@ public class TrieServiceIntent extends IntentService {
             .putExtra(EXTRA_MASTER, master)
             .putExtra(EXTRA_PUBKEY, pubKey)
             .putExtra(EXTRA_POS, pos);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.startForegroundService(intent);
+            return;
+        }
         context.startService(intent);
     }
 
@@ -90,6 +113,10 @@ public class TrieServiceIntent extends IntentService {
             .putExtra(EXTRA_MASTER, master)
             .putExtra(EXTRA_PUBKEY, pubKey)
             .putExtra(EXTRA_POS, pos);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.startForegroundService(intent);
+            return;
+        }
         context.startService(intent);
     }
 
@@ -99,6 +126,10 @@ public class TrieServiceIntent extends IntentService {
             .setAction(ACTION_GENERATE_ANSWER)
             .putExtra(EXTRA_MSG_TYPE, msgType)
             .putExtra(EXTRA_PAYLOAD, payload);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.startForegroundService(intent);
+            return;
+        }
         context.startService(intent);
     }
 
@@ -106,6 +137,7 @@ public class TrieServiceIntent extends IntentService {
     public void onCreate() {
         super.onCreate();
         //android.os.Debug.waitForDebugger();
+        if(isServiceStarted) return;
         app = (Core) getApplicationContext();
         //android.os.Debug.waitForDebugger();
         //ROOT(content BRANCHs & LEAFs)
@@ -119,6 +151,30 @@ public class TrieServiceIntent extends IntentService {
         //0000  /00     /00         /00*18    /00*20                 /00*32          /00*2               max 568 byte (ideal ‭39 062 500‬(leafs)=20GB)
         //total 21GB(ideal trie for 10 000 000 000 accounts)
         //
+        ////////////////////////////////////////////////////////////////
+
+        isServiceStarted = true;
+
+        String channel;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+            channel = createChannel();
+        else {
+            channel = "";
+        }
+
+        NotificationCompat.Builder builder = null; // display indeterminate progress
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+            builder = new NotificationCompat.Builder(getBaseContext(), channel)
+                    .setTicker("TrieIntent") // use something from something from R.string
+                    .setContentTitle("LE trie service") // use something from something from
+                    .setContentText("Sync trie") // use something from something from
+                    .setProgress(0, 0, true)
+                    .setPriority(PRIORITY_LOW)
+                    .setCategory(Notification.CATEGORY_SERVICE);
+        }
+
+        assert builder != null;
+        startForeground(9992, builder.build());
     }
 
     @Override
@@ -131,6 +187,7 @@ public class TrieServiceIntent extends IntentService {
     protected void onHandleIntent(Intent intent) {
         if (intent != null) {
             waitingIntentCount--;
+
             final String action = intent.getAction();
             if (ACTION_GET_HASH.equals(action)) {
                 final String master = intent.getStringExtra(EXTRA_MASTER), cmd = "GetHash";
@@ -149,7 +206,7 @@ public class TrieServiceIntent extends IntentService {
                 final byte[] key = intent.getByteArrayExtra(EXTRA_PUBKEY), value = intent.getByteArrayExtra(EXTRA_AGE);
                 ////////////////////////////////////////////////////////////////
                 try {
-                    broadcastActionMsg(master, cmd, insert(key, value, 0L));
+                    broadcastActionMsg(master, cmd, insert(key, value, 0L, new byte[0]));
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -206,6 +263,8 @@ public class TrieServiceIntent extends IntentService {
             if(waitingIntentCount==0) {
                 //optimize free space in db
                 optimize();
+                stopForeground(true);
+                stopSelf();
             }
         }
     }
@@ -690,7 +749,7 @@ public class TrieServiceIntent extends IntentService {
         return null;
     }
 
-    private byte[] insert(byte[] key, byte[] age, long pos) throws IOException {
+    private byte[] insert(byte[] key, byte[] age, long pos, byte[] fullKey) throws IOException {
         byte[] hash;
         byte[] childsMap = new byte[32];
         byte[] typeAndKeySize = new byte[2];
@@ -699,7 +758,7 @@ public class TrieServiceIntent extends IntentService {
             app.trie.setLength(0);
             byte[] trieTmp = new byte[2070];
             app.trie.write(trieTmp);
-            return insert(key, age, pos);
+            return insert(key, age, pos, fullKey);
         }
 
         byte[] sResult=search(key, pos);
@@ -713,9 +772,12 @@ public class TrieServiceIntent extends IntentService {
                 childsMap = changeChildInMap(new byte[32], (key[key.length-1]&0xFF), true);//add age
                 hash=calcHash(typeAndKeySize[0], Bytes.concat(childsMap, age));
                 pos = addRecordInFile(age, typeAndKeySize, lKey, hash, childsMap, age);
+                if(Bytes.concat(fullKey, new byte[]{key[0]}, lKey, new byte[]{key[key.length-1]}).length!=20){
+                    Log.d("app.trie", new BigInteger(1, Bytes.concat(fullKey, new byte[]{key[0]} , lKey, new byte[]{key[key.length-1]})).toString(16));
+                }
             }else{//insert in child & save in root
                 lKey = getBytesPart(key, 1, key.length - 1);
-                pos = Longs.fromByteArray(insert(lKey, age, Longs.fromByteArray(sResult)));
+                pos = Longs.fromByteArray(insert(lKey, age, Longs.fromByteArray(sResult), new byte[]{key[0]}));
             }
             //save in root
             //if node-age is younger inserted age then change nodeAge to age
@@ -758,7 +820,7 @@ public class TrieServiceIntent extends IntentService {
                 if(childPosInMap==0){
                     Log.d("app.trie", String.valueOf((suffixKey[0] & 0xFF)));
                 }
-                long posToWrite = pos + 4 + keyNodeSize + 20 + 32 + (type==LEAF ? ((childPosInMap * 2L) - 2) : ((childPosInMap * 8L) - 8));
+                long posToWrite = pos + 4 + keyNodeSize + 20 + 32 + (type==LEAF ? ((childPosInMap * 2) - 2) : ((childPosInMap * 8) - 8));
                 app.trie.seek(posToWrite);
 
                 if(type==LEAF){
@@ -767,7 +829,9 @@ public class TrieServiceIntent extends IntentService {
                     byte[] chPos=new byte[8];
                     app.trie.read(chPos, 0, 8);
                     //insert to child
-                    chPos = insert(getBytesPart(suffixKey, 1, suffixKey.length-1), age, Longs.fromByteArray(chPos));
+                    chPos = insert(getBytesPart(suffixKey, 1, suffixKey.length-1), age, Longs.fromByteArray(chPos),
+                            Bytes.concat(fullKey, keyNode, new byte[]{suffixKey[0]})
+                    );
                     app.trie.seek(posToWrite);
                     app.trie.write(chPos);
                 }
@@ -785,7 +849,6 @@ public class TrieServiceIntent extends IntentService {
                 app.trie.write(hash);
                 return Longs.toByteArray(pos);
             } else {
-
                 app.trie.seek(pos);
                 byte[] nodeAge = new byte[2];
                 app.trie.read(nodeAge, 0, 2);
@@ -821,13 +884,17 @@ public class TrieServiceIntent extends IntentService {
                 if(!Arrays.equals(preffixKey, keyNode)){//create sub node
                     //ADD NEW LEAF
                     assert commonKey != null;
-                    byte[] leafKey = getBytesPart(key, commonKey.length , keyNodeSize - commonKey.length);
+                    byte[] leafKey = getBytesPart(key, commonKey.length , key.length - commonKey.length - 2);
                     byte[] leafKey_ = getBytesPart(leafKey, 1 , leafKey.length - 1);
                     typeAndKeySize[0] = LEAF;
                     typeAndKeySize[1] = (byte)leafKey_.length;
                     childsMapNew = changeChildInMap(new byte[32], (key[key.length-1]&0xFF),true);
                     hash=calcHash(typeAndKeySize[0], Bytes.concat(childsMapNew, age));
                     long posLeaf = addRecordInFile(age, typeAndKeySize, leafKey_, hash, childsMapNew, age);
+
+                    if(Bytes.concat(fullKey, key).length!=20){
+                        Log.d("app.trie", new BigInteger(1, Bytes.concat(fullKey, key)).toString(16));
+                    }
 
                     //COPY OLD NODE WITCH CORP(keyNode - common) KEY
                     byte[] oldLeafKey = getBytesPart(keyNode, commonKey.length , keyNodeSize - commonKey.length);
@@ -863,12 +930,16 @@ public class TrieServiceIntent extends IntentService {
                     int insByte;
                     if(type!=LEAF){
                         typeAndKeySize[0] = LEAF;
-                        leafKey = getBytesPart(suffixKey, 1 , suffixKey.length - 1);
+                        leafKey = getBytesPart(suffixKey, 1 , suffixKey.length - 2);
                         insByte = (suffixKey[0]&0xFF);
                         typeAndKeySize[1] = (byte)leafKey.length;
                         childsMapNew = changeChildInMap(new byte[32], (key[key.length-1]&0xFF),true);
                         hash=calcHash(LEAF, Bytes.concat(childsMapNew, age));
                         posLeaf = addRecordInFile(age, typeAndKeySize, leafKey, hash, childsMapNew, age);
+
+                        if(Bytes.concat(fullKey, preffixKey, new byte[]{suffixKey[0]}, leafKey, new byte[]{key[key.length-1]}).length!=20){
+                            Log.d("app.trie", new BigInteger(1, Bytes.concat(fullKey, preffixKey, leafKey, new byte[]{suffixKey[0]})).toString(16));
+                        }
                     }else{
                         insByte = (key[key.length-1]&0xFF);
                     }
@@ -885,7 +956,6 @@ public class TrieServiceIntent extends IntentService {
                     retPos = Longs.toByteArray(addRecordInFile(
                             (Utils.compareDate(Utils.reconstructAgeFromBytes(nodeAge), Utils.reconstructAgeFromBytes(age))>0 ? age : nodeAge),
                             typeAndKeySize, keyNode, hash, childsMap, childArray));
-
                 }
                 return retPos;
             }
@@ -964,11 +1034,14 @@ public class TrieServiceIntent extends IntentService {
                 if (checkExistQueryP.getCount() > 0 && checkExistQuerySP.getCount() > 0) {
                     app.insertFreeSpaceWitchCompressTrieFile(p, s, sp, ss);
                 }
+                checkExistQueryP.close();
+                checkExistQuerySP.close();
             }
             query.close();
             optimize();
+        }else {
+            query.close();
         }
-        query.close();
     }
 
     private boolean deleteOldest(long pos, byte[] key) throws IOException {
@@ -1023,4 +1096,23 @@ public class TrieServiceIntent extends IntentService {
         return false;
     }
 
+    @NonNull
+    @TargetApi(26)
+    private synchronized String createChannel() {
+        NotificationManager mNotificationManager = (NotificationManager) this.getSystemService(Context.NOTIFICATION_SERVICE);
+
+        String name = "Service: Trie";
+        int importance = NotificationManager.IMPORTANCE_LOW;
+
+        NotificationChannel mChannel = new NotificationChannel("Service: Trie", name, importance);
+
+        mChannel.enableLights(true);
+        mChannel.setLightColor(Color.BLUE);
+        if (mNotificationManager != null) {
+            mNotificationManager.createNotificationChannel(mChannel);
+        } else {
+            stopSelf();
+        }
+        return "Service: Trie";
+    }
 }
