@@ -43,6 +43,8 @@ public class Utils {
         ACTION_START        = "com.infoman.liquideconomycs.action.start",
         ACTION_DELETE_OLDEST     = "com.infoman.liquideconomycs.action.delete_oldest",
 
+        ACTION_STOP_SERVICE     = "com.infoman.liquideconomycs.action.delete_oldest",
+
     //input param
         EXTRA_SIGNAL_SERVER = "com.infoman.liquideconomycs.extra.signalServer",
         EXTRA_PROVIDE_SERVICE = "com.infoman.liquideconomycs.extra.provideService",

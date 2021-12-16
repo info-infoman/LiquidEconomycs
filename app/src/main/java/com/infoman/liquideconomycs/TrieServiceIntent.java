@@ -36,6 +36,7 @@ import static com.infoman.liquideconomycs.Utils.ACTION_INSERT;
 import static com.infoman.liquideconomycs.Utils.BRANCH;
 import static com.infoman.liquideconomycs.Utils.BROADCAST_ACTION_ANSWER;
 import static com.infoman.liquideconomycs.Utils.ACTION_DELETE_OLDEST;
+import static com.infoman.liquideconomycs.Utils.ACTION_STOP_SERVICE;
 import static com.infoman.liquideconomycs.Utils.EXTRA_AGE;
 import static com.infoman.liquideconomycs.Utils.EXTRA_ANSWER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_CMD;
@@ -57,7 +58,7 @@ import static org.bitcoinj.core.Utils.sha256hash160;
 //TODO add max age field in leaf and branch node = max age in childs, for automate delete to old pubKey
 
 public class TrieServiceIntent extends IntentService {
-    private int waitingIntentCount = 0;
+    //private int waitingIntentCount = 0;
     private boolean isServiceStarted = false;
     private Core app;
 
@@ -179,14 +180,14 @@ public class TrieServiceIntent extends IntentService {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        waitingIntentCount++;
+        //waitingIntentCount++;
         return super.onStartCommand(intent, flags, startId);
     }
 
     @Override
     protected void onHandleIntent(Intent intent) {
         if (intent != null) {
-            waitingIntentCount--;
+            //waitingIntentCount--;
 
             final String action = intent.getAction();
             if (ACTION_GET_HASH.equals(action)) {
@@ -254,17 +255,18 @@ public class TrieServiceIntent extends IntentService {
             if (ACTION_DELETE_OLDEST.equals(action)) {
                 try {
                     while (deleteOldest(0L, new byte[1])){}
+                    optimize();
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
                 ////////////////////////////////////////////////////////////////
             }
 
-            if(waitingIntentCount==0) {
-                //optimize free space in db
+            if (ACTION_STOP_SERVICE.equals(action)) {
                 optimize();
                 stopForeground(true);
                 stopSelf();
+                ////////////////////////////////////////////////////////////////
             }
         }
     }
@@ -331,7 +333,6 @@ public class TrieServiceIntent extends IntentService {
                     Cursor query = app.getPrefixByPos(pos);
                     if (query.getCount() > 0) {
                         while (query.moveToNext()) {
-                            history = query.getString(query.getColumnIndex("history"));
                             selfPrefix = query.getBlob(query.getColumnIndex("prefix"));
                             exist = query.getInt(query.getColumnIndex("exist")) == 1;
                         }
@@ -400,12 +401,7 @@ public class TrieServiceIntent extends IntentService {
                             )) {
                                 //todo add to table sync add to list new ask
                                 long pos_ = Longs.fromByteArray(Utils.getBytesPart(childsArray, (getChildPosInMap(childsMap, c) * 28) - 28, 8));
-                                app.addPrefixByPos(pos_, newPrefix, null, existSelfChild,
-                                        history+"-prefix"+new BigInteger(1, selfPrefix).toString(16)
-                                                +"pos"+String.valueOf(pos)
-                                                +"type"+String.valueOf(nodeTypeAndKeySize[0])
-                                                +"key"+new BigInteger(1, key).toString(16)
-                                                +"suffix"+String.valueOf(c));
+                                app.addPrefixByPos(pos_, newPrefix, null, existSelfChild);
                                 ask = Bytes.concat(ask, Longs.toByteArray(pos_));
                             }
                         }
@@ -413,12 +409,7 @@ public class TrieServiceIntent extends IntentService {
                         //если это новый узел то если это ветвь то продолжаем запросы
                         if(nodeTypeAndKeySize[0] != LEAF) {
                             long pos_ = Longs.fromByteArray(Utils.getBytesPart(childsArray, (getChildPosInMap(childsMap, c) * 28) - 28, 8));
-                            app.addPrefixByPos(pos_, Bytes.concat(selfPrefix, key, c_), null, false,
-                                    history+"-prefix"+new BigInteger(1, selfPrefix).toString(16)
-                                            +"pos"+String.valueOf(pos)
-                                            +"type"+String.valueOf(nodeTypeAndKeySize[0])
-                                            +"key"+new BigInteger(1, key).toString(16)
-                                            +"suffix"+String.valueOf(c));
+                            app.addPrefixByPos(pos_, Bytes.concat(selfPrefix, key, c_), null, false);
                             ask = Bytes.concat(ask, Longs.toByteArray(pos_));
                         }else{
                             // иначе добавляем новые ключи с возрастами

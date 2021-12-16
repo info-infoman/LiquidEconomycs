@@ -39,8 +39,10 @@ import androidx.fragment.app.FragmentTransaction;
 import static androidx.constraintlayout.widget.Constraints.TAG;
 import static androidx.core.app.NotificationCompat.PRIORITY_LOW;
 import static com.infoman.liquideconomycs.TrieServiceIntent.startActionGenerateAnswer;
+import static com.infoman.liquideconomycs.Utils.ACTION_DELETE_OLDEST;
 import static com.infoman.liquideconomycs.Utils.ACTION_GET_HASH;
 import static com.infoman.liquideconomycs.Utils.ACTION_START;
+import static com.infoman.liquideconomycs.Utils.ACTION_STOP_SERVICE;
 import static com.infoman.liquideconomycs.Utils.BROADCAST_ACTION_ANSWER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_ANSWER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_CMD;
@@ -108,7 +110,6 @@ public class SyncServiceIntent extends IntentService {
         if(isServiceStarted) return;
         isServiceStarted = true;
         app = (Core) getApplicationContext();
-        registerReceiver(mBroadcastReceiver, new IntentFilter(BROADCAST_ACTION_ANSWER));
 
         ////////////////////////////////////////////////////////////////
         String channel;
@@ -139,6 +140,7 @@ public class SyncServiceIntent extends IntentService {
         if (intent != null) {
             final String action = intent.getAction();
             if (ACTION_START.equals(action) && !app.isSynchronized) {
+                registerReceiver(mBroadcastReceiver, new IntentFilter(BROADCAST_ACTION_ANSWER));
                 app.clearPrefixTable();
                 app.isSynchronized = true;
                 app.dateTimeLastSync=new Date().getTime();
@@ -231,6 +233,14 @@ public class SyncServiceIntent extends IntentService {
                 //Таймер проверки ответов
                 while (app.isSynchronized && (new Date().getTime() - app.dateTimeLastSync) / 1000 < 300){}
 
+                app.clearPrefixTable();
+
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    startForegroundService(new Intent(getApplicationContext(), TrieServiceIntent.class).setAction(ACTION_STOP_SERVICE));
+                }else{
+                    startService(new Intent(getApplicationContext(), TrieServiceIntent.class).setAction(ACTION_STOP_SERVICE));
+                }
+                unregisterReceiver(mBroadcastReceiver);
                 app.isSynchronized=false;
                 app.mClient.disconnect();
                 //todo clear tmp register

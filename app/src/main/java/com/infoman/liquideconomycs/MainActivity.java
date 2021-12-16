@@ -58,6 +58,7 @@ import static com.infoman.liquideconomycs.SyncServiceIntent.startActionSync;
 import static com.infoman.liquideconomycs.TrieServiceIntent.startActionFind;
 import static com.infoman.liquideconomycs.TrieServiceIntent.startActionInsert;
 import static com.infoman.liquideconomycs.Utils.ACTION_DELETE_OLDEST;
+import static com.infoman.liquideconomycs.Utils.ACTION_STOP_SERVICE;
 import static com.infoman.liquideconomycs.Utils.BROADCAST_ACTION_ANSWER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_ANSWER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_CMD;

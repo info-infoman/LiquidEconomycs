@@ -2,6 +2,7 @@ package com.infoman.liquideconomycs;
 
 import android.content.Context;
 import android.content.Intent;
+import android.os.Build;
 import android.os.Bundle;
 import android.text.InputType;
 import android.widget.Button;
@@ -13,6 +14,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.preference.PreferenceFragmentCompat;
 
 import static com.infoman.liquideconomycs.Utils.ACTION_INSERT;
+import static com.infoman.liquideconomycs.Utils.ACTION_STOP_SERVICE;
 import static com.infoman.liquideconomycs.Utils.EXTRA_AGE;
 import static com.infoman.liquideconomycs.Utils.EXTRA_MASTER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_PUBKEY;
@@ -63,10 +65,22 @@ public class SettingsActivity extends AppCompatActivity {
             myECKey = new ECKey();
             myPubKey = myECKey.getPubKeyHash();
             age = Utils.ageToBytes();
-            c.startService(intent.setAction(ACTION_INSERT)
-                    .putExtra(EXTRA_MASTER, "Main")
-                    .putExtra(EXTRA_PUBKEY, myPubKey)
-                    .putExtra(EXTRA_AGE, age));
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(new Intent(getApplicationContext(), TrieServiceIntent.class).setAction(ACTION_INSERT)
+                        .putExtra(EXTRA_MASTER, "Main")
+                        .putExtra(EXTRA_PUBKEY, myPubKey)
+                        .putExtra(EXTRA_AGE, age));
+            }else{
+                startService(new Intent(getApplicationContext(), TrieServiceIntent.class).setAction(ACTION_INSERT)
+                        .putExtra(EXTRA_MASTER, "Main")
+                        .putExtra(EXTRA_PUBKEY, myPubKey)
+                        .putExtra(EXTRA_AGE, age));
+            }
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(new Intent(getApplicationContext(), TrieServiceIntent.class).setAction(ACTION_STOP_SERVICE));
+        }else{
+            startService(new Intent(getApplicationContext(), TrieServiceIntent.class).setAction(ACTION_STOP_SERVICE));
         }
     }
 }
