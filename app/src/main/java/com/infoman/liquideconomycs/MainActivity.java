@@ -54,9 +54,6 @@ import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
 
 import static android.content.Intent.ACTION_BOOT_COMPLETED;
-import static com.infoman.liquideconomycs.SyncServiceIntent.startActionSync;
-import static com.infoman.liquideconomycs.TrieServiceIntent.startActionFind;
-import static com.infoman.liquideconomycs.TrieServiceIntent.startActionInsert;
 import static com.infoman.liquideconomycs.Utils.ACTION_DELETE_OLDEST;
 import static com.infoman.liquideconomycs.Utils.ACTION_STOP_SERVICE;
 import static com.infoman.liquideconomycs.Utils.BROADCAST_ACTION_ANSWER;
@@ -91,13 +88,14 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         if(provideService){
                             shakeIt();
                             if(answer!=null) {
-                                Toast.makeText(getApplicationContext(), getResources().getString(R.string.pubKeyFound),Toast.LENGTH_LONG).show();
+                                Toast.makeText(context, getResources().getString(R.string.pubKeyFound),Toast.LENGTH_LONG).show();
                                 //startActionInsert(getApplicationContext(), "Main", ECKey.fromPublicOnly(Utils.hexToByte(resultTextView.getText().toString())).getPubKeyHash(), ageToBytes());
                                 String[] fields = Utils.parseQRString(resultTextView.getText().toString());
                                 byte[] accepterPubKey = Utils.hexToByte(fields[0]);
-                                startActionSync(getApplicationContext(), "Main", "", accepterPubKey, "", true);
+                                app.startActionSync(context, "Main", "", accepterPubKey, "", true);
+                                app.startActionStopSync(context);
                             }else{
-                                DialogsFragment alert = new DialogsFragment(getApplicationContext(), "MainActivity", 0);
+                                DialogsFragment alert = new DialogsFragment(context, "MainActivity", 0);
                                 FragmentManager manager = getSupportFragmentManager();
                                 FragmentTransaction transaction = manager.beginTransaction();
                                 alert.show(transaction, "dialog");
@@ -105,7 +103,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         }
                     }else if(cmd.equals("Sync")){
                         final String answer = intent.getStringExtra(EXTRA_ANSWER);
-                        Toast.makeText(getApplicationContext(), answer,Toast.LENGTH_LONG).show();
+                        Toast.makeText(context, answer,Toast.LENGTH_LONG).show();
                     }
 
                 }
@@ -202,12 +200,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             }
         } else {
             requestNFCPermission();
-        }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(new Intent(getApplicationContext(), TrieServiceIntent.class).setAction(ACTION_DELETE_OLDEST));
-        }else{
-            startService(new Intent(getApplicationContext(), TrieServiceIntent.class).setAction(ACTION_DELETE_OLDEST));
         }
     }
 
@@ -423,7 +415,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             else{
                 byte[] accepterPubKey = Utils.hexToByte(fields[0]);
                 if(chekSig(accepterPubKey, decodeFromDER(Utils.hexToByte(fields[1])), accepterPubKey)) {
-                        startActionFind(getApplicationContext(), "Main", ECKey.fromPublicOnly(accepterPubKey).getPubKeyHash(), 0L);
+                        app.startActionFind(getApplicationContext(), "Main", ECKey.fromPublicOnly(accepterPubKey).getPubKeyHash(), 0L);
                 }
                 //TODO add uncheck msg
             }
@@ -432,8 +424,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             if(fields.length < 3 || fields[1].equals("") || fields[2].equals("") || fields[0].equals("")){
                Toast.makeText(getApplicationContext(), getResources().getString(R.string.ErrorReceivingPartnerData),Toast.LENGTH_LONG).show();
             }else{
-                startActionInsert(this, "Main", ECKey.fromPublicOnly(hexToByte(fields[0])).getPubKeyHash(), ageToBytes());
-                startActionSync(getApplicationContext(), "Main", fields[1], hexToByte(fields[0]), fields[2],false);
+                app.startActionInsert(this, "Main", ECKey.fromPublicOnly(hexToByte(fields[0])).getPubKeyHash(), ageToBytes());
+                app.startActionSync(getApplicationContext(), "Main", fields[1], hexToByte(fields[0]), fields[2],false);
             }
 
         }

@@ -20,7 +20,6 @@ import com.google.common.primitives.Longs;
 import org.bitcoinj.core.SignatureDecodeException;
 
 import java.io.IOException;
-import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.Date;
 
@@ -66,79 +65,12 @@ public class TrieServiceIntent extends IntentService {
         super("TrieServiceIntent");
     }
 
-    // called by activity to communicate to service
-    public static void startActionGetHash(Context context, String master, long pos) {
-        Intent intent = new Intent(context, TrieServiceIntent.class)
-            .setAction(ACTION_GET_HASH)
-            .putExtra(EXTRA_MASTER, master)
-            .putExtra(EXTRA_POS, pos);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.startForegroundService(intent);
-            return;
-        }
-        context.startService(intent);
-    }
-
-    // called by activity to communicate to service
-    public static void startActionInsert(Context context, String master, byte[] pubKey, byte[] age) {
-        Intent intent = new Intent(context, TrieServiceIntent.class)
-            .setAction(ACTION_INSERT)
-            .putExtra(EXTRA_MASTER, master)
-            .putExtra(EXTRA_PUBKEY, pubKey)
-            .putExtra(EXTRA_AGE, age);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.startForegroundService(intent);
-            return;
-        }
-        context.startService(intent);
-    }
-
-    // called by activity to communicate to service
-    public static void startActionFind(Context context, String master, byte[] pubKey, long pos) {
-        Intent intent = new Intent(context, TrieServiceIntent.class)
-            .setAction(ACTION_FIND)
-            .putExtra(EXTRA_MASTER, master)
-            .putExtra(EXTRA_PUBKEY, pubKey)
-            .putExtra(EXTRA_POS, pos);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.startForegroundService(intent);
-            return;
-        }
-        context.startService(intent);
-    }
-
-    // called by activity to communicate to service
-    public static void startActionDelete(Context context, String master, byte[] pubKey, long pos) {
-        Intent intent = new Intent(context, TrieServiceIntent.class)
-            .setAction(ACTION_DELETE)
-            .putExtra(EXTRA_MASTER, master)
-            .putExtra(EXTRA_PUBKEY, pubKey)
-            .putExtra(EXTRA_POS, pos);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.startForegroundService(intent);
-            return;
-        }
-        context.startService(intent);
-    }
-
-    // called by activity to communicate to service
-    public static void startActionGenerateAnswer(Context context, byte msgType, byte[] payload) {
-        Intent intent = new Intent(context, TrieServiceIntent.class)
-            .setAction(ACTION_GENERATE_ANSWER)
-            .putExtra(EXTRA_MSG_TYPE, msgType)
-            .putExtra(EXTRA_PAYLOAD, payload);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.startForegroundService(intent);
-            return;
-        }
-        context.startService(intent);
-    }
-
     @Override
     public void onCreate() {
         super.onCreate();
         //android.os.Debug.waitForDebugger();
         if(isServiceStarted) return;
+        isServiceStarted = true;
         app = (Core) getApplicationContext();
         //android.os.Debug.waitForDebugger();
         //ROOT(content BRANCHs & LEAFs)
@@ -154,7 +86,6 @@ public class TrieServiceIntent extends IntentService {
         //
         ////////////////////////////////////////////////////////////////
 
-        isServiceStarted = true;
 
         String channel;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
@@ -178,11 +109,11 @@ public class TrieServiceIntent extends IntentService {
         startForeground(9992, builder.build());
     }
 
-    @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
-        //waitingIntentCount++;
-        return super.onStartCommand(intent, flags, startId);
-    }
+    //@Override
+    //public int onStartCommand(Intent intent, int flags, int startId) {
+    //    //waitingIntentCount++;
+    //    return super.onStartCommand(intent, flags, startId);
+    //}
 
     @Override
     protected void onHandleIntent(Intent intent) {
@@ -255,7 +186,6 @@ public class TrieServiceIntent extends IntentService {
             if (ACTION_DELETE_OLDEST.equals(action)) {
                 try {
                     while (deleteOldest(0L, new byte[1])){}
-                    optimize();
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -264,8 +194,9 @@ public class TrieServiceIntent extends IntentService {
 
             if (ACTION_STOP_SERVICE.equals(action)) {
                 optimize();
-                stopForeground(true);
+                app.clearPrefixTable();
                 stopSelf();
+                stopForeground(true);
                 ////////////////////////////////////////////////////////////////
             }
         }
@@ -303,7 +234,6 @@ public class TrieServiceIntent extends IntentService {
             //нам прислали рание запрошенные узлы, необходимо их расшифровать
             for(int i = 0; i < payload.length;) {
                 //node from payload
-                String history = "";
                 exist                       = false;
                 long pos                    = Longs.fromByteArray(Utils.getBytesPart(payload, i, 8));
                 byte[] nodeTypeAndKeySize   = Utils.getBytesPart(payload, i+8, 2);
@@ -387,11 +317,8 @@ public class TrieServiceIntent extends IntentService {
                                 //todo add check newPrefix length
                                 SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(context);
                                 long maxAge = Long.parseLong(sharedPref.getString("maxAge", "30"));
-                                if(newPrefix.length<20){
-                                    Log.d("app.trie", String.valueOf(newPrefix));
-                                }
                                 if (Utils.compareDate(new Date(), Utils.reconstructAgeFromBytes(childAge)) < maxAge && Utils.compareDate(new Date(), Utils.reconstructAgeFromBytes(childAge)) >= 0)
-                                    startActionInsert(context, "Main", newPrefix, childAge);
+                                    app.startActionInsert(context, "Main", newPrefix, childAge);
 
                             }
                         } else {
@@ -417,11 +344,11 @@ public class TrieServiceIntent extends IntentService {
                             SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(context);
                             long maxAge = Long.parseLong(sharedPref.getString("maxAge", "30"));
                             //todo add check newPrefix length
-                            if(Bytes.concat(selfPrefix, key, c_).length<20){
-                                Log.d("app.trie", String.valueOf(Bytes.concat(selfPrefix,key, c_)));
+                            if (Utils.compareDate(new Date(), Utils.reconstructAgeFromBytes(childAge)) < maxAge && Utils.compareDate(new Date(), Utils.reconstructAgeFromBytes(childAge)) >= 0){
+                                app.startActionInsert(context, "Main", Bytes.concat(selfPrefix, key, c_), childAge);
+                                Log.d("app.trie update ", String.valueOf(Bytes.concat(selfPrefix,key, c_)));
                             }
-                            if (Utils.compareDate(new Date(), Utils.reconstructAgeFromBytes(childAge)) < maxAge && Utils.compareDate(new Date(), Utils.reconstructAgeFromBytes(childAge)) >= 0)
-                                startActionInsert(context, "Main", Bytes.concat(selfPrefix, key, c_), childAge);
+
                         }
                     }
                 }
@@ -765,9 +692,7 @@ public class TrieServiceIntent extends IntentService {
                 childsMap = changeChildInMap(new byte[32], (key[key.length-1]&0xFF), true);//add age
                 hash=calcHash(typeAndKeySize[0], lKey, Bytes.concat(childsMap, age));
                 pos = addRecordInFile(age, typeAndKeySize, lKey, hash, childsMap, age);
-                if(Bytes.concat(fullKey, new byte[]{key[0]}, lKey, new byte[]{key[key.length-1]}).length!=20){
-                    Log.d("app.trie", new BigInteger(1, Bytes.concat(fullKey, new byte[]{key[0]} , lKey, new byte[]{key[key.length-1]})).toString(16));
-                }
+
             }else{//insert in child & save in root
                 lKey = getBytesPart(key, 1, key.length - 1);
                 pos = Longs.fromByteArray(insert(lKey, age, Longs.fromByteArray(sResult), new byte[]{key[0]}));
@@ -810,9 +735,7 @@ public class TrieServiceIntent extends IntentService {
                 int selfChildArraySize = selfChildsCount * (type==LEAF ? 2 : 8);
 
                 int childPosInMap = getChildPosInMap(childsMap, (suffixKey[0] & 0xFF));
-                if(childPosInMap==0){
-                    Log.d("app.trie", String.valueOf((suffixKey[0] & 0xFF)));
-                }
+
                 long posToWrite = pos + 4 + keyNodeSize + 20 + 32 + (type==LEAF ? ((childPosInMap * 2) - 2) : ((childPosInMap * 8) - 8));
                 app.trie.seek(posToWrite);
 
@@ -885,10 +808,6 @@ public class TrieServiceIntent extends IntentService {
                     hash=calcHash(typeAndKeySize[0], leafKey_, Bytes.concat(childsMapNew, age));
                     long posLeaf = addRecordInFile(age, typeAndKeySize, leafKey_, hash, childsMapNew, age);
 
-                    if(Bytes.concat(fullKey, key).length!=20){
-                        Log.d("app.trie", new BigInteger(1, Bytes.concat(fullKey, key)).toString(16));
-                    }
-
                     //COPY OLD NODE WITCH CORP(keyNode - common) KEY
                     byte[] oldLeafKey = getBytesPart(keyNode, commonKey.length , keyNodeSize - commonKey.length);
                     byte[] oldLeafKey_ = getBytesPart(oldLeafKey, 1 , oldLeafKey.length - 1);
@@ -930,9 +849,6 @@ public class TrieServiceIntent extends IntentService {
                         hash=calcHash(LEAF, leafKey, Bytes.concat(childsMapNew, age));
                         posLeaf = addRecordInFile(age, typeAndKeySize, leafKey, hash, childsMapNew, age);
 
-                        if(Bytes.concat(fullKey, preffixKey, new byte[]{suffixKey[0]}, leafKey, new byte[]{key[key.length-1]}).length!=20){
-                            Log.d("app.trie", new BigInteger(1, Bytes.concat(fullKey, preffixKey, new byte[]{suffixKey[0]}, leafKey, new byte[]{key[key.length-1]})).toString(16));
-                        }
                     }else{
                         insByte = (key[key.length-1]&0xFF);
                     }

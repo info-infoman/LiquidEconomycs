@@ -20,9 +20,13 @@ import static com.infoman.liquideconomycs.Utils.EXTRA_MASTER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_PUBKEY;
 
 public class SettingsActivity extends AppCompatActivity {
+    private Core app;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+
+        app = (Core) getApplicationContext();
+
         super.onCreate(savedInstanceState);
         setContentView(R.layout.settings_activity);
 
@@ -52,35 +56,15 @@ public class SettingsActivity extends AppCompatActivity {
 
     private void insertDemoInTrie(){
         Context c = getApplicationContext();
-        ECKey myECKey = new ECKey();
-        byte[] myPubKey = myECKey.getPubKeyHash(), age = Utils.ageToBytes();
+        ECKey myECKey;
+        byte[] myPubKey, age;
 
-        Intent intent = new Intent(c, TrieServiceIntent.class)
-                .setAction(ACTION_INSERT)
-                .putExtra(EXTRA_MASTER, "Main")
-                .putExtra(EXTRA_PUBKEY, myPubKey)
-                .putExtra(EXTRA_AGE, age);
-        c.startService(intent);
         for(int i=0;i<10000;i++) {
             myECKey = new ECKey();
             myPubKey = myECKey.getPubKeyHash();
             age = Utils.ageToBytes();
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(new Intent(getApplicationContext(), TrieServiceIntent.class).setAction(ACTION_INSERT)
-                        .putExtra(EXTRA_MASTER, "Main")
-                        .putExtra(EXTRA_PUBKEY, myPubKey)
-                        .putExtra(EXTRA_AGE, age));
-            }else{
-                startService(new Intent(getApplicationContext(), TrieServiceIntent.class).setAction(ACTION_INSERT)
-                        .putExtra(EXTRA_MASTER, "Main")
-                        .putExtra(EXTRA_PUBKEY, myPubKey)
-                        .putExtra(EXTRA_AGE, age));
-            }
+            app.startActionInsert(app, "Main", myPubKey, age);
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(new Intent(getApplicationContext(), TrieServiceIntent.class).setAction(ACTION_STOP_SERVICE));
-        }else{
-            startService(new Intent(getApplicationContext(), TrieServiceIntent.class).setAction(ACTION_STOP_SERVICE));
-        }
+        app.startActionStopTrie(app);
     }
 }

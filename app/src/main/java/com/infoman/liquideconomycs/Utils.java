@@ -1,7 +1,10 @@
 package com.infoman.liquideconomycs;
 
+import android.content.Context;
+import android.content.Intent;
 import android.content.res.AssetManager;
 import android.nfc.NdefRecord;
+import android.os.Build;
 
 import com.google.common.primitives.Bytes;
 
@@ -43,7 +46,7 @@ public class Utils {
         ACTION_START        = "com.infoman.liquideconomycs.action.start",
         ACTION_DELETE_OLDEST     = "com.infoman.liquideconomycs.action.delete_oldest",
 
-        ACTION_STOP_SERVICE     = "com.infoman.liquideconomycs.action.delete_oldest",
+        ACTION_STOP_SERVICE     = "com.infoman.liquideconomycs.action.stop_service",
 
     //input param
         EXTRA_SIGNAL_SERVER = "com.infoman.liquideconomycs.extra.signalServer",
@@ -243,6 +246,14 @@ public class Utils {
         records[0] = record;
 
         return records;
+    }
+
+    public static void startIntent(Context context, Intent intent) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.startForegroundService(intent);
+            return;
+        }
+        context.startService(intent);
     }
 
 }

@@ -9,13 +9,9 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.SharedPreferences;
-import android.database.Cursor;
 import android.graphics.Color;
 import android.os.Build;
-import android.preference.PreferenceManager;
 import android.util.Log;
-import android.widget.Toast;
 
 import com.google.common.primitives.Bytes;
 import com.google.common.primitives.Ints;
@@ -33,23 +29,14 @@ import java.util.Objects;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
-import androidx.fragment.app.FragmentManager;
-import androidx.fragment.app.FragmentTransaction;
 
-import static androidx.constraintlayout.widget.Constraints.TAG;
 import static androidx.core.app.NotificationCompat.PRIORITY_LOW;
-import static com.infoman.liquideconomycs.TrieServiceIntent.startActionGenerateAnswer;
-import static com.infoman.liquideconomycs.Utils.ACTION_DELETE_OLDEST;
-import static com.infoman.liquideconomycs.Utils.ACTION_GET_HASH;
 import static com.infoman.liquideconomycs.Utils.ACTION_START;
 import static com.infoman.liquideconomycs.Utils.ACTION_STOP_SERVICE;
 import static com.infoman.liquideconomycs.Utils.BROADCAST_ACTION_ANSWER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_ANSWER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_CMD;
 import static com.infoman.liquideconomycs.Utils.EXTRA_MASTER;
-import static com.infoman.liquideconomycs.Utils.EXTRA_MSG_TYPE;
-import static com.infoman.liquideconomycs.Utils.EXTRA_PAYLOAD;
-import static com.infoman.liquideconomycs.Utils.EXTRA_POS;
 import static com.infoman.liquideconomycs.Utils.EXTRA_PUBKEY;
 import static com.infoman.liquideconomycs.Utils.EXTRA_PROVIDE_SERVICE;
 import static com.infoman.liquideconomycs.Utils.EXTRA_SIGNAL_SERVER;
@@ -60,28 +47,6 @@ public class SyncServiceIntent extends IntentService {
 
     private Core app;
     boolean isServiceStarted = false;
-
-    public static void startActionSync(Context context, String master, String signalServer, byte[] pubKey, String token, boolean Provide_service) {
-
-        if(Provide_service) {
-            SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(context);
-            signalServer = sharedPref.getString("Signal_server_URL", "");
-            token = sharedPref.getString("Signal_server_Token", "");
-        }
-        Intent intent = new Intent(context, SyncServiceIntent.class)
-            .setAction(ACTION_START)
-            .putExtra(EXTRA_SIGNAL_SERVER, signalServer)
-            .putExtra(EXTRA_PROVIDE_SERVICE, Provide_service)
-            .putExtra(EXTRA_PUBKEY, pubKey)
-            .putExtra(EXTRA_TOKEN, token)
-            .putExtra(EXTRA_MASTER, master);
-        Log.d(TAG, Arrays.toString(pubKey));
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.startForegroundService(intent);
-            return;
-        }
-        context.startService(intent);
-    }
 
     private final BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
         @Override public void onReceive(Context context, Intent intent) {
@@ -135,13 +100,24 @@ public class SyncServiceIntent extends IntentService {
 
     }
 
+    public void onDestroy() {
+        super.onDestroy();
+        // cancel any running threads here
+        unregisterReceiver(mBroadcastReceiver);
+    }
+
+    //@Override
+    //public int onStartCommand(Intent intent, int flags, int startId) {
+    //    //waitingIntentCount++;
+    //    return super.onStartCommand(intent, flags, startId);
+    //}
+
     @Override
     protected void onHandleIntent(Intent intent) {
         if (intent != null) {
             final String action = intent.getAction();
             if (ACTION_START.equals(action) && !app.isSynchronized) {
                 registerReceiver(mBroadcastReceiver, new IntentFilter(BROADCAST_ACTION_ANSWER));
-                app.clearPrefixTable();
                 app.isSynchronized = true;
                 app.dateTimeLastSync=new Date().getTime();
                 final String    signalServer = intent.getStringExtra(EXTRA_SIGNAL_SERVER),
@@ -206,9 +182,7 @@ public class SyncServiceIntent extends IntentService {
 
                         //Проверка типа сообщения
                         if((Provide_service && msgType == Utils.getHashs) || (!Provide_service && msgType == Utils.hashs)){
-                            startActionGenerateAnswer(getApplicationContext(),
-                                    msgType,
-                                    payload);
+                            app.startActionGenerateAnswer(getApplicationContext(), msgType, payload);
                         }
 
                     }
@@ -233,20 +207,16 @@ public class SyncServiceIntent extends IntentService {
                 //Таймер проверки ответов
                 while (app.isSynchronized && (new Date().getTime() - app.dateTimeLastSync) / 1000 < 300){}
 
-                app.clearPrefixTable();
-
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    startForegroundService(new Intent(getApplicationContext(), TrieServiceIntent.class).setAction(ACTION_STOP_SERVICE));
-                }else{
-                    startService(new Intent(getApplicationContext(), TrieServiceIntent.class).setAction(ACTION_STOP_SERVICE));
-                }
-                unregisterReceiver(mBroadcastReceiver);
                 app.isSynchronized=false;
                 app.mClient.disconnect();
-                //todo clear tmp register
+                app.startActionDeleteOldest(app);
+                app.startActionStopTrie(app);
+            }
+
+            if (ACTION_STOP_SERVICE.equals(action)) {
                 broadcastActionMsg("Main", "Sync", getResources().getString(R.string.SyncFinish));
-                stopForeground(true);
                 stopSelf();
+                stopForeground(true);
                 ////////////////////////////////////////////////////////////////
             }
         }
