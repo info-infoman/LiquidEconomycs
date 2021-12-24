@@ -5,8 +5,6 @@ import android.app.Dialog;
 import android.content.Context;
 import android.os.Bundle;
 
-import com.infoman.liquideconomycs.Core.startActionSync;
-
 import java.util.Objects;
 
 import androidx.annotation.NonNull;
@@ -18,7 +16,7 @@ public class DialogsFragment extends AppCompatDialogFragment {
     private String  dialogHead;
     private String dialogMsg;
     private final String dialogActivity;
-    Context dialogContext;
+    private Core app;
 
     DialogsFragment(Context context, String activity, int cmd) {
 
@@ -33,12 +31,12 @@ public class DialogsFragment extends AppCompatDialogFragment {
 
         dialogCmd       = cmd;
         dialogActivity  = activity;
-        dialogContext = context;
     }
 
     @NonNull
     @Override
     public Dialog onCreateDialog(Bundle savedInstanceState) {
+        app = (Core) getActivity().getApplicationContext();
         AlertDialog.Builder builder = new AlertDialog.Builder(Objects.requireNonNull(getActivity()));
         builder.setTitle(dialogHead).setMessage(dialogMsg);
 
@@ -46,18 +44,16 @@ public class DialogsFragment extends AppCompatDialogFragment {
                 if(dialogCmd==cantFindPubKey) {
                     builder.setPositiveButton(getResources().getString(android.R.string.yes), (dialog, id) -> {
                         if (dialogActivity.equals("MainActivity")) {
-
-                            startActionSync(dialogContext,
+                            app.startActionSync(getActivity(),
                                     "Main",
                                     "",
                                     Utils.hexToByte(Utils.parseQRString(((MainActivity) Objects.requireNonNull(getActivity())).resultTextView.getText().toString())[0]),
                                     "",
                                     true);
-                            startActionStopSync(dialogContext);
+                            app.startActionStopSync(getActivity());
                             dialog.cancel();
                         }
-                    })
-                    .setNegativeButton(getResources().getString(android.R.string.no), (dialog, id) -> dialog.cancel());
+                    }).setNegativeButton(getResources().getString(android.R.string.no), (dialog, id) -> dialog.cancel());
                 }
         return builder.create();
     }

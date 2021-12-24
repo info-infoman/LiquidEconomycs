@@ -25,7 +25,6 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.AnimationUtils;
 import android.widget.Button;
-import android.widget.CompoundButton;
 import android.widget.ImageView;
 import android.widget.Switch;
 import android.widget.TextView;
@@ -53,9 +52,6 @@ import androidx.core.app.ActivityCompat;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
 
-import static android.content.Intent.ACTION_BOOT_COMPLETED;
-import static com.infoman.liquideconomycs.Utils.ACTION_DELETE_OLDEST;
-import static com.infoman.liquideconomycs.Utils.ACTION_STOP_SERVICE;
 import static com.infoman.liquideconomycs.Utils.BROADCAST_ACTION_ANSWER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_ANSWER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_CMD;
@@ -65,7 +61,7 @@ import static com.infoman.liquideconomycs.Utils.chekSig;
 import static com.infoman.liquideconomycs.Utils.hexToByte;
 import static org.bitcoinj.core.ECKey.ECDSASignature.decodeFromDER;
 
-public class MainActivity extends AppCompatActivity implements ActivityCompat.OnRequestPermissionsResultCallback , QRCodeReaderView.OnQRCodeReadListener, NfcAdapter.CreateNdefMessageCallback {
+public class MainActivity extends AppCompatActivity implements ActivityCompat.OnRequestPermissionsResultCallback , QRCodeReaderView.OnQRCodeReadListener, NfcAdapter.CreateNdefMessageCallback{
 
     private static final int MY_PERMISSION_REQUEST_INTERNET = 0, MY_PERMISSION_REQUEST_CAMERA = 0, MY_PERMISSION_REQUEST_NFC = 0, MY_PERMISSION_REQUEST_FOREGROUND_SERVICE=0;
 
@@ -76,6 +72,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     public TextView             resultTextView, notation, role_capture, scan_gen;
     private QRCodeReaderView    qrCodeReaderView;
     private boolean             provideService;//источник новых данных(тот кто предоставляет услугу\работу)
+    private String[] fields;
 
     // Перехватывает события от фоновых сервисов
     private final BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
@@ -90,7 +87,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                             if(answer!=null) {
                                 Toast.makeText(context, getResources().getString(R.string.pubKeyFound),Toast.LENGTH_LONG).show();
                                 //startActionInsert(getApplicationContext(), "Main", ECKey.fromPublicOnly(Utils.hexToByte(resultTextView.getText().toString())).getPubKeyHash(), ageToBytes());
-                                String[] fields = Utils.parseQRString(resultTextView.getText().toString());
+                                fields = Utils.parseQRString(resultTextView.getText().toString());
                                 byte[] accepterPubKey = Utils.hexToByte(fields[0]);
                                 app.startActionSync(context, "Main", "", accepterPubKey, "", true);
                                 app.startActionStopSync(context);
