@@ -32,10 +32,10 @@ public class DBHelper extends SQLiteOpenHelper {
                     + "prefix BLOB,"
                     + "age BLOB,"
                     + "exist integer" + ");");
-            db.execSQL("create table signalServers ("
+            //таблица потребителей услуг в рамках сессии
+            db.execSQL("create table clients ("
                     + "id integer primary key autoincrement,"
-                    + "host text,"
-                    + "port integer" + ");");
+                    + "pubKey BLOB" + ");");
         }
 
         @Override

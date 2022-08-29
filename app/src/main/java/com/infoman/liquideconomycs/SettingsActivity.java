@@ -7,6 +7,8 @@ import android.os.Bundle;
 import android.text.InputType;
 import android.widget.Button;
 
+import com.google.common.primitives.Bytes;
+
 import org.bitcoinj.core.ECKey;
 
 import androidx.appcompat.app.ActionBar;
@@ -57,7 +59,7 @@ public class SettingsActivity extends AppCompatActivity {
     private void insertDemoInTrie(){
         Context c = getApplicationContext();
         ECKey myECKey;
-        byte[] myPubKey, age;
+        byte[] myPubKey, age, newPubKey, myPubKey_;
 
         for(int i=0;i<10000;i++) {
             myECKey = new ECKey();
@@ -65,6 +67,26 @@ public class SettingsActivity extends AppCompatActivity {
             age = Utils.ageToBytes();
             app.startActionInsert(app, "Main", myPubKey, age);
         }
-        app.startActionStopTrie(app);
+        /*
+        myECKey = new ECKey();
+        myPubKey = Utils.getBytesPart(myECKey.getPubKeyHash(), 0, 19);
+        myPubKey_ = new byte[19];
+        byte[] c_ = new byte[1];
+        for(int i=0;i<2;i++) {
+            c_[0] = (byte)i;
+            newPubKey = Bytes.concat(myPubKey_, c_);
+            age = Utils.ageToBytes();
+            app.startActionInsert(app, "Main", newPubKey, age);
+        }
+        myPubKey_ = Bytes.concat(new byte[1], c_, new byte[17]);//00 01 00-17
+        for(int i=0;i<2;i++) {
+            c_[0] = (byte)i;
+            newPubKey = Bytes.concat(myPubKey_, c_);
+            age = Utils.ageToBytes();
+            app.startActionInsert(app, "Main", newPubKey, age);
+        }
+        */
+
+        //app.startActionStopTrie(app);
     }
 }

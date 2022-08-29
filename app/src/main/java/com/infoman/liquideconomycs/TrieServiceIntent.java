@@ -5,8 +5,10 @@ import android.app.IntentService;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.graphics.Color;
@@ -22,6 +24,7 @@ import org.bitcoinj.core.SignatureDecodeException;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.Objects;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
@@ -49,7 +52,7 @@ import static com.infoman.liquideconomycs.Utils.ROOT;
 import static com.infoman.liquideconomycs.Utils.changeChildInMap;
 import static com.infoman.liquideconomycs.Utils.checkExistChildInMap;
 import static com.infoman.liquideconomycs.Utils.getBytesPart;
-import static com.infoman.liquideconomycs.Utils.getChildPosInArray;
+import static com.infoman.liquideconomycs.Utils.getChildPosInROOT;
 import static com.infoman.liquideconomycs.Utils.getChildPosInMap;
 import static com.infoman.liquideconomycs.Utils.getChildsCountInMap;
 import static com.infoman.liquideconomycs.Utils.getCommonKey;
@@ -57,8 +60,7 @@ import static org.bitcoinj.core.Utils.sha256hash160;
 //TODO add max age field in leaf and branch node = max age in childs, for automate delete to old pubKey
 
 public class TrieServiceIntent extends IntentService {
-    //private int waitingIntentCount = 0;
-    private boolean isServiceStarted = false;
+
     private Core app;
 
     public TrieServiceIntent() {
@@ -69,9 +71,10 @@ public class TrieServiceIntent extends IntentService {
     public void onCreate() {
         super.onCreate();
         //android.os.Debug.waitForDebugger();
-        if(isServiceStarted) return;
-        isServiceStarted = true;
+
         app = (Core) getApplicationContext();
+        if(app.waitingIntentCount !=0) return;
+
         //android.os.Debug.waitForDebugger();
         //ROOT(content BRANCHs & LEAFs)
         //age(2)/hash sha256hash160(20) /child point array(1-256*8)
@@ -85,7 +88,6 @@ public class TrieServiceIntent extends IntentService {
         //total 21GB(ideal trie for 10 000 000 000 accounts)
         //
         ////////////////////////////////////////////////////////////////
-
 
         String channel;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
@@ -109,16 +111,22 @@ public class TrieServiceIntent extends IntentService {
         startForeground(9992, builder.build());
     }
 
-    //@Override
-    //public int onStartCommand(Intent intent, int flags, int startId) {
-    //    //waitingIntentCount++;
-    //    return super.onStartCommand(intent, flags, startId);
-    //}
+    public void onDestroy() {
+        super.onDestroy();
+        // cancel any running threads here
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        app.waitingIntentCount++;
+        return super.onStartCommand(intent, flags, startId);
+    }
 
     @Override
     protected void onHandleIntent(Intent intent) {
         if (intent != null) {
-            //waitingIntentCount--;
+
+            app.waitingIntentCount--;
 
             final String action = intent.getAction();
             if (ACTION_GET_HASH.equals(action)) {
@@ -126,7 +134,7 @@ public class TrieServiceIntent extends IntentService {
                 final long pos = intent.getLongExtra(EXTRA_POS,0L);
                 ////////////////////////////////////////////////////////////////
                 try {
-                    broadcastActionMsg(master, cmd, getHash(pos));
+                    app.broadcastActionMsg(master, cmd, getHash(pos));
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -138,7 +146,7 @@ public class TrieServiceIntent extends IntentService {
                 final byte[] key = intent.getByteArrayExtra(EXTRA_PUBKEY), value = intent.getByteArrayExtra(EXTRA_AGE);
                 ////////////////////////////////////////////////////////////////
                 try {
-                    broadcastActionMsg(master, cmd, insert(key, value, 0L, new byte[0]));
+                    app.broadcastActionMsg(master, cmd, insert(key, value, 0L, new byte[0]));
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -151,7 +159,7 @@ public class TrieServiceIntent extends IntentService {
                 final long pos = intent.getLongExtra(EXTRA_POS, 0L);
                 ////////////////////////////////////////////////////////////////
                 try {
-                    broadcastActionMsg(master, cmd, find(key, pos));
+                    app.broadcastActionMsg(master, cmd, find(key, pos));
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -164,7 +172,7 @@ public class TrieServiceIntent extends IntentService {
                 final long pos = intent.getLongExtra(EXTRA_POS, 0L);
                 ////////////////////////////////////////////////////////////////
                 try {
-                    broadcastActionMsg(master, cmd, delete(key, pos));
+                    app.broadcastActionMsg(master, cmd, delete(key, pos));
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -176,7 +184,7 @@ public class TrieServiceIntent extends IntentService {
                 final byte[] payload = intent.getByteArrayExtra(EXTRA_PAYLOAD);
                 ////////////////////////////////////////////////////////////////
                 try {
-                    broadcastActionMsg("Trie", "Answer", generateAnswer(msgType, payload));
+                    app.broadcastActionMsg("Trie", "Answer", generateAnswer(msgType, payload));
                 } catch (IOException | SignatureDecodeException e) {
                     e.printStackTrace();
                 }
@@ -185,7 +193,10 @@ public class TrieServiceIntent extends IntentService {
 
             if (ACTION_DELETE_OLDEST.equals(action)) {
                 try {
+                    while(app.waitingIntentCount!=0){}
+                    app.waitingIntentCount++;
                     while (deleteOldest(0L, new byte[1])){}
+                    app.waitingIntentCount--;
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -193,22 +204,22 @@ public class TrieServiceIntent extends IntentService {
             }
 
             if (ACTION_STOP_SERVICE.equals(action)) {
+                while(app.waitingIntentCount!=0){}
+                while (true){
+                    try {
+                        if (!deleteOldest(0L, new byte[1])) break;
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
                 optimize();
                 app.clearPrefixTable();
                 stopSelf();
                 stopForeground(true);
                 ////////////////////////////////////////////////////////////////
             }
-        }
-    }
 
-    // called to send data to Activity
-    public void broadcastActionMsg(String master, String cmd, byte[] answer) {
-        Intent intent = new Intent(BROADCAST_ACTION_ANSWER)
-                .putExtra(EXTRA_MASTER, master)
-                .putExtra(EXTRA_CMD, cmd)
-                .putExtra(EXTRA_ANSWER, answer);
-        sendBroadcast(intent);
+        }
     }
 
     //todo add age sort for sync priority
@@ -243,6 +254,7 @@ public class TrieServiceIntent extends IntentService {
                 int childsCountInMap        = Utils.getChildsCountInMap(childsMap);
                 int len                     = childsCountInMap * (nodeTypeAndKeySize[0]==Utils.LEAF ? 2 : 28);
                 byte[] childsArray          = Utils.getBytesPart(payload, i + 10 + nodeTypeAndKeySize[1] + 32, len);
+                //next index of data-part in payload
                 i                           = i + 10 + nodeTypeAndKeySize[1] + 32 + len;
                 //self node
                 byte[] selfNodePos= new byte[8],
@@ -354,7 +366,7 @@ public class TrieServiceIntent extends IntentService {
                 }
                 byte[] type = new byte[1];
                 type[0] = Utils.getHashs;
-                broadcastActionMsg("Trie", "Answer", Bytes.concat(type, ask));
+                app.broadcastActionMsg("Trie", "Answer", Bytes.concat(type, ask));
             }
         }
         return answer;
@@ -450,7 +462,7 @@ public class TrieServiceIntent extends IntentService {
             //если это корень то переместим курсор на позицию в массиве детей = первый байт ключа * 8 - 8
             //если содержимое != 0 то  начинаем искать там и вернем то что нашли + корень, иначе вернем корень
             if (pos == 0L) {
-                app.trie.seek(22 + getChildPosInArray((key[0]&0xFF), BRANCH));
+                app.trie.seek(22 + getChildPosInROOT((key[0]&0xFF)));
                 byte[] childPos = new byte[8];
                 app.trie.read(childPos, 0, 8);
                 if (Longs.fromByteArray(childPos) != 0) {
@@ -504,7 +516,7 @@ public class TrieServiceIntent extends IntentService {
             //если содержимое != 0 то  начинаем искать там и вернем то что нашли + корень, иначе вернем корень
             byte[] childPos = new byte[8];
             if (pos == 0L) {
-                app.trie.seek(22 + getChildPosInArray(key&0xFF, BRANCH));
+                app.trie.seek(22 + getChildPosInROOT(key&0xFF));
             } else {
                 //иначе переместимся на позицию pos пропустим возраст
                 app.trie.seek(2 + pos);
@@ -545,7 +557,7 @@ public class TrieServiceIntent extends IntentService {
                     byte[] nodeAge = new byte[2];
                     app.trie.read(nodeAge, 0, 2);
 
-                    app.trie.seek(22 + getChildPosInArray((key[0] & 0xFF), BRANCH));
+                    app.trie.seek(22 + getChildPosInROOT((key[0] & 0xFF)));
                     app.trie.write(posBytes);
                     app.trie.seek(22);
                     byte[] childArray = new byte[2048];
@@ -706,7 +718,7 @@ public class TrieServiceIntent extends IntentService {
                 app.trie.seek(0);
                 app.trie.write(age);
             }
-            app.trie.seek(22+ getChildPosInArray((key[0]&0xFF), BRANCH));
+            app.trie.seek(22+ getChildPosInROOT((key[0]&0xFF)));
             app.trie.write(Longs.toByteArray(pos));
             app.trie.seek(22);
             byte[] childArray= new byte[2048];

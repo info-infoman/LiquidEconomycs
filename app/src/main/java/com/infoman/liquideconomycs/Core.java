@@ -30,9 +30,12 @@ import static com.infoman.liquideconomycs.Utils.ACTION_FIND;
 import static com.infoman.liquideconomycs.Utils.ACTION_GENERATE_ANSWER;
 import static com.infoman.liquideconomycs.Utils.ACTION_GET_HASH;
 import static com.infoman.liquideconomycs.Utils.ACTION_INSERT;
-import static com.infoman.liquideconomycs.Utils.ACTION_START;
+import static com.infoman.liquideconomycs.Utils.ACTION_START_SYNC;
 import static com.infoman.liquideconomycs.Utils.ACTION_STOP_SERVICE;
+import static com.infoman.liquideconomycs.Utils.BROADCAST_ACTION_ANSWER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_AGE;
+import static com.infoman.liquideconomycs.Utils.EXTRA_ANSWER;
+import static com.infoman.liquideconomycs.Utils.EXTRA_CMD;
 import static com.infoman.liquideconomycs.Utils.EXTRA_MASTER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_MSG_TYPE;
 import static com.infoman.liquideconomycs.Utils.EXTRA_PAYLOAD;
@@ -44,14 +47,16 @@ import static com.infoman.liquideconomycs.Utils.EXTRA_TOKEN;
 import static com.infoman.liquideconomycs.Utils.copyAssetFolder;
 
 public class Core extends Application {
-    public long dateTimeLastSync;
+
     private DBHelper dbHelper;
     private SQLiteDatabase db;
     private ContentValues cv;
     public Pair myKey;
+    public byte[] clientPubKey;
     public RandomAccessFile trie;
     public WebSocketClient mClient;
-    public boolean isSynchronized;
+    public long dateTimeLastSync;
+    public int waitingIntentCount;
 
     @Override
     public void onCreate() {
@@ -60,8 +65,8 @@ public class Core extends Application {
         dbHelper = new DBHelper(context);
         db = dbHelper.getWritableDatabase();
         cv = new ContentValues();
-        mClient = null;
-        isSynchronized = false;
+        waitingIntentCount = 0;
+        //isSynchronized = false;
 
         setMyKey();
         ///////////init trie//////////////////////////////////////////////////////
@@ -163,16 +168,21 @@ public class Core extends Application {
     }
 
     /////////Sync/////////////////////////////////////////////////////////////////////////////////
-    public void sendMsg(byte msgType, byte[] payload) {
-        if (mClient != null && mClient.isConnected() && payload.length > 0) {
-            byte[] type = new byte[1];
-            type[0] = msgType;
-            byte[] sig = Utils.Sig(
-                    (byte[]) getMyKey().second,
-                    Sha256Hash.hash(Bytes.concat(type, Utils.getBytesPart(payload, 0, 8)))
-            );
-            mClient.send(Bytes.concat(type, Ints.toByteArray(sig.length), sig, payload));
-        }
+
+    public void addClient(byte[] pubKey) {
+        cv.put("pubKey", pubKey);
+        db.insert("clients", null, cv);
+        cv.clear();
+    }
+
+    public Cursor getClients() {
+        return db.rawQuery("SELECT " +
+                "clients.pubKey " +
+                "FROM clients AS clients", null);
+    }
+
+    public void deleteClient(byte[] pubKey) {
+        db.delete("clients", "pubKey = ?", new String[]{String.valueOf(pubKey)});
     }
 
     public Cursor getPrefixByPos(long pos) {
@@ -194,6 +204,7 @@ public class Core extends Application {
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
     //intents
+    //start
     //Trie
     public void startActionStopTrie(Context context){
         Utils.startIntent(context, new Intent(context, TrieServiceIntent.class).setAction(ACTION_STOP_SERVICE));
@@ -248,26 +259,34 @@ public class Core extends Application {
     }
 
     //Sync
-    public void startActionSync(Context context, String master, String signalServer, byte[] pubKey, String token, boolean Provide_service) {
+    public void startActionSync(Context context, String master, String signalServer, String token, boolean Provide_service) {
         if(Provide_service) {
             SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(context);
             signalServer = sharedPref.getString("Signal_server_URL", "");
             token = sharedPref.getString("Signal_server_Token", "");
         }
         Intent intent = new Intent(context, SyncServiceIntent.class)
-                .setAction(ACTION_START)
+                .setAction(ACTION_START_SYNC)
                 .putExtra(EXTRA_SIGNAL_SERVER, signalServer)
                 .putExtra(EXTRA_PROVIDE_SERVICE, Provide_service)
-                .putExtra(EXTRA_PUBKEY, pubKey)
                 .putExtra(EXTRA_TOKEN, token)
                 .putExtra(EXTRA_MASTER, master);
-        Log.d(TAG, Arrays.toString(pubKey));
         Utils.startIntent(context, intent);
     }
 
     public void startActionStopSync(Context context) {
         Intent intent = new Intent(context, SyncServiceIntent.class).setAction(ACTION_STOP_SERVICE);
         Utils.startIntent(context, intent);
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    //broadcast
+    public void broadcastActionMsg(String master, String cmd, byte[] answer) {
+        Intent intent = new Intent(BROADCAST_ACTION_ANSWER)
+                .putExtra(EXTRA_MASTER, master)
+                .putExtra(EXTRA_CMD, cmd)
+                .putExtra(EXTRA_ANSWER, answer);
+        sendBroadcast(intent);
     }
 
 }

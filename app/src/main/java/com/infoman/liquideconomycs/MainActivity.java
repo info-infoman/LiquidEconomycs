@@ -43,6 +43,7 @@ import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.Sha256Hash;
 import org.bitcoinj.core.SignatureDecodeException;
 
+import java.util.Date;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -89,8 +90,10 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                                 //startActionInsert(getApplicationContext(), "Main", ECKey.fromPublicOnly(Utils.hexToByte(resultTextView.getText().toString())).getPubKeyHash(), ageToBytes());
                                 fields = Utils.parseQRString(resultTextView.getText().toString());
                                 byte[] accepterPubKey = Utils.hexToByte(fields[0]);
-                                app.startActionSync(context, "Main", "", accepterPubKey, "", true);
-                                app.startActionStopSync(context);
+                                //insert
+                                app.addClient(accepterPubKey);
+                                //app.startActionSync(context, "Main", "", accepterPubKey, "", true);
+                                //app.startActionStopSync(context);
                             }else{
                                 DialogsFragment alert = new DialogsFragment(context, "MainActivity", 0);
                                 FragmentManager manager = getSupportFragmentManager();
@@ -98,10 +101,10 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                                 alert.show(transaction, "dialog");
                             }
                         }
-                    }else if(cmd.equals("Sync")){
+                    }/*else if(cmd.equals("Sync")){
                         final String answer = intent.getStringExtra(EXTRA_ANSWER);
                         Toast.makeText(context, answer,Toast.LENGTH_LONG).show();
-                    }
+                    }*/
 
                 }
                 //resultTextView.setText(param);
@@ -161,6 +164,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 tbMade.setChecked(true);
                 provideService = true;
                 role_capture.setText(getResources().getString(R.string.Provide_service));
+                if((new Date().getTime() - app.dateTimeLastSync) / 1000 > 300){
+                    app.startActionSync(app, "Main", "", "", true);
+                }
             }else{
                 tbResive.setChecked(true);
                 tbMade.setChecked(false);
@@ -217,6 +223,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     @Override protected void onResume() {
         super.onResume();
 
+        Context context = getApplicationContext();
+        app = (Core) context;
+
         registerReceiver(mBroadcastReceiver, new IntentFilter(BROADCAST_ACTION_ANSWER));
 
         //if (tbQR.isChecked() && qrCodeReaderView != null) {
@@ -230,6 +239,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             }
         }
 
+        if((new Date().getTime() - app.dateTimeLastSync) / 1000 > 300 && provideService){
+            app.startActionSync(app, "Main", "","", true);
+        }
         //}
     }
 
@@ -421,8 +433,10 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             if(fields.length < 3 || fields[1].equals("") || fields[2].equals("") || fields[0].equals("")){
                Toast.makeText(getApplicationContext(), getResources().getString(R.string.ErrorReceivingPartnerData),Toast.LENGTH_LONG).show();
             }else{
-                app.startActionInsert(this, "Main", ECKey.fromPublicOnly(hexToByte(fields[0])).getPubKeyHash(), ageToBytes());
-                app.startActionSync(getApplicationContext(), "Main", fields[1], hexToByte(fields[0]), fields[2],false);
+                byte[] providerPubKey = hexToByte(fields[0]);
+                app.startActionInsert(this, "Main", ECKey.fromPublicOnly(providerPubKey).getPubKeyHash(), ageToBytes());
+                app.addClient(providerPubKey);
+                app.startActionSync(getApplicationContext(), "Main", fields[1], fields[2],false);
             }
 
         }

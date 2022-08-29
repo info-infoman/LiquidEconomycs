@@ -43,7 +43,7 @@ public class Utils {
         ACTION_FIND         = "com.infoman.liquideconomycs.action.find",
         ACTION_DELETE       = "com.infoman.liquideconomycs.action.delete",
         ACTION_GENERATE_ANSWER = "com.infoman.liquideconomycs.action.getAnswer",
-        ACTION_START        = "com.infoman.liquideconomycs.action.start",
+        ACTION_START_SYNC = "com.infoman.liquideconomycs.action.start",
         ACTION_DELETE_OLDEST     = "com.infoman.liquideconomycs.action.delete_oldest",
 
         ACTION_STOP_SERVICE     = "com.infoman.liquideconomycs.action.stop_service",
@@ -101,12 +101,8 @@ public class Utils {
         return null;
     }
 
-    public static int getChildPosInArray(int key, byte type){
-        if(type==BRANCH){
-            return (key==0?0:(key * 8) - 8);
-        }else{
-            return (key==0?0:(key * 2) - 2);
-        }
+    public static int getChildPosInROOT(int key){
+        return (key==0?0:(key * 8) - 8);
     }
 
     public static int getChildPosInMap(byte[]childsMap, int key){

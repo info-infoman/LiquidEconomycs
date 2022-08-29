@@ -9,12 +9,14 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.database.Cursor;
 import android.graphics.Color;
 import android.os.Build;
 import android.util.Log;
 
 import com.google.common.primitives.Bytes;
 import com.google.common.primitives.Ints;
+import com.infoman.liquideconomycs.WebSocketClient.Listener;
 
 import org.apache.http.message.BasicNameValuePair;
 import org.bitcoinj.core.Sha256Hash;
@@ -31,7 +33,7 @@ import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
 
 import static androidx.core.app.NotificationCompat.PRIORITY_LOW;
-import static com.infoman.liquideconomycs.Utils.ACTION_START;
+import static com.infoman.liquideconomycs.Utils.ACTION_START_SYNC;
 import static com.infoman.liquideconomycs.Utils.ACTION_STOP_SERVICE;
 import static com.infoman.liquideconomycs.Utils.BROADCAST_ACTION_ANSWER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_ANSWER;
@@ -41,12 +43,14 @@ import static com.infoman.liquideconomycs.Utils.EXTRA_PUBKEY;
 import static com.infoman.liquideconomycs.Utils.EXTRA_PROVIDE_SERVICE;
 import static com.infoman.liquideconomycs.Utils.EXTRA_SIGNAL_SERVER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_TOKEN;
+import static com.infoman.liquideconomycs.Utils.byteToHex;
 import static org.bitcoinj.core.ECKey.ECDSASignature.decodeFromDER;
 
 public class SyncServiceIntent extends IntentService {
 
     private Core app;
-    boolean isServiceStarted = false;
+    private boolean isServiceStarted = false;
+
 
     private final BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
         @Override public void onReceive(Context context, Intent intent) {
@@ -56,7 +60,7 @@ public class SyncServiceIntent extends IntentService {
                     if(cmd.equals("Answer")){
                         final byte[] answer = intent.getByteArrayExtra(EXTRA_ANSWER);
                         if (answer.length > 1)
-                            app.sendMsg(answer[0], Utils.getBytesPart(answer, 1, (answer.length)-1));
+                            sendMsg(answer[0], Utils.getBytesPart(answer, 1, (answer.length)-1));
                     }
                     //resultTextView.setText(param);
                 }
@@ -72,9 +76,10 @@ public class SyncServiceIntent extends IntentService {
     public void onCreate() {
         super.onCreate();
         //android.os.Debug.waitForDebugger();
+        app = (Core) getApplicationContext();
         if(isServiceStarted) return;
         isServiceStarted = true;
-        app = (Core) getApplicationContext();
+        registerReceiver(mBroadcastReceiver, new IntentFilter(BROADCAST_ACTION_ANSWER));
 
         ////////////////////////////////////////////////////////////////
         String channel;
@@ -114,46 +119,47 @@ public class SyncServiceIntent extends IntentService {
 
     @Override
     protected void onHandleIntent(Intent intent) {
+        String action = null;
         if (intent != null) {
-            final String action = intent.getAction();
-            if (ACTION_START.equals(action) && !app.isSynchronized) {
-                registerReceiver(mBroadcastReceiver, new IntentFilter(BROADCAST_ACTION_ANSWER));
-                app.isSynchronized = true;
-                app.dateTimeLastSync=new Date().getTime();
-                final String    signalServer = intent.getStringExtra(EXTRA_SIGNAL_SERVER),
-                                token = intent.getStringExtra(EXTRA_TOKEN),
-                                master = intent.getStringExtra(EXTRA_MASTER);
-                final byte[] pubKey = intent.getByteArrayExtra(EXTRA_PUBKEY);
-                final boolean Provide_service = intent.getBooleanExtra(EXTRA_PROVIDE_SERVICE,true);
+            action = intent.getAction();
+            if (ACTION_START_SYNC.equals(action) /*&& !app.isSynchronized*/) {
+                //app.isSynchronized = true;
+                app.dateTimeLastSync = new Date().getTime();
+                final String TAG = "WebSocketClient";
+                Cursor query = app.getClients();
+
+                final String signalServer = intent.getStringExtra(EXTRA_SIGNAL_SERVER),
+                        token = intent.getStringExtra(EXTRA_TOKEN),
+                        master = intent.getStringExtra(EXTRA_MASTER);
+
+                final boolean Provide_service = intent.getBooleanExtra(EXTRA_PROVIDE_SERVICE, true);
 
                 //todo sync processor
                 List<BasicNameValuePair> mExtraHeaders = Collections.singletonList(new BasicNameValuePair("Cookie", "session=abcd"));
-                app.mClient = new WebSocketClient(new WebSocketClient.Listener() {
 
-                    private static final String TAG = "WebSocketClient";
+                app.mClient = new WebSocketClient(new WebSocketClient.Listener() {
 
                     @Override
                     public void onConnect() {
                         Log.d(TAG, "Connected!");
-                        broadcastActionMsg(master, "Sync", getResources().getString(R.string.onConnection));
+                        //app.broadcastActionMsg(master, "Sync", getResources().getString(R.string.onConnection));
                         //first send information about as for signal server
                         app.mClient.send(token);
                     }
 
-
                     @Override
                     public void onMessage(String message) {
                         //  Log.d(TAG, String.format("Got string message! %s", message));
-                        if(message.equals("Completed")){
-                        // //    broadcastActionMsg(master, "Sync", getResources().getString(R.string.onCheckToken));
-                        //     //если получатель услуг то запросим хеш корня базы
-                            if(!Provide_service){
-                                app.sendMsg(Utils.getHashs, new byte[8]);
+                        if (message.equals("Completed")) {
+                            // //    broadcastActionMsg(master, "Sync", getResources().getString(R.string.onCheckToken));
+                            //     //если получатель услуг то запросим хеш корня базы
+                            if (!Provide_service) {
+                                sendMsg(Utils.getHashs, new byte[8]);
                             }
                             app.dateTimeLastSync = new Date().getTime();
-                        }else{
-                             broadcastActionMsg(master, "Sync", getResources().getString(R.string.onCheckTokenError));
-                             app.mClient.disconnect();
+                        } else {
+                            //app.broadcastActionMsg(master, "Sync", getResources().getString(R.string.onCheckTokenError));
+                            app.mClient.disconnect();
                         }
                     }
 
@@ -162,65 +168,96 @@ public class SyncServiceIntent extends IntentService {
                         Log.d(TAG, String.format("Got binary message! %s", Arrays.toString(data)));
                         app.dateTimeLastSync = new Date().getTime();
 
-                        if(data.length<7)
+                        if (data.length < 7)
                             app.mClient.disconnect();
 
-                        byte msgType    = Utils.getBytesPart(data,0,1)[0];
-                        int sigLength   = Ints.fromByteArray(Utils.getBytesPart(data,1,4));
-                        byte[] sig      = Utils.getBytesPart(data,5, sigLength), payload  = Utils.getBytesPart(data, 5+sigLength, data.length-(5+sigLength));
+                        byte msgType = Utils.getBytesPart(data, 0, 1)[0];
+                        int sigLength = Ints.fromByteArray(Utils.getBytesPart(data, 1, 4));
+                        byte[] sig = Utils.getBytesPart(data, 5, sigLength), payload = Utils.getBytesPart(data, 5 + sigLength, data.length - (5 + sigLength));
 
                         //Проверка подписи
                         try {
                             byte[] digest = new byte[1];
                             digest[0] = msgType;
-                            digest = Sha256Hash.hash(Bytes.concat(digest, Utils.getBytesPart(payload,0, 8)));
-                            if(!Utils.chekSig(pubKey, decodeFromDER(sig), digest))
-                                app.mClient.disconnect();
+                            digest = Sha256Hash.hash(Bytes.concat(digest, Utils.getBytesPart(payload, 0, 8)));
+                            //если публичный ключ не поределен, найти его в базе путем перебора таблицы clients
+                            if(Arrays.equals(app.clientPubKey, new byte[32])) {
+                                byte[] pk;
+                                while (query.moveToNext()) {
+                                    pk = query.getBlob(query.getColumnIndex("pubKey"));
+                                    if (Utils.chekSig(pk, decodeFromDER(sig), digest)) {
+                                        app.clientPubKey = pk;
+                                        break;
+                                    }else{
+                                        app.mClient.disconnect();
+                                    }
+                                }
+                                query.close();
+                            }else{
+                                if (!Utils.chekSig(app.clientPubKey, decodeFromDER(sig), digest))
+                                    app.mClient.disconnect();
+                            }
                         } catch (SignatureDecodeException e) {
                             app.mClient.disconnect();
                         }
 
                         //Проверка типа сообщения
-                        if((Provide_service && msgType == Utils.getHashs) || (!Provide_service && msgType == Utils.hashs)){
+                        if ((Provide_service && msgType == Utils.getHashs) || (!Provide_service && msgType == Utils.hashs)) {
                             app.startActionGenerateAnswer(getApplicationContext(), msgType, payload);
                         }
-
                     }
 
                     @Override
                     public void onDisconnect(int code, String reason) {
-                        Log.d(TAG, String.format("Disconnected! Code: %d Reason: %s", code, reason));
-                        broadcastActionMsg(master, "Sync", getResources().getString(R.string.disconnect)+reason);
-                        app.isSynchronized = false;
                     }
 
                     @Override
                     public void onError(Exception error) {
-                        Log.e(TAG, "Error!", error);
-                        broadcastActionMsg(master, "Sync", getResources().getString(R.string.errorConnection) + error);
-                        app.isSynchronized=false;
                     }
 
+
                 }, mExtraHeaders);
+
                 app.mClient.connect(URI.create(signalServer));
 
                 //Таймер проверки ответов
-                while (app.isSynchronized && (new Date().getTime() - app.dateTimeLastSync) / 1000 < 300){}
-
-                app.isSynchronized=false;
+                while ((new Date().getTime() - app.dateTimeLastSync) / 1000 < 300){
+                    if(app.waitingIntentCount>0) {
+                        app.dateTimeLastSync = new Date().getTime();
+                    }
+                }
+                //если публичный ключ опоределен, ещ удалить его в базе в таблице clients
+                if(!Arrays.equals(app.clientPubKey, new byte[32])) {
+                    app.deleteClient(app.clientPubKey);
+                }
+                //app.isSynchronized=false;
                 app.mClient.disconnect();
-                app.startActionDeleteOldest(app);
+                //app.startActionDeleteOldest(app);
                 app.startActionStopTrie(app);
-            }
-
-            if (ACTION_STOP_SERVICE.equals(action)) {
-                broadcastActionMsg("Main", "Sync", getResources().getString(R.string.SyncFinish));
                 stopSelf();
                 stopForeground(true);
-                ////////////////////////////////////////////////////////////////
             }
+            //broadcastActionMsg("Main", "Sync", getResources().getString(R.string.SyncFinish));
+            //stopSelf();
+            //stopForeground(true);
+            //app.startActionDeleteOldest(app);
+            //app.startActionStopTrie(app);
         }
     }
+
+    private void sendMsg(byte msgType, byte[] payload) {
+        if (app.mClient.mListener != null && app.mClient.isConnected() && payload.length > 0) {
+            byte[] type = new byte[1];
+            type[0] = msgType;
+            byte[] sig = Utils.Sig(
+                    (byte[]) app.getMyKey().second,
+                    Sha256Hash.hash(Bytes.concat(type, Utils.getBytesPart(payload, 0, 8)))
+            );
+            app.mClient.send(Bytes.concat(type, Ints.toByteArray(sig.length), sig, payload));
+        }
+    }
+
+
 
     @NonNull
     @TargetApi(26)
@@ -242,11 +279,4 @@ public class SyncServiceIntent extends IntentService {
         return "Service: liquideconomycs SyncServiceIntent";
     }
     // called to send data to Activity
-    public void broadcastActionMsg(String master, String cmd, String answer) {
-        Intent intent = new Intent(BROADCAST_ACTION_ANSWER)
-            .putExtra(EXTRA_MASTER, master)
-            .putExtra(EXTRA_CMD, cmd)
-            .putExtra(EXTRA_ANSWER, answer);
-        sendBroadcast(intent);
-    }
 }

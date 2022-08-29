@@ -44,13 +44,15 @@ public class DialogsFragment extends AppCompatDialogFragment {
                 if(dialogCmd==cantFindPubKey) {
                     builder.setPositiveButton(getResources().getString(android.R.string.yes), (dialog, id) -> {
                         if (dialogActivity.equals("MainActivity")) {
-                            app.startActionSync(getActivity(),
+                            //в базе добавить потребителя
+                            app.addClient(Utils.hexToByte(Utils.parseQRString(((MainActivity) Objects.requireNonNull(getActivity())).resultTextView.getText().toString())[0]));
+                            /*app.startActionSync(getActivity(),
                                     "Main",
                                     "",
                                     Utils.hexToByte(Utils.parseQRString(((MainActivity) Objects.requireNonNull(getActivity())).resultTextView.getText().toString())[0]),
                                     "",
-                                    true);
-                            app.startActionStopSync(getActivity());
+                                    true);*/
+                            //app.startActionStopSync(getActivity());
                             dialog.cancel();
                         }
                     }).setNegativeButton(getResources().getString(android.R.string.no), (dialog, id) -> dialog.cancel());
