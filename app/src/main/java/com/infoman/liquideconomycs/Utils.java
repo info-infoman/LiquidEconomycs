@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.content.res.AssetManager;
 import android.nfc.NdefRecord;
 import android.os.Build;
+import android.util.Log;
 
 import com.google.common.primitives.Bytes;
 
@@ -44,7 +45,6 @@ public class Utils {
         ACTION_DELETE       = "com.infoman.liquideconomycs.action.delete",
         ACTION_GENERATE_ANSWER = "com.infoman.liquideconomycs.action.getAnswer",
         ACTION_START_SYNC = "com.infoman.liquideconomycs.action.start",
-        ACTION_DELETE_OLDEST     = "com.infoman.liquideconomycs.action.delete_oldest",
 
         ACTION_STOP_SERVICE     = "com.infoman.liquideconomycs.action.stop_service",
 
@@ -71,19 +71,27 @@ public class Utils {
     }
 
     public static long compareDate(Date newDate, Date oldDate){
-        long diffInMillies = Math.abs(newDate.getTime() - oldDate.getTime());
-        return TimeUnit.DAYS.convert(diffInMillies, TimeUnit.MILLISECONDS);
+        return  (newDate.getTime() - oldDate.getTime())/86400000;
     }
 
     public static Date reconstructAgeFromBytes(byte[] d) {
-        long timestampRecovered = (d[0] << 8);
-        timestampRecovered += d[1];
+        long timestampRecovered = ((d[0]&0xFF) << 8);//todo добавить &0xFF
+        timestampRecovered += d[1]&0xFF;//todo добавить &0xFF
         timestampRecovered *= 86400000;
         return new Date(timestampRecovered);
     }
 
     public static byte[] ageToBytes(){
         long time = new Date().getTime();  // time in ms since epoch
+        time /= 86400000; // ms in a day
+        byte[]res = new byte[2];
+        res[0] = (byte)(time >>> 8);
+        res[1] = (byte)(time);
+        return res;
+    }
+
+    public static byte[] ageToBytesTest(){
+        long time = new Date().getTime()-3456000000L;  // time in ms since epoch
         time /= 86400000; // ms in a day
         byte[]res = new byte[2];
         res[0] = (byte)(time >>> 8);
@@ -105,6 +113,7 @@ public class Utils {
         return (key==0?0:(key * 8) - 8);
     }
 
+    //todo проверить применение если нет в мапе
     public static int getChildPosInMap(byte[]childsMap, int key){
         int result=0;
         BitSet prepare = BitSet.valueOf(childsMap);
@@ -132,7 +141,10 @@ public class Utils {
                 for(int b=0;b<8;b++) {
                     if ((i * 8) + b == key) {
                         prepare1.set(b, operation);
-                        return Bytes.concat(getBytesPart(childsMap,0,i),prepare1.toByteArray(),getBytesPart(childsMap,i+1,32-(i+1)));
+                        if (prepare1.toByteArray().length==0){
+                            return Bytes.concat(getBytesPart(childsMap,0,i), new byte[1], getBytesPart(childsMap,i+1,32-(i+1)));
+                        }
+                        return Bytes.concat(getBytesPart(childsMap,0,i), prepare1.toByteArray(), getBytesPart(childsMap,i+1,32-(i+1)));
                     }
                 }
             }

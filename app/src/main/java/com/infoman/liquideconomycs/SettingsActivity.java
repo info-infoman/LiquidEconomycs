@@ -2,6 +2,7 @@ package com.infoman.liquideconomycs;
 
 import android.content.Context;
 import android.content.Intent;
+import android.database.Cursor;
 import android.os.Build;
 import android.os.Bundle;
 import android.text.InputType;
@@ -10,6 +11,8 @@ import android.widget.Button;
 import com.google.common.primitives.Bytes;
 
 import org.bitcoinj.core.ECKey;
+
+import java.util.Date;
 
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
@@ -60,13 +63,25 @@ public class SettingsActivity extends AppCompatActivity {
         Context c = getApplicationContext();
         ECKey myECKey;
         byte[] myPubKey, age, newPubKey, myPubKey_;
-
-        for(int i=0;i<10000;i++) {
+        age = Utils.ageToBytesTest();
+        Date b = Utils.reconstructAgeFromBytes(age);
+        for(int i=0;i<1000;i++) {
             myECKey = new ECKey();
             myPubKey = myECKey.getPubKeyHash();
-            age = Utils.ageToBytes();
             app.startActionInsert(app, "Main", myPubKey, age);
         }
+        age = Utils.ageToBytes();
+        b = Utils.reconstructAgeFromBytes(age);
+        for(int i=0;i<1000;i++) {
+            myECKey = new ECKey();
+            myPubKey = myECKey.getPubKeyHash();
+            app.startActionInsert(app, "Main", myPubKey, age);
+        }
+
+        app.startActionStopTrie(app);
+
+        //delete Oldest Key
+
         /*
         myECKey = new ECKey();
         myPubKey = Utils.getBytesPart(myECKey.getPubKeyHash(), 0, 19);

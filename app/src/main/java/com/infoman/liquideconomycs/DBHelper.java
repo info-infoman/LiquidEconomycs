@@ -36,6 +36,10 @@ public class DBHelper extends SQLiteOpenHelper {
             db.execSQL("create table clients ("
                     + "id integer primary key autoincrement,"
                     + "pubKey BLOB" + ");");
+            //таблица кеша удаления старых узлов
+            db.execSQL("create table forDelete ("
+                    + "id integer primary key autoincrement,"
+                    + "pubKey BLOB" + ");");
         }
 
         @Override

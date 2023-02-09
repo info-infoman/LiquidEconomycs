@@ -25,7 +25,6 @@ import androidx.core.util.Pair;
 
 import static androidx.constraintlayout.widget.Constraints.TAG;
 import static com.infoman.liquideconomycs.Utils.ACTION_DELETE;
-import static com.infoman.liquideconomycs.Utils.ACTION_DELETE_OLDEST;
 import static com.infoman.liquideconomycs.Utils.ACTION_FIND;
 import static com.infoman.liquideconomycs.Utils.ACTION_GENERATE_ANSWER;
 import static com.infoman.liquideconomycs.Utils.ACTION_GET_HASH;
@@ -140,6 +139,44 @@ public class Core extends Application {
         insertFreeSpaceWitchOutCompressTrieFile(pos, space);
     }
 
+    public void addForDelete(byte[] pubKey) {
+        cv.put("pubKey", pubKey);
+        db.insert("forDelete", null, cv);
+        cv.clear();
+    }
+
+    public Cursor getPubKeysForDelete() {
+        return db.rawQuery("SELECT * FROM forDelete", null);
+    }
+
+    public void clearTableForDelete() {
+        db.delete("forDelete", null, null);
+    }
+
+    public void optimize() {
+        Cursor query = getFreeSpaceWitchCompress();
+        int s, ss;
+        long p, sp;
+        if (query.getCount() > 0) {
+            while (query.moveToNext()) {
+                p = query.getLong(query.getColumnIndex("pos"));
+                s = query.getInt(query.getColumnIndex("space"));
+                sp = query.getLong(query.getColumnIndex("Second_pos"));
+                ss = query.getInt(query.getColumnIndex("Second_space"));
+                Cursor checkExistQueryP = checkExistFreeSpace(p);
+                Cursor checkExistQuerySP = checkExistFreeSpace(sp);
+                if (checkExistQueryP.getCount() > 0 && checkExistQuerySP.getCount() > 0) {
+                    insertFreeSpaceWitchCompressTrieFile(p, s, sp, ss);
+                }
+                checkExistQueryP.close();
+                checkExistQuerySP.close();
+            }
+            query.close();
+            optimize();
+        }else {
+            query.close();
+        }
+    }
     /////////MyKey/////////////////////////////////////////////////////////////////////////////////
     public Pair getMyKey() {
         return myKey;
@@ -236,11 +273,6 @@ public class Core extends Application {
         Utils.startIntent(context, intent);
     }
 
-    public void startActionDeleteOldest(Context context) {
-        Intent intent = new Intent(context, TrieServiceIntent.class).setAction(ACTION_DELETE_OLDEST);
-        Utils.startIntent(context, intent);
-    }
-
     public void startActionGetHash(Context context, String master, long pos) {
         Intent intent = new Intent(context, TrieServiceIntent.class)
                 .setAction(ACTION_GET_HASH)
@@ -288,5 +320,7 @@ public class Core extends Application {
                 .putExtra(EXTRA_ANSWER, answer);
         sendBroadcast(intent);
     }
+
+
 
 }
