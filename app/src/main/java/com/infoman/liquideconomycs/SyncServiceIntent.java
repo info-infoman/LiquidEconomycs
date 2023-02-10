@@ -192,7 +192,6 @@ public class SyncServiceIntent extends IntentService {
                                         app.mClient.disconnect();
                                     }
                                 }
-                                query.close();
                             }else{
                                 if (!Utils.chekSig(app.clientPubKey, decodeFromDER(sig), digest))
                                     app.mClient.disconnect();
@@ -231,6 +230,7 @@ public class SyncServiceIntent extends IntentService {
                     app.deleteClient(app.clientPubKey);
                 }
                 //app.isSynchronized=false;
+                query.close();
                 app.mClient.disconnect();
                 //app.startActionDeleteOldest(app);
                 app.startActionStopTrie(app);

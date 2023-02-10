@@ -29,8 +29,10 @@ import static com.infoman.liquideconomycs.Utils.ACTION_FIND;
 import static com.infoman.liquideconomycs.Utils.ACTION_GENERATE_ANSWER;
 import static com.infoman.liquideconomycs.Utils.ACTION_GET_HASH;
 import static com.infoman.liquideconomycs.Utils.ACTION_INSERT;
+import static com.infoman.liquideconomycs.Utils.ACTION_INSERT_FREE_SPACE_IN_MAP;
 import static com.infoman.liquideconomycs.Utils.ACTION_START_SYNC;
 import static com.infoman.liquideconomycs.Utils.ACTION_STOP_SERVICE;
+import static com.infoman.liquideconomycs.Utils.ACTION_STOP_TRIE;
 import static com.infoman.liquideconomycs.Utils.BROADCAST_ACTION_ANSWER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_AGE;
 import static com.infoman.liquideconomycs.Utils.EXTRA_ANSWER;
@@ -42,6 +44,7 @@ import static com.infoman.liquideconomycs.Utils.EXTRA_POS;
 import static com.infoman.liquideconomycs.Utils.EXTRA_PROVIDE_SERVICE;
 import static com.infoman.liquideconomycs.Utils.EXTRA_PUBKEY;
 import static com.infoman.liquideconomycs.Utils.EXTRA_SIGNAL_SERVER;
+import static com.infoman.liquideconomycs.Utils.EXTRA_SPACE;
 import static com.infoman.liquideconomycs.Utils.EXTRA_TOKEN;
 import static com.infoman.liquideconomycs.Utils.copyAssetFolder;
 
@@ -88,55 +91,61 @@ public class Core extends Application {
 
     /////////TRIE//////////////////////////////////////////////////////////////////////////////////
     public Cursor getFreeSpace(int recordlength) {
-        return db.rawQuery("SELECT * FROM freeSpace where space>=" + recordlength + " ORDER BY space ASC", null);
+        return db.rawQuery("SELECT * FROM freeSpace where space>=" + recordlength + " ORDER BY space ASC Limit 1", null);
     }
 
-    public Cursor checkExistFreeSpace(long pos) {
-        return db.rawQuery("SELECT * FROM freeSpace where pos=" + pos, null);
-    }
-
-    //TODO optimize for paralell(limit>1)
-    public Cursor getFreeSpaceWitchCompress() {
+    public Cursor getFreeSpaceWitchCompress(long pos, int space) {
         return db.rawQuery("SELECT " +
-                "freeSpaceFirst.id, " +
-                "freeSpaceFirst.pos, " +
-                "freeSpaceFirst.space, " +
-                "freeSpaceSecond.id AS Second_id, " +
-                "freeSpaceSecond.pos AS Second_pos, " +
-                "freeSpaceSecond.space AS Second_space " +
-                "FROM freeSpace AS freeSpaceFirst " +
-                "LEFT JOIN freeSpace AS freeSpaceSecond " +
-                "ON freeSpaceSecond.pos + freeSpaceSecond.space = freeSpaceFirst.pos " +
-                "or freeSpaceFirst.pos+freeSpaceFirst.space = freeSpaceSecond.pos" +
-                " WHERE freeSpaceSecond.id IS NOT null", null);
+                "freeSpace.id," +
+                " CASE WHEN " + pos + " < freeSpace.pos "+
+                " then "+
+                    pos +
+                " else " +
+                    "freeSpace.pos " +
+                " end as pos, " +
+                " CASE WHEN "+ pos + " < freeSpace.pos AND freeSpace.pos + freeSpace.space < " + (pos + space) +
+                " then " +
+                    space +
+                " else " +
+                    " CASE WHEN freeSpace.pos < " + pos + " AND freeSpace.pos + freeSpace.space  BETWEEN " + pos + " AND " + (pos + space) +
+                    " then " +
+                        (pos + space) +" - freeSpace.pos " +
+                    " else "+
+                        " freeSpace.pos + freeSpace.space - " + pos +
+                    " end " +
+                " end as space " +
+                " FROM freeSpace AS freeSpace " +
+                " where (freeSpace.pos < " + pos + " AND freeSpace.pos + freeSpace.space  BETWEEN " + pos + " AND " + (pos + space) + ")"+
+                " or (" + pos + " < freeSpace.pos AND " + (pos + space) + " BETWEEN freeSpace.pos AND freeSpace.pos + freeSpace.space)" +
+                " or ("+ pos + " < freeSpace.pos AND freeSpace.pos + freeSpace.space < " + (pos + space) + ") limit 1", null);
     }
 
     public void deleteFreeSpace(long pos, int recordLength, int space) {
         db.delete("freeSpace", "pos = ?", new String[]{String.valueOf(pos)});
         if (recordLength < space) {
-            insertFreeSpaceWitchOutCompressTrieFile(pos + recordLength, space - recordLength);
+            insertFreeSpaceWitchCompressTrieFile(pos + recordLength, space - recordLength);
         }
     }
 
-    public void addPosInFreeSpaceMap(long pos, int keyNodeSize, int selfChildArraySize) {
-        insertFreeSpaceWitchOutCompressTrieFile(pos, 4 + keyNodeSize + 20 + 32 + selfChildArraySize);
-    }
-
-    public void insertFreeSpaceWitchOutCompressTrieFile(long pos, int space) {
-        cv.put("pos", pos);
-        cv.put("space", space);
-        db.insert("freeSpace", null, cv);
-        cv.clear();
-    }
-
-    public void insertFreeSpaceWitchCompressTrieFile(long pos, int space, long secondPos, int secondSpace) {
-        deleteFreeSpace(pos, space, space);
-        deleteFreeSpace(secondPos, secondSpace, secondSpace);
-        if (pos > secondPos) {
-            pos = secondPos;
+    public void insertFreeSpaceWitchCompressTrieFile(long pos, int space) {
+        Cursor query = getFreeSpaceWitchCompress(pos, space);
+        if (query.moveToFirst()) {
+            long p  = query.getLong(query.getColumnIndex("pos"));
+            int s   = query.getInt(query.getColumnIndex("space"));
+            int id   = query.getInt(query.getColumnIndex("id"));
+            cv.put("pos", p);
+            cv.put("space", s);
+            // обновляем по id
+            db.update("freeSpace", cv, "id = ?",
+                    new String[] {String.valueOf(id)});
+            cv.clear();
+        }else{
+            cv.put("pos", pos);
+            cv.put("space", space);
+            db.insert("freeSpace", null, cv);
+            cv.clear();
         }
-        space = space + secondSpace;
-        insertFreeSpaceWitchOutCompressTrieFile(pos, space);
+        query.close();
     }
 
     public void addForDelete(byte[] pubKey) {
@@ -153,30 +162,6 @@ public class Core extends Application {
         db.delete("forDelete", null, null);
     }
 
-    public void optimize() {
-        Cursor query = getFreeSpaceWitchCompress();
-        int s, ss;
-        long p, sp;
-        if (query.getCount() > 0) {
-            while (query.moveToNext()) {
-                p = query.getLong(query.getColumnIndex("pos"));
-                s = query.getInt(query.getColumnIndex("space"));
-                sp = query.getLong(query.getColumnIndex("Second_pos"));
-                ss = query.getInt(query.getColumnIndex("Second_space"));
-                Cursor checkExistQueryP = checkExistFreeSpace(p);
-                Cursor checkExistQuerySP = checkExistFreeSpace(sp);
-                if (checkExistQueryP.getCount() > 0 && checkExistQuerySP.getCount() > 0) {
-                    insertFreeSpaceWitchCompressTrieFile(p, s, sp, ss);
-                }
-                checkExistQueryP.close();
-                checkExistQuerySP.close();
-            }
-            query.close();
-            optimize();
-        }else {
-            query.close();
-        }
-    }
     /////////MyKey/////////////////////////////////////////////////////////////////////////////////
     public Pair getMyKey() {
         return myKey;
@@ -244,7 +229,7 @@ public class Core extends Application {
     //start
     //Trie
     public void startActionStopTrie(Context context){
-        Utils.startIntent(context, new Intent(context, TrieServiceIntent.class).setAction(ACTION_STOP_SERVICE));
+        Utils.startIntent(context, new Intent(context, TrieServiceIntent.class).setAction(ACTION_STOP_TRIE));
     }
 
     public void startActionGenerateAnswer(Context context, byte msgType, byte[] payload) {
@@ -270,6 +255,14 @@ public class Core extends Application {
                 .putExtra(EXTRA_MASTER, master)
                 .putExtra(EXTRA_PUBKEY, pubKey)
                 .putExtra(EXTRA_AGE, age);
+        Utils.startIntent(context, intent);
+    }
+
+    public void startActionInsertFreeSpaceInMap(Context context, long pos, int space) {
+        Intent intent = new Intent(context, TrieServiceIntent.class)
+                .setAction(ACTION_INSERT_FREE_SPACE_IN_MAP)
+                .putExtra(EXTRA_POS, pos)
+                .putExtra(EXTRA_SPACE, space);
         Utils.startIntent(context, intent);
     }
 

@@ -45,7 +45,8 @@ public class Utils {
         ACTION_DELETE       = "com.infoman.liquideconomycs.action.delete",
         ACTION_GENERATE_ANSWER = "com.infoman.liquideconomycs.action.getAnswer",
         ACTION_START_SYNC = "com.infoman.liquideconomycs.action.start",
-
+        ACTION_INSERT_FREE_SPACE_IN_MAP = "com.infoman.liquideconomycs.action.INSERT_FREE_SPACE_IN_MAP",
+        ACTION_STOP_TRIE     = "com.infoman.liquideconomycs.action.stop_trie",
         ACTION_STOP_SERVICE     = "com.infoman.liquideconomycs.action.stop_service",
 
     //input param
@@ -53,6 +54,7 @@ public class Utils {
         EXTRA_PROVIDE_SERVICE = "com.infoman.liquideconomycs.extra.provideService",
         EXTRA_TOKEN         = "com.infoman.liquideconomycs.extra.token",
         EXTRA_POS           = "com.infoman.liquideconomycs.extra.pos",
+        EXTRA_SPACE           = "com.infoman.liquideconomycs.extra.space",
         EXTRA_PUBKEY        = "com.infoman.liquideconomycs.extra.pubKey",
         EXTRA_AGE           = "com.infoman.liquideconomycs.extra.age",
         EXTRA_MAX_AGE       = "com.infoman.liquideconomycs.extra.maxAge",

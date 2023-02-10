@@ -60,6 +60,8 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     private void insertDemoInTrie(){
+
+
         Context c = getApplicationContext();
         ECKey myECKey;
         byte[] myPubKey, age, newPubKey, myPubKey_;
