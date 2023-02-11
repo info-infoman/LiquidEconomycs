@@ -202,7 +202,7 @@ public class SyncServiceIntent extends IntentService {
 
                         //Проверка типа сообщения
                         if ((Provide_service && msgType == Utils.getHashs) || (!Provide_service && msgType == Utils.hashs)) {
-                            app.startActionGenerateAnswer(getApplicationContext(), msgType, payload);
+                            app.startActionGenerateAnswer(msgType, payload);
                         }
                     }
 
@@ -233,7 +233,7 @@ public class SyncServiceIntent extends IntentService {
                 query.close();
                 app.mClient.disconnect();
                 //app.startActionDeleteOldest(app);
-                app.startActionStopTrie(app);
+                app.startActionStopTrie();
                 stopSelf();
                 stopForeground(true);
             }

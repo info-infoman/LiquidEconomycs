@@ -1,14 +1,9 @@
 package com.infoman.liquideconomycs;
 
 import android.content.Context;
-import android.content.Intent;
-import android.database.Cursor;
-import android.os.Build;
 import android.os.Bundle;
 import android.text.InputType;
 import android.widget.Button;
-
-import com.google.common.primitives.Bytes;
 
 import org.bitcoinj.core.ECKey;
 
@@ -17,12 +12,6 @@ import java.util.Date;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.preference.PreferenceFragmentCompat;
-
-import static com.infoman.liquideconomycs.Utils.ACTION_INSERT;
-import static com.infoman.liquideconomycs.Utils.ACTION_STOP_SERVICE;
-import static com.infoman.liquideconomycs.Utils.EXTRA_AGE;
-import static com.infoman.liquideconomycs.Utils.EXTRA_MASTER;
-import static com.infoman.liquideconomycs.Utils.EXTRA_PUBKEY;
 
 public class SettingsActivity extends AppCompatActivity {
     private Core app;
@@ -67,20 +56,20 @@ public class SettingsActivity extends AppCompatActivity {
         byte[] myPubKey, age, newPubKey, myPubKey_;
         age = Utils.ageToBytesTest();
         Date b = Utils.reconstructAgeFromBytes(age);
-        for(int i=0;i<1000;i++) {
+        for(int i=0;i<2000;i++) {
             myECKey = new ECKey();
             myPubKey = myECKey.getPubKeyHash();
-            app.startActionInsert(app, "Main", myPubKey, age);
+            app.startActionInsert(myPubKey, age);
         }
         age = Utils.ageToBytes();
         b = Utils.reconstructAgeFromBytes(age);
-        for(int i=0;i<1000;i++) {
+        for(int i=0;i<2000;i++) {
             myECKey = new ECKey();
             myPubKey = myECKey.getPubKeyHash();
-            app.startActionInsert(app, "Main", myPubKey, age);
+            app.startActionInsert(myPubKey, age);
         }
 
-        app.startActionStopTrie(app);
+        app.startActionStopTrie();
 
         //delete Oldest Key
 

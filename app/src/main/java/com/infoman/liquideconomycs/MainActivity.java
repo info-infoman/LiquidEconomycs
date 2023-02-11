@@ -165,7 +165,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 provideService = true;
                 role_capture.setText(getResources().getString(R.string.Provide_service));
                 if((new Date().getTime() - app.dateTimeLastSync) / 1000 > 300){
-                    app.startActionSync(app, "Main", "", "", true);
+                    app.startActionSync("Main", "", "", true);
                 }
             }else{
                 tbResive.setChecked(true);
@@ -240,7 +240,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         }
 
         if((new Date().getTime() - app.dateTimeLastSync) / 1000 > 300 && provideService){
-            app.startActionSync(app, "Main", "","", true);
+            app.startActionSync("Main", "","", true);
         }
         //}
     }
@@ -424,7 +424,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             else{
                 byte[] accepterPubKey = Utils.hexToByte(fields[0]);
                 if(chekSig(accepterPubKey, decodeFromDER(Utils.hexToByte(fields[1])), accepterPubKey)) {
-                        app.startActionFind(getApplicationContext(), "Main", ECKey.fromPublicOnly(accepterPubKey).getPubKeyHash(), 0L);
+                        app.startActionFind("Main", ECKey.fromPublicOnly(accepterPubKey).getPubKeyHash(), 0L);
                 }
                 //TODO add uncheck msg
             }
@@ -434,9 +434,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                Toast.makeText(getApplicationContext(), getResources().getString(R.string.ErrorReceivingPartnerData),Toast.LENGTH_LONG).show();
             }else{
                 byte[] providerPubKey = hexToByte(fields[0]);
-                app.startActionInsert(this, "Main", ECKey.fromPublicOnly(providerPubKey).getPubKeyHash(), ageToBytes());
+                app.startActionInsert(ECKey.fromPublicOnly(providerPubKey).getPubKeyHash(), ageToBytes());
                 app.addClient(providerPubKey);
-                app.startActionSync(getApplicationContext(), "Main", fields[1], fields[2],false);
+                app.startActionSync("Main", fields[1], fields[2],false);
             }
 
         }

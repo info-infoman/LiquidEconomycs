@@ -5,9 +5,6 @@ import android.content.Intent;
 import android.content.res.AssetManager;
 import android.nfc.NdefRecord;
 import android.os.Build;
-import android.util.Log;
-
-import com.google.common.primitives.Bytes;
 
 import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.Sha256Hash;
@@ -20,9 +17,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
-import java.util.BitSet;
 import java.util.Date;
-import java.util.concurrent.TimeUnit;
 
 
 public class Utils {
@@ -77,8 +72,8 @@ public class Utils {
     }
 
     public static Date reconstructAgeFromBytes(byte[] d) {
-        long timestampRecovered = ((d[0]&0xFF) << 8);//todo добавить &0xFF
-        timestampRecovered += d[1]&0xFF;//todo добавить &0xFF
+        long timestampRecovered = ((d[0]&0xFF) << 8);
+        timestampRecovered += d[1]&0xFF;
         timestampRecovered *= 86400000;
         return new Date(timestampRecovered);
     }
@@ -115,44 +110,7 @@ public class Utils {
         return (key==0?0:(key * 8) - 8);
     }
 
-    //todo проверить применение если нет в мапе
-    public static int getChildPosInMap(byte[]childsMap, int key){
-        int result=0;
-        BitSet prepare = BitSet.valueOf(childsMap);
-        for(int i = 0; i < key+1;i++){
-            if(prepare.get(i)) result=result+1;
-        }
-        return result;
-    }
 
-    public static int getChildsCountInMap(byte[]childsMap){
-        return BitSet.valueOf(childsMap).cardinality();
-    }
-
-    public static boolean checkExistChildInMap(byte[]childsMap, int key){
-        BitSet prepare = BitSet.valueOf(childsMap);
-        return prepare.get(key);
-    }
-
-    public static byte[] changeChildInMap(byte[]childsMap, int key, boolean operation){
-        for(int i=0; i < 32; i++){
-            if(key>(i*8)-1 && key<(i*8)+9){
-                byte[] p = new byte[1];
-                p[0]=childsMap[i];
-                BitSet prepare1 = BitSet.valueOf(p);
-                for(int b=0;b<8;b++) {
-                    if ((i * 8) + b == key) {
-                        prepare1.set(b, operation);
-                        if (prepare1.toByteArray().length==0){
-                            return Bytes.concat(getBytesPart(childsMap,0,i), new byte[1], getBytesPart(childsMap,i+1,32-(i+1)));
-                        }
-                        return Bytes.concat(getBytesPart(childsMap,0,i), prepare1.toByteArray(), getBytesPart(childsMap,i+1,32-(i+1)));
-                    }
-                }
-            }
-        }
-        return childsMap;//result.array();
-    }
 
     public static byte[] Sig(byte[] privKey, byte[] digest) {
         return ECKey.fromPrivate(privKey).sign(Sha256Hash.wrap(Sha256Hash.hash(digest))).encodeToDER();

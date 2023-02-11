@@ -8,22 +8,15 @@ import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.preference.PreferenceManager;
-import android.util.Log;
-
-import com.google.common.primitives.Bytes;
-import com.google.common.primitives.Ints;
 
 import org.bitcoinj.core.ECKey;
-import org.bitcoinj.core.Sha256Hash;
 
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.RandomAccessFile;
-import java.util.Arrays;
 
 import androidx.core.util.Pair;
 
-import static androidx.constraintlayout.widget.Constraints.TAG;
 import static com.infoman.liquideconomycs.Utils.ACTION_DELETE;
 import static com.infoman.liquideconomycs.Utils.ACTION_FIND;
 import static com.infoman.liquideconomycs.Utils.ACTION_GENERATE_ANSWER;
@@ -69,7 +62,6 @@ public class Core extends Application {
         cv = new ContentValues();
         waitingIntentCount = 0;
         //isSynchronized = false;
-
         setMyKey();
         ///////////init trie//////////////////////////////////////////////////////
         String nodeDir = context.getFilesDir().getAbsolutePath() + "/trie";
@@ -120,13 +112,6 @@ public class Core extends Application {
                 " or ("+ pos + " < freeSpace.pos AND freeSpace.pos + freeSpace.space < " + (pos + space) + ") limit 1", null);
     }
 
-    public void deleteFreeSpace(long pos, int recordLength, int space) {
-        db.delete("freeSpace", "pos = ?", new String[]{String.valueOf(pos)});
-        if (recordLength < space) {
-            insertFreeSpaceWitchCompressTrieFile(pos + recordLength, space - recordLength);
-        }
-    }
-
     public void insertFreeSpaceWitchCompressTrieFile(long pos, int space) {
         Cursor query = getFreeSpaceWitchCompress(pos, space);
         if (query.moveToFirst()) {
@@ -154,6 +139,13 @@ public class Core extends Application {
         cv.clear();
     }
 
+    public void deleteFreeSpace(long pos, int recordLength, int space) {
+        db.delete("freeSpace", "pos = ?", new String[]{String.valueOf(pos)});
+        if (recordLength < space) {
+            insertFreeSpaceWitchCompressTrieFile(pos + recordLength, space - recordLength);
+        }
+    }
+
     public Cursor getPubKeysForDelete() {
         return db.rawQuery("SELECT * FROM forDelete", null);
     }
@@ -173,7 +165,7 @@ public class Core extends Application {
             int pubKeyColIndex = query.getColumnIndex("pubKey"), privKeyColIndex = query.getColumnIndex("privKey");
             myKey = new Pair(query.getBlob(pubKeyColIndex), query.getBlob(privKeyColIndex));
             //update self key in trie
-            query.close();
+
         } else {
             ECKey myECKey = new ECKey();
             byte[] myPrivKey = myECKey.getPrivKeyBytes(), myPubKey = ECKey.fromPrivate(myPrivKey).getPubKey();
@@ -183,10 +175,9 @@ public class Core extends Application {
             db.insert("users", null, cv);
             //startActionInsert(this, "Core", myPubKey, Utils.ageToBytes());
             cv.clear();
-            query.close();
             setMyKey();
         }
-
+        query.close();
     }
 
     /////////Sync/////////////////////////////////////////////////////////////////////////////////
@@ -228,42 +219,41 @@ public class Core extends Application {
     //intents
     //start
     //Trie
-    public void startActionStopTrie(Context context){
-        Utils.startIntent(context, new Intent(context, TrieServiceIntent.class).setAction(ACTION_STOP_TRIE));
+    public void startActionStopTrie(){
+        Utils.startIntent(this, new Intent(this, TrieServiceIntent.class).setAction(ACTION_STOP_TRIE));
     }
 
-    public void startActionGenerateAnswer(Context context, byte msgType, byte[] payload) {
-        Intent intent = new Intent(context, TrieServiceIntent.class)
+    public void startActionGenerateAnswer(byte msgType, byte[] payload) {
+        Intent intent = new Intent(this, TrieServiceIntent.class)
                 .setAction(ACTION_GENERATE_ANSWER)
                 .putExtra(EXTRA_MSG_TYPE, msgType)
                 .putExtra(EXTRA_PAYLOAD, payload);
-        Utils.startIntent(context, intent);
+        Utils.startIntent(this, intent);
     }
 
-    public void startActionFind(Context context, String master, byte[] pubKey, long pos) {
-        Intent intent = new Intent(context, TrieServiceIntent.class)
+    public void startActionFind(String master, byte[] pubKey, long pos) {
+        Intent intent = new Intent(this, TrieServiceIntent.class)
                 .setAction(ACTION_FIND)
                 .putExtra(EXTRA_MASTER, master)
                 .putExtra(EXTRA_PUBKEY, pubKey)
                 .putExtra(EXTRA_POS, pos);
-        Utils.startIntent(context, intent);
+        Utils.startIntent(this, intent);
     }
 
-    public void startActionInsert(Context context, String master, byte[] pubKey, byte[] age) {
-        Intent intent = new Intent(context, TrieServiceIntent.class)
+    public void startActionInsert(byte[] pubKey, byte[] age) {
+        Intent intent = new Intent(this, TrieServiceIntent.class)
                 .setAction(ACTION_INSERT)
-                .putExtra(EXTRA_MASTER, master)
                 .putExtra(EXTRA_PUBKEY, pubKey)
                 .putExtra(EXTRA_AGE, age);
-        Utils.startIntent(context, intent);
+        Utils.startIntent(this, intent);
     }
 
-    public void startActionInsertFreeSpaceInMap(Context context, long pos, int space) {
-        Intent intent = new Intent(context, TrieServiceIntent.class)
+    public void startActionInsertFreeSpaceInMap(long pos, int space) {
+        Intent intent = new Intent(this, TrieServiceIntent.class)
                 .setAction(ACTION_INSERT_FREE_SPACE_IN_MAP)
                 .putExtra(EXTRA_POS, pos)
                 .putExtra(EXTRA_SPACE, space);
-        Utils.startIntent(context, intent);
+        Utils.startIntent(this, intent);
     }
 
     public void startActionGetHash(Context context, String master, long pos) {
@@ -284,19 +274,19 @@ public class Core extends Application {
     }
 
     //Sync
-    public void startActionSync(Context context, String master, String signalServer, String token, boolean Provide_service) {
+    public void startActionSync(String master, String signalServer, String token, boolean Provide_service) {
         if(Provide_service) {
-            SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(context);
+            SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(this);
             signalServer = sharedPref.getString("Signal_server_URL", "");
             token = sharedPref.getString("Signal_server_Token", "");
         }
-        Intent intent = new Intent(context, SyncServiceIntent.class)
+        Intent intent = new Intent(this, SyncServiceIntent.class)
                 .setAction(ACTION_START_SYNC)
                 .putExtra(EXTRA_SIGNAL_SERVER, signalServer)
                 .putExtra(EXTRA_PROVIDE_SERVICE, Provide_service)
                 .putExtra(EXTRA_TOKEN, token)
                 .putExtra(EXTRA_MASTER, master);
-        Utils.startIntent(context, intent);
+        Utils.startIntent(this, intent);
     }
 
     public void startActionStopSync(Context context) {
