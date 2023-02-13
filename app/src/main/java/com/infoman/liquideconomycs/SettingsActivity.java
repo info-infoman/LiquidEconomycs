@@ -3,7 +3,10 @@ package com.infoman.liquideconomycs;
 import android.content.Context;
 import android.os.Bundle;
 import android.text.InputType;
+import android.util.Log;
 import android.widget.Button;
+
+import com.google.common.primitives.Bytes;
 
 import org.bitcoinj.core.ECKey;
 
@@ -59,13 +62,19 @@ public class SettingsActivity extends AppCompatActivity {
         for(int i=0;i<2000;i++) {
             myECKey = new ECKey();
             myPubKey = myECKey.getPubKeyHash();
+            if(Bytes.concat(myPubKey).length != 20){
+                Log.d("app.trie", "ERROR! inserted key to small");
+            }
             app.startActionInsert(myPubKey, age);
         }
-        age = Utils.ageToBytes();
+        age = Utils.ageToBytes(new Date());
         b = Utils.reconstructAgeFromBytes(age);
         for(int i=0;i<2000;i++) {
             myECKey = new ECKey();
             myPubKey = myECKey.getPubKeyHash();
+            if(Bytes.concat(myPubKey).length != 20){
+                Log.d("app.trie", "ERROR! inserted key to small");
+            }
             app.startActionInsert(myPubKey, age);
         }
 

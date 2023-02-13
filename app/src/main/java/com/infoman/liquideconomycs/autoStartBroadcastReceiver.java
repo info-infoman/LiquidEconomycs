@@ -5,6 +5,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
 
+import com.infoman.liquideconomycs.trie.TrieServiceIntent;
+
 import java.util.Objects;
 
 import static android.content.Intent.ACTION_BOOT_COMPLETED;

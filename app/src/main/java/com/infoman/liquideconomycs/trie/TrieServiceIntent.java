@@ -1,4 +1,4 @@
-package com.infoman.liquideconomycs;
+package com.infoman.liquideconomycs.trie;
 
 import android.annotation.TargetApi;
 import android.app.IntentService;
@@ -7,23 +7,14 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
-import android.database.Cursor;
 import android.graphics.Color;
 import android.os.Build;
-import android.preference.PreferenceManager;
 import android.util.Log;
 
-import com.google.common.primitives.Bytes;
-import com.google.common.primitives.Longs;
-import com.google.common.primitives.Shorts;
-
-import org.bitcoinj.core.SignatureDecodeException;
+import com.infoman.liquideconomycs.Core;
+import com.infoman.liquideconomycs.Utils;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.BitSet;
-import java.util.Date;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
@@ -35,8 +26,6 @@ import static com.infoman.liquideconomycs.Utils.ACTION_GENERATE_ANSWER;
 import static com.infoman.liquideconomycs.Utils.ACTION_GET_HASH;
 import static com.infoman.liquideconomycs.Utils.ACTION_INSERT;
 import static com.infoman.liquideconomycs.Utils.ACTION_INSERT_FREE_SPACE_IN_MAP;
-import static com.infoman.liquideconomycs.Utils.ACTION_STOP_TRIE;
-import static com.infoman.liquideconomycs.Utils.BRANCH;
 import static com.infoman.liquideconomycs.Utils.EXTRA_AGE;
 import static com.infoman.liquideconomycs.Utils.EXTRA_MASTER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_MSG_TYPE;
@@ -44,17 +33,12 @@ import static com.infoman.liquideconomycs.Utils.EXTRA_PAYLOAD;
 import static com.infoman.liquideconomycs.Utils.EXTRA_POS;
 import static com.infoman.liquideconomycs.Utils.EXTRA_PUBKEY;
 import static com.infoman.liquideconomycs.Utils.EXTRA_SPACE;
-import static com.infoman.liquideconomycs.Utils.LEAF;
-import static com.infoman.liquideconomycs.Utils.ROOT;
-import static com.infoman.liquideconomycs.Utils.getBytesPart;
-import static com.infoman.liquideconomycs.Utils.getChildPosInROOT;
-import static com.infoman.liquideconomycs.Utils.getCommonKey;
-import static org.bitcoinj.core.Utils.sha256hash160;
 //TODO add max age field in leaf and branch node = max age in childs, for automate delete to old pubKey
 
 public class TrieServiceIntent extends IntentService {
 
-    private Core app;
+    protected Core app;
+    protected TrieNode node;
 
     public TrieServiceIntent() {
         super("TrieServiceIntent");
@@ -68,7 +52,12 @@ public class TrieServiceIntent extends IntentService {
         app = (Core) getApplicationContext();
         Log.d("app.trie", "Create!"+app.waitingIntentCount);
         if(app.waitingIntentCount !=0) return;
-
+        //load root
+        try {
+            TrieNode node = new TrieNode(app, 0L, new byte[20], false);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         //android.os.Debug.waitForDebugger();
         //TODO cut down childMap 4 bytes sector mask and 2-32 bytes map? total 5-36 bytes
         //ROOT(content BRANCHs & LEAFs)
@@ -129,7 +118,7 @@ public class TrieServiceIntent extends IntentService {
                 final long pos = intent.getLongExtra(EXTRA_POS,0L);
                 ////////////////////////////////////////////////////////////////
                 try {
-                    app.broadcastActionMsg(master, cmd, getHash(pos));
+                    app.broadcastActionMsg(master, cmd, node.getHash(pos));
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -143,10 +132,19 @@ public class TrieServiceIntent extends IntentService {
                 final byte[] key = intent.getByteArrayExtra(EXTRA_PUBKEY), value = intent.getByteArrayExtra(EXTRA_AGE);
                 ////////////////////////////////////////////////////////////////
                 try {
-                    app.broadcastActionMsg(master, cmd, insert(key, value, 0L, new byte[0]));
+                    node.insert(key, value);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
+                /*try {
+                    if(Bytes.concat(key).length != 20){
+                        Log.d("app.trie", "ERROR! inserted key to small");
+                    }
+                    node.insert(key, value, 0L, new byte[0]);
+                    //app.broadcastActionMsg(master, cmd, );
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }*/
                 app.waitingIntentCount--;
                 ////////////////////////////////////////////////////////////////
             }
@@ -156,11 +154,11 @@ public class TrieServiceIntent extends IntentService {
                 final byte[] key = intent.getByteArrayExtra(EXTRA_PUBKEY);
                 final long pos = intent.getLongExtra(EXTRA_POS, 0L);
                 ////////////////////////////////////////////////////////////////
-                try {
-                    app.broadcastActionMsg(master, cmd, find(key, pos));
+                /*try {
+                    //app.broadcastActionMsg(master, cmd, find(key, pos));
                 } catch (IOException e) {
                     e.printStackTrace();
-                }
+                }*/
                 ////////////////////////////////////////////////////////////////
             }
 
@@ -169,11 +167,11 @@ public class TrieServiceIntent extends IntentService {
                 final byte[] key = intent.getByteArrayExtra(EXTRA_PUBKEY);
                 final long pos = intent.getLongExtra(EXTRA_POS, 0L);
                 ////////////////////////////////////////////////////////////////
-                try {
-                    app.broadcastActionMsg(master, cmd, delete(key, pos));
+                /*try {
+                    //app.broadcastActionMsg(master, cmd, delete(key, pos));
                 } catch (IOException e) {
                     e.printStackTrace();
-                }
+                }*/
                 ////////////////////////////////////////////////////////////////
             }
 
@@ -181,11 +179,11 @@ public class TrieServiceIntent extends IntentService {
                 final byte msgType = intent.getByteExtra(EXTRA_MSG_TYPE, Utils.getHashs);
                 final byte[] payload = intent.getByteArrayExtra(EXTRA_PAYLOAD);
                 ////////////////////////////////////////////////////////////////
-                try {
-                    app.broadcastActionMsg("Trie", "Answer", generateAnswer(msgType, payload));
+                /*try {
+                    //app.broadcastActionMsg("Trie", "Answer", generateAnswer(msgType, payload));
                 } catch (IOException | SignatureDecodeException e) {
                     e.printStackTrace();
-                }
+                }*/
                 ////////////////////////////////////////////////////////////////
             }
 
@@ -196,7 +194,7 @@ public class TrieServiceIntent extends IntentService {
                 app.insertFreeSpaceWitchCompressTrieFile(pos, space);
                 ////////////////////////////////////////////////////////////////
             }
-
+/*
             if (ACTION_STOP_TRIE.equals(action)) {
                 try {
                     while(app.waitingIntentCount!=0){}
@@ -221,13 +219,20 @@ public class TrieServiceIntent extends IntentService {
                 }
                 ////////////////////////////////////////////////////////////////
             }
+
+ */
         }
     }
 
+
+
+    /*
     //todo add age sort for sync priority
     //todo изолировать запись
     private byte[] generateAnswer(byte msgType, byte[] payload) throws IOException, SignatureDecodeException {
         Context context = app.getApplicationContext();
+        ChildsMap childsMap = new ChildsMap(32);
+        ChildsMap selfNodeMap = new ChildsMap(32);
         boolean exist, existSelfChild;
         byte[] answer = new byte[0];
         if (null == payload) payload = new byte[8];
@@ -252,7 +257,7 @@ public class TrieServiceIntent extends IntentService {
                 byte[] nodeTypeAndKeySize   = Utils.getBytesPart(payload, i+8, 2);
                 int offLen                  = (nodeTypeAndKeySize[0]!=LEAF?20:2);
                 byte[] key                  = Utils.getBytesPart(payload, i + 10, nodeTypeAndKeySize[1]);
-                ChildsMap childsMap          = new ChildsMap(Utils.getBytesPart(payload, i + 10 + nodeTypeAndKeySize[1], 32));
+                childsMap.value             = Utils.getBytesPart(payload, i + 10 + nodeTypeAndKeySize[1], 32);
                 int childsCountInMap        = childsMap.getCount();
                 int len                     = childsCountInMap * (nodeTypeAndKeySize[0]==Utils.LEAF ? 2 : 28);
                 byte[] childsArray          = Utils.getBytesPart(payload, i + 10 + nodeTypeAndKeySize[1] + 32, len);
@@ -264,11 +269,11 @@ public class TrieServiceIntent extends IntentService {
                         selfNodeMapAndHashOrAge,
                         selfTypeAndKeySize = new byte[2],
                         selfNodeHashsOrAges = new byte[0];
-                ChildsMap selfNodeMap = new ChildsMap(new byte[32]);
+                selfNodeMap.value = null;
                 if (nodeTypeAndKeySize[0]== ROOT){
                     selfNodeMapAndHashOrAge = getNodeMapAndHashesOrAges(selfNodePos);
                     selfTypeAndKeySize = Utils.getBytesPart(selfNodeMapAndHashOrAge, 0, 2);
-                    selfNodeMap.map = Utils.getBytesPart(selfNodeMapAndHashOrAge, 2, 32);
+                    selfNodeMap.value = Utils.getBytesPart(selfNodeMapAndHashOrAge, 2, 32);
                     selfNodeHashsOrAges = Utils.getBytesPart(selfNodeMapAndHashOrAge, 2 + 32, selfNodeMapAndHashOrAge.length - (2 + 32));
                 }else {
                     //Получим полный префикс ключа в предидущем цикле перед запросом
@@ -293,10 +298,10 @@ public class TrieServiceIntent extends IntentService {
                             selfNodeMapAndHashOrAge = getNodeMapAndHashesOrAges(selfNodePos);
                             selfTypeAndKeySize = Utils.getBytesPart(selfNodeMapAndHashOrAge, 0, 2);
                             if (selfTypeAndKeySize[1] > 0) {
-                                selfNodeMap.map = Utils.getBytesPart(selfNodeMapAndHashOrAge, 2 + selfTypeAndKeySize[1], 32);
+                                selfNodeMap.value = Utils.getBytesPart(selfNodeMapAndHashOrAge, 2 + selfTypeAndKeySize[1], 32);
                                 selfNodeHashsOrAges = Utils.getBytesPart(selfNodeMapAndHashOrAge, 2 + selfTypeAndKeySize[1] + 32, selfNodeMapAndHashOrAge.length - (2 + selfTypeAndKeySize[1] + 32));
                             } else {
-                                selfNodeMap.map = Utils.getBytesPart(selfNodeMapAndHashOrAge, 2, 32);
+                                selfNodeMap.value = Utils.getBytesPart(selfNodeMapAndHashOrAge, 2, 32);
                                 selfNodeHashsOrAges = Utils.getBytesPart(selfNodeMapAndHashOrAge, 2 + 32, selfNodeMapAndHashOrAge.length - (2 + 32));
                             }
                         } else {
@@ -381,14 +386,15 @@ public class TrieServiceIntent extends IntentService {
     private byte[] find(byte[] key, long pos) throws IOException {
         byte[] s=search(key, pos);
 
-        if (s!=null && s.length>2 && key.length>1){
+        if (s.length>2 && key.length>1){
             return find(getBytesPart(key, 1, key.length - 1), Longs.fromByteArray(s));
         }else return s;
     }
 
     private byte[] insert(byte[] key, byte[] age, long pos, byte[] fullKey) throws IOException {
         byte[] hash;
-        ChildsMap childsMap = new ChildsMap(new byte[32]);
+        ChildsMap childsMap = new ChildsMap(32);
+
         byte[] typeAndKeySize = new byte[2];
 
         if (app.trie.length() == 0) {
@@ -404,18 +410,27 @@ public class TrieServiceIntent extends IntentService {
         byte[] sResult=search(key, pos);
 
         if (pos==0L) {
-            byte[] lKey;
-            if (sResult == null){//Create new LEAF witch age
-                lKey = getBytesPart(key, 1, key.length - 2);
+            byte[] NodeKey;
+            if (sResult.length == 0 || Arrays.equals(sResult, new byte[8])){//Create new LEAF witch age
+                childsMap.value = new byte[32];
+                NodeKey = getBytesPart(key, 1, key.length - 2);
                 typeAndKeySize[0] = LEAF;
-                typeAndKeySize[1] = (byte)lKey.length;
-                childsMap.set((key[key.length-1]&0xFF), true);//add age
-                hash=calcHash(typeAndKeySize[0], lKey, Bytes.concat(childsMap.map, age));
-                pos = addRecordInFile(age, typeAndKeySize, lKey, hash, childsMap, age);
+                typeAndKeySize[1] = (byte)NodeKey.length;
+                childsMap.set((key[key.length - 1] & 0xFF), true);//add age
+                hash=calcHash(typeAndKeySize[0], NodeKey, Bytes.concat(childsMap.value, age));
+                if(Bytes.concat(new byte[1], NodeKey, new byte[1]).length != 20){
+                    Log.d("app.trie", "ERROR! inserted key to small");
+                }
+                pos = addRecordInFile(age, typeAndKeySize, NodeKey, hash, childsMap, age);
 
             }else{//insert in child & save in root
-                lKey = getBytesPart(key, 1, key.length - 1);
-                pos = Longs.fromByteArray(insert(lKey, age, Longs.fromByteArray(sResult), new byte[]{key[0]}));
+                NodeKey = getBytesPart(key, 1, key.length - 1);
+                fullKey = new byte[1];
+                fullKey[0] = key[0];
+                if(Bytes.concat(fullKey, NodeKey).length != 20){
+                    Log.d("app.trie", "ERROR! inserted key to small");
+                }
+                pos = Longs.fromByteArray(insert(NodeKey, age, Longs.fromByteArray(sResult), fullKey));
             }
             //save in root
             //if node-age is younger inserted age then change nodeAge to age
@@ -438,17 +453,16 @@ public class TrieServiceIntent extends IntentService {
             return hash;
 
         }else {
-            if (sResult != null) {
+            if (sResult.length > 0) {
                 app.trie.seek(pos);
                 byte[] nodeAge = new byte[2];
                 app.trie.read(nodeAge, 0, 2);
-
                 byte type = app.trie.readByte();
                 byte keyNodeSize = app.trie.readByte();
                 byte[] keyNode = new byte[keyNodeSize];
                 app.trie.read(keyNode, 0, keyNodeSize);
                 app.trie.seek(pos + 4 + keyNodeSize + 20); //skip hash
-                app.trie.read(childsMap.map, 0, 32);
+                app.trie.read(childsMap.value, 0, 32);
                 //Получим суффикс
                 byte[] suffixKey = getBytesPart(key, keyNodeSize, key.length - keyNodeSize);
 
@@ -462,21 +476,29 @@ public class TrieServiceIntent extends IntentService {
                 //todo изолировать запись
                 if(type==LEAF){
                     app.trie.write(age);
-                    if(Bytes.concat(fullKey, keyNode, suffixKey).length!=20){
-                        Log.d("app.trie", "ERROR! deleteOldest key to small");
+                    if(Bytes.concat(fullKey, keyNode, suffixKey).length != 20){
+                        Log.d("app.trie", "ERROR! inserted key to small");
                     }
                 }else{
                     byte[] chPos=new byte[8];
                     app.trie.read(chPos, 0, 8);
                     //insert to child
+                    byte[] fullKey2 = new byte[1];
+                    fullKey2[0] = suffixKey[0];
+                    if(Bytes.concat(fullKey, keyNode, fullKey2, (getBytesPart(suffixKey, 1, suffixKey.length-1))).length != 20){
+                        Log.d("app.trie", "ERROR! inserted key to small");
+                    }
+                    if((Longs.fromByteArray(chPos)) < 0L){
+                        Log.d("app.trie", "ERROR! inserted key to small");
+                    }
                     chPos = insert(getBytesPart(suffixKey, 1, suffixKey.length-1), age, Longs.fromByteArray(chPos),
-                            Bytes.concat(fullKey, keyNode, new byte[]{suffixKey[0]})
+                            Bytes.concat(fullKey, keyNode, fullKey2)
                     );
                     app.trie.seek(posToWrite);
                     app.trie.write(chPos);
                 }
 
-                //if node-age is younger inserted age then change nodeAge to age
+                //if the entered key is older than the node, then we will make the node older
                 if(Utils.compareDate(Utils.reconstructAgeFromBytes(nodeAge), Utils.reconstructAgeFromBytes(age)) > 0L) {
                     app.trie.seek(pos);
                     app.trie.write(age);
@@ -484,7 +506,7 @@ public class TrieServiceIntent extends IntentService {
                 app.trie.seek(pos + 4 + keyNodeSize + 20 + 32);
                 byte[] childArray = new byte[selfChildArraySize];
                 app.trie.read(childArray, 0, selfChildArraySize);
-                hash = calcHash(type, keyNode, type==LEAF ? Bytes.concat(childsMap.map, childArray) : childArray);
+                hash = calcHash(type, keyNode, type==LEAF ? Bytes.concat(childsMap.value, childArray) : childArray);
                 app.trie.seek(pos + 4 + keyNodeSize);
                 app.trie.write(hash);
                 return Longs.toByteArray(pos);
@@ -500,7 +522,7 @@ public class TrieServiceIntent extends IntentService {
                 app.trie.read(keyNode, 0, keyNodeSize);
 
                 app.trie.seek(pos + 4 + keyNodeSize + 20); //skip hash
-                app.trie.read(childsMap.map, 0, 32);
+                app.trie.read(childsMap.value, 0, 32);
                 //Получим префикс и суффикс искомого ключа
                 byte[] preffixKey = getBytesPart(key, 0, keyNodeSize);
 
@@ -519,7 +541,7 @@ public class TrieServiceIntent extends IntentService {
 
                 byte[] retPos;
                 byte[] childArray;
-                ChildsMap childsMapNew = new ChildsMap(new byte[32]);
+                ChildsMap childsMapNew = new ChildsMap(32);
                 if(!Arrays.equals(preffixKey, keyNode)){//create sub node
                     //ADD NEW LEAF
                     assert commonKey != null;
@@ -529,9 +551,9 @@ public class TrieServiceIntent extends IntentService {
                     typeAndKeySize[0] = LEAF;
                     typeAndKeySize[1] = (byte)leafKey_.length;
                     childsMapNew.set((key[key.length-1]&0xFF),true);
-                    hash=calcHash(typeAndKeySize[0], leafKey_, Bytes.concat(childsMapNew.map, age));
+                    hash=calcHash(typeAndKeySize[0], leafKey_, Bytes.concat(childsMapNew.value, age));
                     if(Bytes.concat(fullKey, commonKey, new byte[1], leafKey_, new byte[1]).length!=20){
-                        Log.d("app.trie", "ERROR! deleteOldest key to small");
+                        Log.d("app.trie", "ERROR! inserted key to small");
                     }
                     long posLeaf = addRecordInFile(age, typeAndKeySize, leafKey_, hash, childsMapNew, age);
 
@@ -540,10 +562,10 @@ public class TrieServiceIntent extends IntentService {
                     byte[] oldLeafKey_ = getBytesPart(oldLeafKey, 1 , oldLeafKey.length - 1);
                     typeAndKeySize[0] = type;
                     typeAndKeySize[1] = (byte)oldLeafKey_.length;
-                    hash=calcHash(type, oldLeafKey_, type==LEAF ? Bytes.concat(childsMap.map, selfChildArray) : selfChildArray);
+                    hash=calcHash(type, oldLeafKey_, type==LEAF ? Bytes.concat(childsMap.value, selfChildArray) : selfChildArray);
                     if(type==LEAF) {
                         if (Bytes.concat(fullKey, commonKey, new byte[1], oldLeafKey_, new byte[1]).length != 20) {
-                            Log.d("app.trie", "ERROR! deleteOldest key to small");
+                            Log.d("app.trie", "ERROR! inserted key to small");
                         }
                     }
                     long posOldLeaf = addRecordInFile(nodeAge, typeAndKeySize, oldLeafKey_, hash, childsMap, selfChildArray);
@@ -558,7 +580,7 @@ public class TrieServiceIntent extends IntentService {
                     }
                     hash=calcHash(BRANCH, commonKey, childArray);
 
-                    ChildsMap childsMapNewBRANCH = new ChildsMap(new byte[32]);
+                    ChildsMap childsMapNewBRANCH = new ChildsMap(32);
                     childsMapNewBRANCH.set((leafKey[0]&0xFF),true);
                     childsMapNewBRANCH.set((oldLeafKey[0]&0xFF),true);
                     retPos = Longs.toByteArray(addRecordInFile(
@@ -580,9 +602,10 @@ public class TrieServiceIntent extends IntentService {
                         insByte = (suffixKey[0]&0xFF);
                         typeAndKeySize[1] = (byte)leafKey.length;
                         childsMapNew.set((key[key.length-1]&0xFF),true);
-                        hash=calcHash(LEAF, leafKey, Bytes.concat(childsMapNew.map, age));
+                        hash=calcHash(LEAF, leafKey, Bytes.concat(childsMapNew.value, age));
+                        /////////////////pref key + branchKey + place + leafKey + place
                         if (Bytes.concat(fullKey, keyNode, new byte[1], leafKey, new byte[1]).length != 20) {
-                            Log.d("app.trie", "ERROR! deleteOldest key to small");
+                            Log.d("app.trie", "ERROR! inserted key to small");
                         }
                         posLeaf = addRecordInFile(age, typeAndKeySize, leafKey, hash, childsMapNew, age);
 
@@ -597,10 +620,10 @@ public class TrieServiceIntent extends IntentService {
                     byte[] before=(chp == 0 ? new byte[0] : getBytesPart(selfChildArray,0,  (chp-1)*(type==LEAF ? 2 : 8)));
                     childArray = Bytes.concat(before, (type==LEAF ? age : Longs.toByteArray(posLeaf)), getBytesPart(selfChildArray, before.length, selfChildArray.length-before.length));
                     // пересчитываем хеш и рекурсивно вносим позицию в вышестоящие узлы
-                    hash=calcHash(type, keyNode, type==LEAF ? Bytes.concat(childsMap.map, childArray) : childArray);
+                    hash=calcHash(type, keyNode, type==LEAF ? Bytes.concat(childsMap.value, childArray) : childArray);
                     if(type==LEAF) {
                         if (Bytes.concat(fullKey, keyNode, new byte[1]).length != 20) {
-                            Log.d("app.trie", "ERROR! deleteOldest key to small");
+                            Log.d("app.trie", "ERROR! inserted key to small");
                         }
                     }
                     retPos = Longs.toByteArray(addRecordInFile(
@@ -614,6 +637,7 @@ public class TrieServiceIntent extends IntentService {
 
     private void deleteOldest(long pos, byte[] key) throws IOException {
         SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(app);
+
         long maxAge = Long.parseLong(sharedPref.getString("maxAge", "30"));
         byte[] nodeAge = new byte[2];
         app.trie.seek(pos);
@@ -630,14 +654,14 @@ public class TrieServiceIntent extends IntentService {
                     }
                 }
             }else{
-                ChildsMap childsMap = new ChildsMap(new byte[32]);
+                ChildsMap childsMap = new ChildsMap(32);
                 byte type = app.trie.readByte();
                 byte keyNodeSize = app.trie.readByte();
                 byte[] keyNode = new byte[keyNodeSize];
                 app.trie.read(keyNode, 0, keyNodeSize);
                 byte[] fullKey = Bytes.concat(key, keyNode);
                 app.trie.seek(pos + 4 + keyNodeSize + 20); //skip hash
-                app.trie.read(childsMap.map, 0, 32);
+                app.trie.read(childsMap.value, 0, 32);
                 int childPosInMap = 0;
                 for(int i=0; i < 256; i++) {
                     if(childsMap.get(i)){
@@ -655,10 +679,10 @@ public class TrieServiceIntent extends IntentService {
                                         Log.d("app.trie", "ERROR! deleteOldest key to small");
                                         return;
                                     }
-                                    if(find(Bytes.concat(fullKey, sKey), 0L)==null){
+                                    if(find(Bytes.concat(fullKey, sKey), 0L).length == 0){
                                         Log.d("app.trie", "ERROR! key not found");
                                     }
-                                    app.addForDelete(Bytes.concat(fullKey, sKey));
+                                    //app.addForDelete(Bytes.concat(fullKey, sKey));
                                 }
                             }else{
                                 deleteOldest(Longs.fromByteArray(childPos), Bytes.concat(fullKey, sKey));
@@ -670,13 +694,13 @@ public class TrieServiceIntent extends IntentService {
         }
     }
 
-    //return null if not change(not found) or pos in file if change or hash if root
+    //return byte[8] if deleted or not found, or pos in file if change or hash if root
     private byte[] delete(byte[] key, long pos) throws IOException {
         byte[] hash;
-        ChildsMap childsMap = new ChildsMap(new byte[32]);
+        ChildsMap childsMap = new ChildsMap(32);
         byte[] typeAndKeySize = new byte[2];
         byte[] s=search(key, pos);
-        if (s != null) {
+        if (s.length > 0) {
             if(pos==0L) {
                 if(key.length<20){
                     Log.d("app.trie", "ERROR! delete key to small");
@@ -684,8 +708,6 @@ public class TrieServiceIntent extends IntentService {
                 }
                 byte[] dKey = getBytesPart(key, 1, key.length - 1);
                 byte[] posBytes = delete(dKey, Longs.fromByteArray(s));
-                if (posBytes == null)
-                    posBytes = new byte[8];
                 //todo изолировать запись
                 app.trie.seek(0);
                 byte[] nodeAge = new byte[2];
@@ -718,7 +740,7 @@ public class TrieServiceIntent extends IntentService {
                 byte[] keyNode = new byte[keyNodeSize];
                 app.trie.read(keyNode, 0, keyNodeSize);
                 app.trie.seek(pos + 4 + keyNodeSize + 20); //skip hash
-                app.trie.read(childsMap.map, 0, 32);
+                app.trie.read(childsMap.value, 0, 32);
                 byte[] suffixKey = getBytesPart(key, keyNodeSize, key.length - keyNodeSize);
 
                 int selfChildsCount = childsMap.getCount();
@@ -727,7 +749,7 @@ public class TrieServiceIntent extends IntentService {
                 if(selfChildsCount==1 && type == LEAF){ //jast delete empty LEAF node and return zero
                     app.startActionInsertFreeSpaceInMap(pos, 56 + keyNodeSize + selfChildArraySize);
                     return new byte[8];
-                }else{//if childs > 1 or type Branch
+                }else{//selfChildsCount <=> 1 && any type
                     app.trie.seek(pos + 4 + keyNodeSize + 20 + 32);
                     byte[] childArray = new byte[selfChildArraySize];
                     app.trie.read(childArray, 0, selfChildArraySize);
@@ -740,53 +762,27 @@ public class TrieServiceIntent extends IntentService {
                         byte[] chPos = new byte[8];
                         app.trie.read(chPos, 0, 8);
                         //delete in child
-                        chPos = delete(getBytesPart(suffixKey, 1, suffixKey.length - 1), Longs.fromByteArray(chPos));
-                        if(chPos == null || Longs.fromByteArray(chPos) == 0L){//deleted child node
-                            int chp = childsMap.getPos(delByte);
-                            //delete in map
-                            childsMap.set(delByte, false);
-                            //delete in array
-                            byte[] before = (chp == 0 ? new byte[0] : getBytesPart(childArray, 0, (chp - 1) * 8));
-                            childArray = Bytes.concat(before, getBytesPart(childArray, (chp * 8), childArray.length - (chp * 8)));
-
+                        byte[] newChPos = delete(getBytesPart(suffixKey, 1, suffixKey.length - 1), Longs.fromByteArray(chPos));
+                        if(Longs.fromByteArray(newChPos) == 0L){//deleted all child node
                             app.startActionInsertFreeSpaceInMap(pos, 56 + keyNodeSize + selfChildArraySize);
+                            if(selfChildsCount==1){// deleted node
+                                return new byte[8];
+                            }else{ //jast copy node in new place
+                                int chp = childsMap.getPos(delByte);
+                                //delete in map
+                                childsMap.set(delByte, false);
+                                //delete in array
+                                byte[] before = (chp == 0 ? new byte[0] : getBytesPart(childArray, 0, (chp - 1) * 8));
+                                childArray = Bytes.concat(before, getBytesPart(childArray, (chp * 8), childArray.length - (chp * 8)));
 
-                            if((selfChildsCount-1)==1 && childArray.length == 8){//recover key if one stay child
-                                pos = Longs.fromByteArray(childArray);
-                                app.trie.seek(pos);
-                                app.trie.read(nodeAge, 0, 2);
-                                typeAndKeySize[0] = app.trie.readByte();
-                                int oldKeySize = app.trie.readByte();
-                                typeAndKeySize[1] = (byte)(oldKeySize+keyNodeSize);
-                                byte[] oldKeyNode = new byte[oldKeySize];
-                                app.trie.read(oldKeyNode, 0, oldKeySize);
-                                app.trie.seek(pos + 4 + oldKeySize + 20);
-                                app.trie.read(childsMap.map, 0, 32);
-                                selfChildsCount = childsMap.getCount();
-                                selfChildArraySize = selfChildsCount * (typeAndKeySize[0] == LEAF ? 2 : 8);
-                                byte[] newChildArray = new byte[selfChildArraySize];
-                                app.trie.read(newChildArray, 0, selfChildArraySize);
-                                hash = calcHash(typeAndKeySize[0],
-                                        (keyNode.length > 0 && oldKeyNode.length > 0 ? Bytes.concat(keyNode, oldKeyNode) : (keyNode.length > 0 ? keyNode : oldKeyNode)),
-                                        typeAndKeySize[0]==LEAF ? Bytes.concat(childsMap.map, newChildArray) : newChildArray);
-                                app.startActionInsertFreeSpaceInMap(pos, 56 +  oldKeySize + selfChildArraySize);
-
-                                byte[] oldestNodeAge = getOldestNodeAge(nodeAge, typeAndKeySize[0], newChildArray);
-                                return Longs.toByteArray(
-                                        addRecordInFile(oldestNodeAge,
-                                                typeAndKeySize,
-                                                (keyNode.length > 0 && oldKeyNode.length > 0 ? Bytes.concat(keyNode, oldKeyNode) : (keyNode.length > 0 ? keyNode : oldKeyNode)),
-                                                hash,
-                                                childsMap,
-                                                newChildArray)
-                                );
-                            }else {
-                                if(selfChildsCount==1){
-                                    app.startActionInsertFreeSpaceInMap(pos, 56 + keyNodeSize + selfChildArraySize);
-                                    return new byte[8];
+                                if(childArray.length == 8) {//if stay one child then
+                                    byte[] k = new byte[1];
+                                    k[0] = (byte) childsMap.getOne();
+                                    byte[] reconstNode = reconctructNode(childArray, keyNodeSize, keyNode, k);
+                                    if (reconstNode.length > 0) {//if not leaf then reconstruct this branch witch
+                                        return reconstNode;
+                                    }
                                 }
-                                //jast copy node in new place
-                                // пересчитываем хеш и рекурсивно вносим позицию в вышестоящие узлы
                                 hash = calcHash(type, keyNode, childArray);
                                 byte[] oldestNodeAge = getOldestNodeAge(nodeAge, BRANCH, childArray);
                                 return Longs.toByteArray(
@@ -798,23 +794,23 @@ public class TrieServiceIntent extends IntentService {
                                                 childArray)
                                 );
                             }
-                        }else{//changed child node
-                            //todo изолировать запись
-                            app.trie.seek(posToDelete);
-                            app.trie.write(chPos);
-                            app.trie.seek(pos + 4 + keyNodeSize + 20 + 32);
-                            childArray = new byte[selfChildArraySize];
-                            app.trie.read(childArray, 0, selfChildArraySize);
-                            hash=calcHash(type, keyNode, childArray);
+                        }else{//changed child node todo изолировать запись
+                                app.trie.seek(posToDelete);
+                                app.trie.write(newChPos);
+                                app.trie.seek(pos + 4 + keyNodeSize + 20 + 32);
+                                childArray = new byte[selfChildArraySize];
+                                app.trie.read(childArray, 0, selfChildArraySize);
+                                hash = calcHash(type, keyNode, childArray);
 
-                            byte[] oldestNodeAge = getOldestNodeAge(nodeAge, BRANCH, childArray);
-                            app.trie.seek(pos);
-                            app.trie.write(oldestNodeAge);
-                            app.trie.seek(pos + 4 + keyNodeSize);
-                            app.trie.write(hash);
-                            return Longs.toByteArray(pos);
+                                byte[] oldestNodeAge = getOldestNodeAge(nodeAge, BRANCH, childArray);
+                                app.trie.seek(pos);
+                                app.trie.write(oldestNodeAge);
+                                app.trie.seek(pos + 4 + keyNodeSize);
+                                app.trie.write(hash);
+                                return Longs.toByteArray(pos);
                         }
                     }else{ // for leaf jast delete age and copy node to new place
+                        app.startActionInsertFreeSpaceInMap(pos, 56 +  keyNodeSize + selfChildArraySize);
                         int chp= childsMap.getPos(delByte);
                         //delete in map
                         childsMap.set(delByte, false);
@@ -822,9 +818,8 @@ public class TrieServiceIntent extends IntentService {
                         byte[] before=(chp == 0 ? new byte[0] : getBytesPart(childArray,0,  (chp-1)*2));
                         childArray = Bytes.concat(before, getBytesPart(childArray, (chp * 2), childArray.length-(chp * 2)));
 
-                        hash=calcHash(type, keyNode, Bytes.concat(childsMap.map, childArray));
+                        hash=calcHash(type, keyNode, Bytes.concat(childsMap.value, childArray));
                         byte[] oldestNodeAge = getOldestNodeAge(nodeAge, LEAF, childArray);
-                        app.startActionInsertFreeSpaceInMap(pos, 56 +  keyNodeSize + selfChildArraySize);
 
                         return Longs.toByteArray(
                                 addRecordInFile(oldestNodeAge,
@@ -838,7 +833,49 @@ public class TrieServiceIntent extends IntentService {
                 }
             }
         }
-        return null;
+        //not found
+        return new byte[8];
+    }
+
+    private byte[] reconctructNode(byte[] childArray, int keyNodeSize, byte[] keyNode, byte[] childKey) throws IOException {
+        long pos = Longs.fromByteArray(childArray);
+        byte[] nodeAge = new byte[2], typeAndKeySize = new byte[2];
+
+        app.trie.seek(pos);
+        app.trie.read(nodeAge, 0, 2);
+        typeAndKeySize[0] = app.trie.readByte();
+        if(typeAndKeySize[0] == LEAF){
+           return new byte[0];//do nothing
+        }else{
+            ChildsMap childsMap = new ChildsMap(32);
+            int selfChildsCount, selfChildArraySize, oldKeySize;
+            byte[] oldKeyChild, newChildArray, newKeyNode, hash;
+
+            oldKeySize = app.trie.readByte();
+            typeAndKeySize[1] = (byte)(oldKeySize + 1 + keyNodeSize);
+            oldKeyChild = new byte[oldKeySize];
+            app.trie.read(oldKeyChild, 0, oldKeySize);
+            app.trie.seek(pos + 4 + oldKeySize + 20);
+            app.trie.read(childsMap.value, 0, 32);
+            selfChildsCount = childsMap.getCount();
+            selfChildArraySize = selfChildsCount * 8;
+            newChildArray = new byte[selfChildArraySize];
+            app.trie.read(newChildArray, 0, selfChildArraySize);
+            newKeyNode = Bytes.concat(keyNode,childKey, oldKeyChild);
+            hash = calcHash(typeAndKeySize[0], newKeyNode, newChildArray);
+
+            app.startActionInsertFreeSpaceInMap(pos, 56 +  oldKeySize + selfChildArraySize);
+
+            return Longs.toByteArray(
+                    addRecordInFile(nodeAge,
+                            typeAndKeySize,
+                            newKeyNode,
+                            hash,
+                            childsMap,
+                            newChildArray)
+            );
+        }
+
     }
 
     private byte[] getOldestNodeAge(byte[] oldestNodeAge, byte type, byte[] childArray) throws IOException {
@@ -866,7 +903,7 @@ public class TrieServiceIntent extends IntentService {
     // узла по позиции в файле дерева
     private byte[] getNodeMapAndHashesOrAges(byte[] selfNodePos) throws IOException {
         long pos = Longs.fromByteArray(selfNodePos);
-        ChildsMap childsMap = new ChildsMap(new byte[32]);
+        ChildsMap childsMap = new ChildsMap(32);
         byte[]  typeAndKeySize  = new byte[2],
                 keyNode,
                 selfChildArray  = new byte[0],
@@ -891,7 +928,7 @@ public class TrieServiceIntent extends IntentService {
             keyNode = new byte[typeAndKeySize[1]];
             app.trie.read(keyNode, 0, typeAndKeySize[1]);
             app.trie.seek(pos + 4 + typeAndKeySize[1] + 20); //skip hash
-            app.trie.read(childsMap.map, 0, 32);
+            app.trie.read(childsMap.value, 0, 32);
             int selfChildrenCount = childsMap.getCount();
             int selfChildArraySize = selfChildrenCount * (typeAndKeySize[0] == LEAF ? 2 : 8);
             selfChildArray = new byte[selfChildArraySize];
@@ -910,17 +947,18 @@ public class TrieServiceIntent extends IntentService {
             }
         }
         if (typeAndKeySize[1] > 0)
-            return Bytes.concat(typeAndKeySize, keyNode, childsMap.map, result);
+            return Bytes.concat(typeAndKeySize, keyNode, childsMap.value, result);
         else
-            return Bytes.concat(typeAndKeySize, childsMap.map, result);
+            return Bytes.concat(typeAndKeySize, childsMap.value, result);
     }
 
-    //return pos or age or null - if not found
+    //return pos or age or byte[0] - if not found
     private byte[] search(byte[] key, long pos) throws IOException {
         //Если размер файла == 0  то вернем null
+        ChildsMap childsMap = new ChildsMap(32);
         if(app.trie.length()>0) {
             //если это корень то переместим курсор на позицию в массиве детей = первый байт ключа * 8 - 8
-            //если содержимое != 0 то  начинаем искать там и вернем то что нашли + корень, иначе вернем корень
+            //и вернем если не равно 0
             if (pos == 0L) {
                 app.trie.seek(22 + getChildPosInROOT((key[0]&0xFF)));
                 byte[] childPos = new byte[8];
@@ -937,8 +975,7 @@ public class TrieServiceIntent extends IntentService {
                 byte[] keyNode = new byte[keyNodeSize];
                 app.trie.read(keyNode, 0, keyNodeSize);
                 app.trie.seek(pos + 4 + keyNodeSize + 20); //skip hash
-                ChildsMap childsMap = new ChildsMap(new byte[32]);
-                app.trie.read(childsMap.map, 0, 32);
+                app.trie.read(childsMap.value, 0, 32);
                 //Получим префикс и суффикс искомого ключа
 
                 byte[] preffixKey = getBytesPart(key, 0, keyNodeSize);
@@ -963,11 +1000,12 @@ public class TrieServiceIntent extends IntentService {
                 }
             }
         }
-        return null;
+        return new byte[0];
     }
     //return pos or age or null - if not found
     private byte[] searchPos(byte key, byte[] sPos) throws IOException {
         long pos = Longs.fromByteArray(sPos);
+        ChildsMap childsMap = new ChildsMap(32);
         byte[] result = null;
         //Если размер файла == 0  то вернем null
         if(app.trie.length()>0) {
@@ -985,8 +1023,8 @@ public class TrieServiceIntent extends IntentService {
                 byte[] keyNode = new byte[keyNodeSize];
                 app.trie.read(keyNode, 0, keyNodeSize);
                 app.trie.seek(pos + 4 + keyNodeSize + 20); //skip hash
-                ChildsMap childsMap = new ChildsMap(new byte[32]);
-                app.trie.read(childsMap.map, 0, 32);
+
+                app.trie.read(childsMap.value, 0, 32);
                 int childPosInMap = childsMap.getPos(key & 0xFF);
 
                 if(type==BRANCH) {//ret pos
@@ -1009,10 +1047,13 @@ public class TrieServiceIntent extends IntentService {
         if (typeAndKeySize.length<2){
             Log.d("app.trie", "ERROR! typeAndKeySize to small");
         }
+        if (key.length != (typeAndKeySize[1]&0xFF)){
+            Log.d("app.trie", "ERROR! typeAndKeySize != key.length");
+        }
         if (hash.length<20){
             Log.d("app.trie", "ERROR! hash to small");
         }
-        if (childsMap.map.length<32){
+        if (childsMap.value.length<32){
             Log.d("app.trie", "ERROR! childsMap to small");
         }
         if (childsMap.getCount() != childArray.length/(typeAndKeySize[0]==LEAF? 2 : 8)){
@@ -1020,21 +1061,22 @@ public class TrieServiceIntent extends IntentService {
         }
 
         if(typeAndKeySize[1]==0){
-            record = Bytes.concat(age, typeAndKeySize, hash, childsMap.map, childArray);
+            record = Bytes.concat(age, typeAndKeySize, hash, childsMap.value, childArray);
         }else{
-            record = Bytes.concat(age, typeAndKeySize, key, hash, childsMap.map, childArray);
+            record = Bytes.concat(age, typeAndKeySize, key, hash, childsMap.value, childArray);
         }
         Cursor query = app.getFreeSpace(record.length);
         app.trie.seek(app.trie.length());
         long pos = app.trie.getFilePointer();
 
         if (query.getCount() > 0 && query.moveToFirst()) {
+            int id  = query.getInt(query.getColumnIndex("id"));
             int posColIndex = query.getColumnIndex("pos");
             int spaceColIndex = query.getColumnIndex("space");
             long p = query.getLong(posColIndex);
             int s = query.getInt(spaceColIndex);
             if( p > 0 ) {
-                app.deleteFreeSpace(p, record.length, s);
+                app.deleteFreeSpace(id, p, record.length, s);
                 app.trie.seek(p);
                 pos=p;
             }
@@ -1074,7 +1116,7 @@ public class TrieServiceIntent extends IntentService {
         }
         return sha256hash160(Bytes.concat(digest,childArray));
     }
-
+*/
     @NonNull
     @TargetApi(26)
     private synchronized String createChannel() {
@@ -1095,38 +1137,4 @@ public class TrieServiceIntent extends IntentService {
         return "Service: Trie";
     }
 
- public class ChildsMap {
-     private byte[] map;
-
-     public ChildsMap(byte[] bytesPart) {
-         map = bytesPart;
-     }
-
-     //todo проверить применение если нет в мапе
-     public int getPos(int key){
-         int result=0;
-         BitSet prepare = BitSet.valueOf(map);
-         for(int i = 0; i < key+1;i++){
-             if(prepare.get(i)) result=result+1;
-         }
-         return result;
-     }
-
-     public int getCount(){
-         return BitSet.valueOf(map).cardinality();
-     }
-
-     public boolean get(int key){
-         BitSet prepare = BitSet.valueOf(map);
-         return prepare.get(key);
-     }
-
-     public void set(int key, boolean operation){
-         BitSet prepare = BitSet.valueOf(map);
-         prepare.set(key, operation);
-         map = prepare.toByteArray().length==0 ? new byte[32] : prepare.toByteArray();
-         //return map;//result.array();
-     }
-
- }
 }

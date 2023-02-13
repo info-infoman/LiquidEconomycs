@@ -16,7 +16,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 import java.util.Date;
 
 
@@ -71,6 +70,10 @@ public class Utils {
         return  (newDate.getTime() - oldDate.getTime())/86400000;
     }
 
+    public static boolean compareDate(byte[] d1, byte[] d2, long maxAge){
+        return (Utils.compareDate(Utils.reconstructAgeFromBytes(d1), Utils.reconstructAgeFromBytes(d2)) > maxAge);
+    }
+
     public static Date reconstructAgeFromBytes(byte[] d) {
         long timestampRecovered = ((d[0]&0xFF) << 8);
         timestampRecovered += d[1]&0xFF;
@@ -78,8 +81,9 @@ public class Utils {
         return new Date(timestampRecovered);
     }
 
-    public static byte[] ageToBytes(){
-        long time = new Date().getTime();  // time in ms since epoch
+    public static byte[] ageToBytes(Date date){
+        Date defDate = new Date(00000000);
+        long time = date.equals(defDate) ? new Date().getTime(): date.getTime();  // time in ms since epoch
         time /= 86400000; // ms in a day
         byte[]res = new byte[2];
         res[0] = (byte)(time >>> 8);
@@ -96,15 +100,7 @@ public class Utils {
         return res;
     }
 
-    public static byte[] getCommonKey(byte[] selfKey, byte[] key) {
-        for(int i = 1; i < selfKey.length+1; i++){
-            byte[] sK = getBytesPart(key, 0, selfKey.length-i);
-            if(Arrays.equals(sK, getBytesPart(selfKey, 0, selfKey.length-i))){
-                return sK;
-            }
-        }
-        return null;
-    }
+
 
     public static int getChildPosInROOT(int key){
         return (key==0?0:(key * 8) - 8);

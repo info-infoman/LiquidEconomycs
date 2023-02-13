@@ -9,11 +9,15 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.preference.PreferenceManager;
 
+import com.infoman.liquideconomycs.trie.TrieServiceIntent;
+
 import org.bitcoinj.core.ECKey;
 
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.util.Date;
 
 import androidx.core.util.Pair;
 
@@ -78,6 +82,19 @@ public class Core extends Application {
             }
         }
 
+        try {
+            if (trie.length() == 0) {
+                //todo изолировать запись
+                trie.setLength(0);
+                byte[] trieTmp = new byte[2070];
+                trie.write(trieTmp);
+                trie.seek(0);
+                trie.write(Utils.ageToBytes(new Date()));
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
         //MySingleton.initInstance();
     }
 
@@ -139,10 +156,13 @@ public class Core extends Application {
         cv.clear();
     }
 
-    public void deleteFreeSpace(long pos, int recordLength, int space) {
-        db.delete("freeSpace", "pos = ?", new String[]{String.valueOf(pos)});
+    public void deleteFreeSpace(int id, long pos, int recordLength, int space) {
         if (recordLength < space) {
-            insertFreeSpaceWitchCompressTrieFile(pos + recordLength, space - recordLength);
+            cv.put("pos", pos + recordLength);
+            cv.put("space", space - recordLength);
+            db.update("freeSpace", cv, "id = ?",
+                    new String[] {String.valueOf(id)});
+            cv.clear();
         }
     }
 

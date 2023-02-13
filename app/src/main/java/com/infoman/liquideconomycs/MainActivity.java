@@ -85,7 +85,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         final byte[] answer = intent.getByteArrayExtra(EXTRA_ANSWER);
                         if(provideService){
                             shakeIt();
-                            if(answer!=null) {
+                            if(answer.length > 0) {
                                 Toast.makeText(context, getResources().getString(R.string.pubKeyFound),Toast.LENGTH_LONG).show();
                                 //startActionInsert(getApplicationContext(), "Main", ECKey.fromPublicOnly(Utils.hexToByte(resultTextView.getText().toString())).getPubKeyHash(), ageToBytes());
                                 fields = Utils.parseQRString(resultTextView.getText().toString());
@@ -434,7 +434,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                Toast.makeText(getApplicationContext(), getResources().getString(R.string.ErrorReceivingPartnerData),Toast.LENGTH_LONG).show();
             }else{
                 byte[] providerPubKey = hexToByte(fields[0]);
-                app.startActionInsert(ECKey.fromPublicOnly(providerPubKey).getPubKeyHash(), ageToBytes());
+                app.startActionInsert(ECKey.fromPublicOnly(providerPubKey).getPubKeyHash(), ageToBytes(new Date()));
                 app.addClient(providerPubKey);
                 app.startActionSync("Main", fields[1], fields[2],false);
             }
