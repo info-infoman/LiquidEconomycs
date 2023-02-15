@@ -23,10 +23,7 @@ public class Utils {
 
     public static byte
             getHashs    = 0,
-            hashs       = 1,
-            ROOT        = 1,
-            BRANCH      = 2,
-            LEAF        = 3;
+            hashs       = 1;
 
     public static final String
         EXTRA_MESSAGE       = "com.infoman.liquideconomycs.message",
@@ -57,8 +54,6 @@ public class Utils {
 
         BROADCAST_ACTION_ANSWER = "com.infoman.liquideconomycs.broadcast_action.answer",
         EXTRA_ANSWER        = "com.infoman.liquideconomycs.extra.answer";
-
-
 
     public static byte[] getBytesPart(byte[] src, int off, int len){
         byte[] result= new byte[len];
@@ -100,13 +95,9 @@ public class Utils {
         return res;
     }
 
-
-
     public static int getChildPosInROOT(int key){
         return (key==0?0:(key * 8) - 8);
     }
-
-
 
     public static byte[] Sig(byte[] privKey, byte[] digest) {
         return ECKey.fromPrivate(privKey).sign(Sha256Hash.wrap(Sha256Hash.hash(digest))).encodeToDER();

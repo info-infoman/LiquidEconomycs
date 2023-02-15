@@ -8,13 +8,24 @@ import java.util.BitSet;
 public class ChildMap{
     public int         mapSize;
     public byte[]      mapBytes;
-    public TrieNode[]  mapChilds;
+    public Node[]  mapChilds;
     public byte[][]    mapAges;
     public BitSet prepare = new BitSet();
 
     public ChildMap(int maxSize) throws IOException {
         mapSize = maxSize;
         mapBytes = new byte[mapSize];
+        mapChilds = new Node[mapSize * 8];
+        mapAges = new byte[mapSize * 8][2];
+        loadMapChildsAndAges();
+
+    }
+
+    private void loadMapChildsAndAges() {
+        for(int i = 0; i < (mapSize * 8); i++) {
+            mapChilds[i] = null;
+            mapAges[i] = null;
+        }
     }
 
     //todo проверить применение если нет в мапе

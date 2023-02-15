@@ -1,4 +1,4 @@
-package com.infoman.liquideconomycs;
+package com.infoman.liquideconomycs.sync;
 
 import android.annotation.TargetApi;
 import android.app.IntentService;
@@ -16,7 +16,8 @@ import android.util.Log;
 
 import com.google.common.primitives.Bytes;
 import com.google.common.primitives.Ints;
-import com.infoman.liquideconomycs.WebSocketClient.Listener;
+import com.infoman.liquideconomycs.Core;
+import com.infoman.liquideconomycs.Utils;
 
 import org.apache.http.message.BasicNameValuePair;
 import org.bitcoinj.core.Sha256Hash;
@@ -34,24 +35,19 @@ import androidx.core.app.NotificationCompat;
 
 import static androidx.core.app.NotificationCompat.PRIORITY_LOW;
 import static com.infoman.liquideconomycs.Utils.ACTION_START_SYNC;
-import static com.infoman.liquideconomycs.Utils.ACTION_STOP_SERVICE;
 import static com.infoman.liquideconomycs.Utils.BROADCAST_ACTION_ANSWER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_ANSWER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_CMD;
 import static com.infoman.liquideconomycs.Utils.EXTRA_MASTER;
-import static com.infoman.liquideconomycs.Utils.EXTRA_PUBKEY;
 import static com.infoman.liquideconomycs.Utils.EXTRA_PROVIDE_SERVICE;
 import static com.infoman.liquideconomycs.Utils.EXTRA_SIGNAL_SERVER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_TOKEN;
-import static com.infoman.liquideconomycs.Utils.byteToHex;
 import static org.bitcoinj.core.ECKey.ECDSASignature.decodeFromDER;
 
-public class SyncServiceIntent extends IntentService {
+public class ServiceIntent extends IntentService {
 
     private Core app;
     private boolean isServiceStarted = false;
-
-
     private final BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
         @Override public void onReceive(Context context, Intent intent) {
             if (Objects.equals(intent.getAction(), BROADCAST_ACTION_ANSWER)) {
@@ -68,7 +64,7 @@ public class SyncServiceIntent extends IntentService {
         }
     };
 
-    public SyncServiceIntent() {
+    public ServiceIntent() {
         super("SyncServiceIntent");
     }
 
@@ -237,11 +233,6 @@ public class SyncServiceIntent extends IntentService {
                 stopSelf();
                 stopForeground(true);
             }
-            //broadcastActionMsg("Main", "Sync", getResources().getString(R.string.SyncFinish));
-            //stopSelf();
-            //stopForeground(true);
-            //app.startActionDeleteOldest(app);
-            //app.startActionStopTrie(app);
         }
     }
 
@@ -256,8 +247,6 @@ public class SyncServiceIntent extends IntentService {
             app.mClient.send(Bytes.concat(type, Ints.toByteArray(sig.length), sig, payload));
         }
     }
-
-
 
     @NonNull
     @TargetApi(26)

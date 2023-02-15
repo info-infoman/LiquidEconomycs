@@ -14,6 +14,7 @@ import android.util.Log;
 import com.infoman.liquideconomycs.Core;
 import com.infoman.liquideconomycs.Utils;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 
 import androidx.annotation.NonNull;
@@ -33,14 +34,15 @@ import static com.infoman.liquideconomycs.Utils.EXTRA_PAYLOAD;
 import static com.infoman.liquideconomycs.Utils.EXTRA_POS;
 import static com.infoman.liquideconomycs.Utils.EXTRA_PUBKEY;
 import static com.infoman.liquideconomycs.Utils.EXTRA_SPACE;
+import static com.infoman.liquideconomycs.Utils.ROOT;
 //TODO add max age field in leaf and branch node = max age in childs, for automate delete to old pubKey
 
-public class TrieServiceIntent extends IntentService {
+public class ServiceIntent extends IntentService {
 
     protected Core app;
-    protected TrieNode node;
+    protected Node node;
 
-    public TrieServiceIntent() {
+    public ServiceIntent() {
         super("TrieServiceIntent");
     }
 
@@ -48,13 +50,27 @@ public class TrieServiceIntent extends IntentService {
     public void onCreate() {
         super.onCreate();
         //android.os.Debug.waitForDebugger();
-
         app = (Core) getApplicationContext();
-        Log.d("app.trie", "Create!"+app.waitingIntentCount);
+
         if(app.waitingIntentCount !=0) return;
-        //load root
+        Log.d("TrieServiceIntent", "Create!"+app.waitingIntentCount);
+
+        //init trie file class
         try {
-            TrieNode node = new TrieNode(app, 0L, new byte[20], false);
+            app.file = new File(app.getFilesDir().getAbsolutePath() + "/trie" + "/trie.dat", "rw");
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+
+        //load root
+        NodeParams nodeParams = new NodeParams();
+        nodeParams.type = ROOT;
+        nodeParams.pos = 0L;
+        nodeParams.hash = new byte[20];
+        nodeParams.newble = false;
+
+        try {
+            node = new Node(app, nodeParams);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -126,13 +142,15 @@ public class TrieServiceIntent extends IntentService {
             }
 
             if (ACTION_INSERT.equals(action)) {
-                while(app.waitingIntentCount!=0){}
+                //while(app.waitingIntentCount!=0){}
                 app.waitingIntentCount++;
                 final String master = intent.getStringExtra(EXTRA_MASTER), cmd = "Insert";
-                final byte[] key = intent.getByteArrayExtra(EXTRA_PUBKEY), value = intent.getByteArrayExtra(EXTRA_AGE);
+                final byte[] pubKey = intent.getByteArrayExtra(EXTRA_PUBKEY), age = intent.getByteArrayExtra(EXTRA_AGE);
                 ////////////////////////////////////////////////////////////////
                 try {
-                    node.insert(key, value);
+                    Log.d("TriePubKey", String.valueOf(app.waitingIntentCount));
+                    //node = new TrieNode(app, 0L, new byte[20], false);
+                    node.insert(pubKey, age);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -145,7 +163,7 @@ public class TrieServiceIntent extends IntentService {
                 } catch (IOException e) {
                     e.printStackTrace();
                 }*/
-                app.waitingIntentCount--;
+                //app.waitingIntentCount--;
                 ////////////////////////////////////////////////////////////////
             }
 

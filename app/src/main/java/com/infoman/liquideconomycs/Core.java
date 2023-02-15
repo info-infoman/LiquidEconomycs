@@ -9,15 +9,11 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.preference.PreferenceManager;
 
-import com.infoman.liquideconomycs.trie.TrieServiceIntent;
+import com.infoman.liquideconomycs.sync.ServiceIntent;
+import com.infoman.liquideconomycs.sync.WebSocketClient;
+import com.infoman.liquideconomycs.trie.File;
 
 import org.bitcoinj.core.ECKey;
-
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.util.Date;
 
 import androidx.core.util.Pair;
 
@@ -52,10 +48,10 @@ public class Core extends Application {
     private ContentValues cv;
     public Pair myKey;
     public byte[] clientPubKey;
-    public RandomAccessFile trie;
     public WebSocketClient mClient;
     public long dateTimeLastSync;
     public int waitingIntentCount;
+    public File file;
 
     @Override
     public void onCreate() {
@@ -67,34 +63,13 @@ public class Core extends Application {
         waitingIntentCount = 0;
         //isSynchronized = false;
         setMyKey();
-        ///////////init trie//////////////////////////////////////////////////////
+        ///////////create trie file//////////////////////////////////////////////////////
         String nodeDir = context.getFilesDir().getAbsolutePath() + "/trie";
-        File nodeDirReference = new File(nodeDir);
+        java.io.File nodeDirReference = new java.io.File(nodeDir);
         while (!nodeDirReference.exists()) {
             copyAssetFolder(context.getAssets(), "trie", nodeDir);
         }
         /////////////////////////////////////////////////////////////////////////////
-        if (nodeDirReference.exists()) {
-            try {
-                trie = new RandomAccessFile(context.getFilesDir().getAbsolutePath() + "/trie" + "/trie.dat", "rw");
-            } catch (FileNotFoundException e) {
-                e.printStackTrace();
-            }
-        }
-
-        try {
-            if (trie.length() == 0) {
-                //todo изолировать запись
-                trie.setLength(0);
-                byte[] trieTmp = new byte[2070];
-                trie.write(trieTmp);
-                trie.seek(0);
-                trie.write(Utils.ageToBytes(new Date()));
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
         //MySingleton.initInstance();
     }
 
@@ -240,11 +215,11 @@ public class Core extends Application {
     //start
     //Trie
     public void startActionStopTrie(){
-        Utils.startIntent(this, new Intent(this, TrieServiceIntent.class).setAction(ACTION_STOP_TRIE));
+        Utils.startIntent(this, new Intent(this, com.infoman.liquideconomycs.trie.ServiceIntent.class).setAction(ACTION_STOP_TRIE));
     }
 
     public void startActionGenerateAnswer(byte msgType, byte[] payload) {
-        Intent intent = new Intent(this, TrieServiceIntent.class)
+        Intent intent = new Intent(this, com.infoman.liquideconomycs.trie.ServiceIntent.class)
                 .setAction(ACTION_GENERATE_ANSWER)
                 .putExtra(EXTRA_MSG_TYPE, msgType)
                 .putExtra(EXTRA_PAYLOAD, payload);
@@ -252,7 +227,7 @@ public class Core extends Application {
     }
 
     public void startActionFind(String master, byte[] pubKey, long pos) {
-        Intent intent = new Intent(this, TrieServiceIntent.class)
+        Intent intent = new Intent(this, com.infoman.liquideconomycs.trie.ServiceIntent.class)
                 .setAction(ACTION_FIND)
                 .putExtra(EXTRA_MASTER, master)
                 .putExtra(EXTRA_PUBKEY, pubKey)
@@ -261,7 +236,7 @@ public class Core extends Application {
     }
 
     public void startActionInsert(byte[] pubKey, byte[] age) {
-        Intent intent = new Intent(this, TrieServiceIntent.class)
+        Intent intent = new Intent(this, com.infoman.liquideconomycs.trie.ServiceIntent.class)
                 .setAction(ACTION_INSERT)
                 .putExtra(EXTRA_PUBKEY, pubKey)
                 .putExtra(EXTRA_AGE, age);
@@ -269,7 +244,7 @@ public class Core extends Application {
     }
 
     public void startActionInsertFreeSpaceInMap(long pos, int space) {
-        Intent intent = new Intent(this, TrieServiceIntent.class)
+        Intent intent = new Intent(this, com.infoman.liquideconomycs.trie.ServiceIntent.class)
                 .setAction(ACTION_INSERT_FREE_SPACE_IN_MAP)
                 .putExtra(EXTRA_POS, pos)
                 .putExtra(EXTRA_SPACE, space);
@@ -277,7 +252,7 @@ public class Core extends Application {
     }
 
     public void startActionGetHash(Context context, String master, long pos) {
-        Intent intent = new Intent(context, TrieServiceIntent.class)
+        Intent intent = new Intent(context, com.infoman.liquideconomycs.trie.ServiceIntent.class)
                 .setAction(ACTION_GET_HASH)
                 .putExtra(EXTRA_MASTER, master)
                 .putExtra(EXTRA_POS, pos);
@@ -285,7 +260,7 @@ public class Core extends Application {
     }
 
     public void startActionDelete(Context context, String master, byte[] pubKey, long pos) {
-        Intent intent = new Intent(context, TrieServiceIntent.class)
+        Intent intent = new Intent(context, com.infoman.liquideconomycs.trie.ServiceIntent.class)
                 .setAction(ACTION_DELETE)
                 .putExtra(EXTRA_MASTER, master)
                 .putExtra(EXTRA_PUBKEY, pubKey)
@@ -300,7 +275,7 @@ public class Core extends Application {
             signalServer = sharedPref.getString("Signal_server_URL", "");
             token = sharedPref.getString("Signal_server_Token", "");
         }
-        Intent intent = new Intent(this, SyncServiceIntent.class)
+        Intent intent = new Intent(this, ServiceIntent.class)
                 .setAction(ACTION_START_SYNC)
                 .putExtra(EXTRA_SIGNAL_SERVER, signalServer)
                 .putExtra(EXTRA_PROVIDE_SERVICE, Provide_service)
@@ -310,7 +285,7 @@ public class Core extends Application {
     }
 
     public void startActionStopSync(Context context) {
-        Intent intent = new Intent(context, SyncServiceIntent.class).setAction(ACTION_STOP_SERVICE);
+        Intent intent = new Intent(context, ServiceIntent.class).setAction(ACTION_STOP_SERVICE);
         Utils.startIntent(context, intent);
     }
 
@@ -323,7 +298,5 @@ public class Core extends Application {
                 .putExtra(EXTRA_ANSWER, answer);
         sendBroadcast(intent);
     }
-
-
 
 }

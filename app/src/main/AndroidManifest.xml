@@ -44,12 +44,12 @@
         </activity>
 
         <service
-            android:name=".SyncServiceIntent"
+            android:name=".sync.ServiceIntent"
             android:enabled="true"
             android:exported="true"
             android:process=".liquideconomycs_syncServiceIntent" />
         <service
-            android:name=".trie.TrieServiceIntent"
+            android:name=".trie.ServiceIntent"
             android:enabled="true"
             android:exported="true"
             android:process=".liquideconomycs_trieServiceIntent" />

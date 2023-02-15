@@ -1,4 +1,4 @@
-package com.infoman.liquideconomycs;
+package com.infoman.liquideconomycs.sync;
 
 import android.os.Handler;
 import android.os.HandlerThread;
