@@ -34,7 +34,7 @@ import static com.infoman.liquideconomycs.Utils.EXTRA_PAYLOAD;
 import static com.infoman.liquideconomycs.Utils.EXTRA_POS;
 import static com.infoman.liquideconomycs.Utils.EXTRA_PUBKEY;
 import static com.infoman.liquideconomycs.Utils.EXTRA_SPACE;
-import static com.infoman.liquideconomycs.Utils.ROOT;
+import static com.infoman.liquideconomycs.trie.Node.ROOT;
 //TODO add max age field in leaf and branch node = max age in childs, for automate delete to old pubKey
 
 public class ServiceIntent extends IntentService {
@@ -57,14 +57,22 @@ public class ServiceIntent extends IntentService {
 
         //init trie file class
         try {
-            app.file = new File(app.getFilesDir().getAbsolutePath() + "/trie" + "/trie.dat", "rw");
+            app.file = new File(app,app.getFilesDir().getAbsolutePath() + "/trie" + "/trie.dat", "rw");
         } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+
+        try {
+            app.file.recovery();
+        } catch (IOException e) {
             e.printStackTrace();
         }
 
         //load root
         NodeParams nodeParams = new NodeParams();
+        nodeParams.age = new byte[2];
         nodeParams.type = ROOT;
+        nodeParams.pubKey = new byte[0];
         nodeParams.pos = 0L;
         nodeParams.hash = new byte[20];
         nodeParams.newble = false;
@@ -142,28 +150,32 @@ public class ServiceIntent extends IntentService {
             }
 
             if (ACTION_INSERT.equals(action)) {
-                //while(app.waitingIntentCount!=0){}
+                while(app.waitingIntentCount!=0){}
                 app.waitingIntentCount++;
-                final String master = intent.getStringExtra(EXTRA_MASTER), cmd = "Insert";
                 final byte[] pubKey = intent.getByteArrayExtra(EXTRA_PUBKEY), age = intent.getByteArrayExtra(EXTRA_AGE);
                 ////////////////////////////////////////////////////////////////
                 try {
-                    Log.d("TriePubKey", String.valueOf(app.waitingIntentCount));
-                    //node = new TrieNode(app, 0L, new byte[20], false);
+
+/*
+                    NodeParams nodeParams = new NodeParams();
+                    nodeParams.age = new byte[2];
+                    nodeParams.type = ROOT;
+                    nodeParams.pubKey = new byte[0];
+                    nodeParams.pos = 0L;
+                    nodeParams.hash = new byte[20];
+                    nodeParams.newble = false;
+
+                    try {
+                        node = new Node(app, nodeParams);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+*/
                     node.insert(pubKey, age);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
-                /*try {
-                    if(Bytes.concat(key).length != 20){
-                        Log.d("app.trie", "ERROR! inserted key to small");
-                    }
-                    node.insert(key, value, 0L, new byte[0]);
-                    //app.broadcastActionMsg(master, cmd, );
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }*/
-                //app.waitingIntentCount--;
+                app.waitingIntentCount--;
                 ////////////////////////////////////////////////////////////////
             }
 
@@ -398,259 +410,6 @@ public class ServiceIntent extends IntentService {
             }
         }
         return answer;
-    }
-
-    //return null if not found or (pos or age) if found
-    private byte[] find(byte[] key, long pos) throws IOException {
-        byte[] s=search(key, pos);
-
-        if (s.length>2 && key.length>1){
-            return find(getBytesPart(key, 1, key.length - 1), Longs.fromByteArray(s));
-        }else return s;
-    }
-
-    private byte[] insert(byte[] key, byte[] age, long pos, byte[] fullKey) throws IOException {
-        byte[] hash;
-        ChildsMap childsMap = new ChildsMap(32);
-
-        byte[] typeAndKeySize = new byte[2];
-
-        if (app.trie.length() == 0) {
-            //todo изолировать запись
-            app.trie.setLength(0);
-            byte[] trieTmp = new byte[2070];
-            app.trie.write(trieTmp);
-            app.trie.seek(0);
-            app.trie.write(age);
-            return insert(key, age, pos, fullKey);
-        }
-
-        byte[] sResult=search(key, pos);
-
-        if (pos==0L) {
-            byte[] NodeKey;
-            if (sResult.length == 0 || Arrays.equals(sResult, new byte[8])){//Create new LEAF witch age
-                childsMap.value = new byte[32];
-                NodeKey = getBytesPart(key, 1, key.length - 2);
-                typeAndKeySize[0] = LEAF;
-                typeAndKeySize[1] = (byte)NodeKey.length;
-                childsMap.set((key[key.length - 1] & 0xFF), true);//add age
-                hash=calcHash(typeAndKeySize[0], NodeKey, Bytes.concat(childsMap.value, age));
-                if(Bytes.concat(new byte[1], NodeKey, new byte[1]).length != 20){
-                    Log.d("app.trie", "ERROR! inserted key to small");
-                }
-                pos = addRecordInFile(age, typeAndKeySize, NodeKey, hash, childsMap, age);
-
-            }else{//insert in child & save in root
-                NodeKey = getBytesPart(key, 1, key.length - 1);
-                fullKey = new byte[1];
-                fullKey[0] = key[0];
-                if(Bytes.concat(fullKey, NodeKey).length != 20){
-                    Log.d("app.trie", "ERROR! inserted key to small");
-                }
-                pos = Longs.fromByteArray(insert(NodeKey, age, Longs.fromByteArray(sResult), fullKey));
-            }
-            //save in root
-            //if node-age is younger inserted age then change nodeAge to age
-            //todo изолировать запись
-            app.trie.seek(0);
-            byte[] nodeAge = new byte[2];
-            app.trie.read(nodeAge, 0, 2);
-            if(Utils.compareDate(Utils.reconstructAgeFromBytes(nodeAge), Utils.reconstructAgeFromBytes(age)) > 0L) {
-                app.trie.seek(0);
-                app.trie.write(age);
-            }
-            app.trie.seek(22+ getChildPosInROOT((key[0]&0xFF)));
-            app.trie.write(Longs.toByteArray(pos));
-            app.trie.seek(22);
-            byte[] childArray= new byte[2048];
-            app.trie.read(childArray,0,2048);
-            hash=calcHash(ROOT, new byte[0], childArray);
-            app.trie.seek(2);
-            app.trie.write(hash);
-            return hash;
-
-        }else {
-            if (sResult.length > 0) {
-                app.trie.seek(pos);
-                byte[] nodeAge = new byte[2];
-                app.trie.read(nodeAge, 0, 2);
-                byte type = app.trie.readByte();
-                byte keyNodeSize = app.trie.readByte();
-                byte[] keyNode = new byte[keyNodeSize];
-                app.trie.read(keyNode, 0, keyNodeSize);
-                app.trie.seek(pos + 4 + keyNodeSize + 20); //skip hash
-                app.trie.read(childsMap.value, 0, 32);
-                //Получим суффикс
-                byte[] suffixKey = getBytesPart(key, keyNodeSize, key.length - keyNodeSize);
-
-                int selfChildsCount = childsMap.getCount();
-                int selfChildArraySize = selfChildsCount * (type==LEAF ? 2 : 8);
-
-                int childPosInMap = childsMap.getPos(suffixKey[0] & 0xFF);
-
-                long posToWrite = pos + 4 + keyNodeSize + 20 + 32 + (type==LEAF ? ((childPosInMap * 2) - 2) : ((childPosInMap * 8) - 8));
-                app.trie.seek(posToWrite);
-                //todo изолировать запись
-                if(type==LEAF){
-                    app.trie.write(age);
-                    if(Bytes.concat(fullKey, keyNode, suffixKey).length != 20){
-                        Log.d("app.trie", "ERROR! inserted key to small");
-                    }
-                }else{
-                    byte[] chPos=new byte[8];
-                    app.trie.read(chPos, 0, 8);
-                    //insert to child
-                    byte[] fullKey2 = new byte[1];
-                    fullKey2[0] = suffixKey[0];
-                    if(Bytes.concat(fullKey, keyNode, fullKey2, (getBytesPart(suffixKey, 1, suffixKey.length-1))).length != 20){
-                        Log.d("app.trie", "ERROR! inserted key to small");
-                    }
-                    if((Longs.fromByteArray(chPos)) < 0L){
-                        Log.d("app.trie", "ERROR! inserted key to small");
-                    }
-                    chPos = insert(getBytesPart(suffixKey, 1, suffixKey.length-1), age, Longs.fromByteArray(chPos),
-                            Bytes.concat(fullKey, keyNode, fullKey2)
-                    );
-                    app.trie.seek(posToWrite);
-                    app.trie.write(chPos);
-                }
-
-                //if the entered key is older than the node, then we will make the node older
-                if(Utils.compareDate(Utils.reconstructAgeFromBytes(nodeAge), Utils.reconstructAgeFromBytes(age)) > 0L) {
-                    app.trie.seek(pos);
-                    app.trie.write(age);
-                }
-                app.trie.seek(pos + 4 + keyNodeSize + 20 + 32);
-                byte[] childArray = new byte[selfChildArraySize];
-                app.trie.read(childArray, 0, selfChildArraySize);
-                hash = calcHash(type, keyNode, type==LEAF ? Bytes.concat(childsMap.value, childArray) : childArray);
-                app.trie.seek(pos + 4 + keyNodeSize);
-                app.trie.write(hash);
-                return Longs.toByteArray(pos);
-            } else {
-                app.trie.seek(pos);
-                byte[] nodeAge = new byte[2];
-                app.trie.read(nodeAge, 0, 2);
-                //прочитаем ключ, карту детей, число детей, суфикс префикс
-                byte type = app.trie.readByte();
-                byte keyNodeSize = app.trie.readByte();
-
-                byte[] keyNode = new byte[keyNodeSize];
-                app.trie.read(keyNode, 0, keyNodeSize);
-
-                app.trie.seek(pos + 4 + keyNodeSize + 20); //skip hash
-                app.trie.read(childsMap.value, 0, 32);
-                //Получим префикс и суффикс искомого ключа
-                byte[] preffixKey = getBytesPart(key, 0, keyNodeSize);
-
-                byte[] suffixKey = getBytesPart(key, keyNodeSize, key.length - keyNodeSize);
-                byte[] commonKey = getCommonKey(keyNode, preffixKey);
-
-                int selfChildsCount = childsMap.getCount();
-                int selfChildArraySize = selfChildsCount*(type==LEAF ? 2 : 8);
-
-                byte[] selfChildArray= new byte[selfChildArraySize];
-                app.trie.seek(pos + 4 + keyNodeSize + 20 + 32);//go to childArray
-                app.trie.read(selfChildArray,0,selfChildArraySize);
-
-                //insert free space in db
-                app.startActionInsertFreeSpaceInMap(pos, 56 + keyNodeSize + selfChildArraySize);
-
-                byte[] retPos;
-                byte[] childArray;
-                ChildsMap childsMapNew = new ChildsMap(32);
-                if(!Arrays.equals(preffixKey, keyNode)){//create sub node
-                    //ADD NEW LEAF
-                    assert commonKey != null;
-
-                    byte[] leafKey = getBytesPart(key, commonKey.length , key.length - commonKey.length - 1);
-                    byte[] leafKey_ = getBytesPart(leafKey, 1 , leafKey.length - 1);
-                    typeAndKeySize[0] = LEAF;
-                    typeAndKeySize[1] = (byte)leafKey_.length;
-                    childsMapNew.set((key[key.length-1]&0xFF),true);
-                    hash=calcHash(typeAndKeySize[0], leafKey_, Bytes.concat(childsMapNew.value, age));
-                    if(Bytes.concat(fullKey, commonKey, new byte[1], leafKey_, new byte[1]).length!=20){
-                        Log.d("app.trie", "ERROR! inserted key to small");
-                    }
-                    long posLeaf = addRecordInFile(age, typeAndKeySize, leafKey_, hash, childsMapNew, age);
-
-                    //COPY OLD NODE WITCH CORP(keyNode - common) KEY
-                    byte[] oldLeafKey = getBytesPart(keyNode, commonKey.length , keyNodeSize - commonKey.length);
-                    byte[] oldLeafKey_ = getBytesPart(oldLeafKey, 1 , oldLeafKey.length - 1);
-                    typeAndKeySize[0] = type;
-                    typeAndKeySize[1] = (byte)oldLeafKey_.length;
-                    hash=calcHash(type, oldLeafKey_, type==LEAF ? Bytes.concat(childsMap.value, selfChildArray) : selfChildArray);
-                    if(type==LEAF) {
-                        if (Bytes.concat(fullKey, commonKey, new byte[1], oldLeafKey_, new byte[1]).length != 20) {
-                            Log.d("app.trie", "ERROR! inserted key to small");
-                        }
-                    }
-                    long posOldLeaf = addRecordInFile(nodeAge, typeAndKeySize, oldLeafKey_, hash, childsMap, selfChildArray);
-
-                    //CREATE NEW BRANCH WITCH COMMON KEY AND CONTENT = NEW LEAF POSITION + OLD NODE POSITION
-                    typeAndKeySize[0] = BRANCH;
-                    typeAndKeySize[1] = (byte)commonKey.length;
-                    if (leafKey[0]>oldLeafKey[0]){
-                        childArray = Bytes.concat(Longs.toByteArray(posOldLeaf), Longs.toByteArray(posLeaf));
-                    }else{
-                        childArray = Bytes.concat(Longs.toByteArray(posLeaf), Longs.toByteArray(posOldLeaf));
-                    }
-                    hash=calcHash(BRANCH, commonKey, childArray);
-
-                    ChildsMap childsMapNewBRANCH = new ChildsMap(32);
-                    childsMapNewBRANCH.set((leafKey[0]&0xFF),true);
-                    childsMapNewBRANCH.set((oldLeafKey[0]&0xFF),true);
-                    retPos = Longs.toByteArray(addRecordInFile(
-                            (Utils.compareDate(Utils.reconstructAgeFromBytes(nodeAge), Utils.reconstructAgeFromBytes(age)) > 0L ? age : nodeAge),
-                            typeAndKeySize,
-                            commonKey,
-                            hash,
-                            childsMapNewBRANCH,
-                            childArray)
-                    );
-
-                }else{//if is Leaf add age in node, else create leaf witch suffix key and add pos in node(branch)
-                    long posLeaf=0L;
-                    byte[] leafKey;
-                    int insByte;
-                    if(type!=LEAF){
-                        typeAndKeySize[0] = LEAF;
-                        leafKey = getBytesPart(suffixKey, 1 , suffixKey.length - 2);
-                        insByte = (suffixKey[0]&0xFF);
-                        typeAndKeySize[1] = (byte)leafKey.length;
-                        childsMapNew.set((key[key.length-1]&0xFF),true);
-                        hash=calcHash(LEAF, leafKey, Bytes.concat(childsMapNew.value, age));
-                        /////////////////pref key + branchKey + place + leafKey + place
-                        if (Bytes.concat(fullKey, keyNode, new byte[1], leafKey, new byte[1]).length != 20) {
-                            Log.d("app.trie", "ERROR! inserted key to small");
-                        }
-                        posLeaf = addRecordInFile(age, typeAndKeySize, leafKey, hash, childsMapNew, age);
-
-                    }else{
-                        insByte = (key[key.length-1]&0xFF);
-                    }
-
-                    typeAndKeySize[0] = type;
-                    typeAndKeySize[1] = (byte)keyNode.length;
-                    childsMap.set(insByte,true);
-                    int chp= childsMap.getPos(insByte);
-                    byte[] before=(chp == 0 ? new byte[0] : getBytesPart(selfChildArray,0,  (chp-1)*(type==LEAF ? 2 : 8)));
-                    childArray = Bytes.concat(before, (type==LEAF ? age : Longs.toByteArray(posLeaf)), getBytesPart(selfChildArray, before.length, selfChildArray.length-before.length));
-                    // пересчитываем хеш и рекурсивно вносим позицию в вышестоящие узлы
-                    hash=calcHash(type, keyNode, type==LEAF ? Bytes.concat(childsMap.value, childArray) : childArray);
-                    if(type==LEAF) {
-                        if (Bytes.concat(fullKey, keyNode, new byte[1]).length != 20) {
-                            Log.d("app.trie", "ERROR! inserted key to small");
-                        }
-                    }
-                    retPos = Longs.toByteArray(addRecordInFile(
-                            (Utils.compareDate(Utils.reconstructAgeFromBytes(nodeAge), Utils.reconstructAgeFromBytes(age)) > 0L ? age : nodeAge),
-                            typeAndKeySize, keyNode, hash, childsMap, childArray));
-                }
-                return retPos;
-            }
-        }
     }
 
     private void deleteOldest(long pos, byte[] key) throws IOException {
@@ -1020,120 +779,8 @@ public class ServiceIntent extends IntentService {
         }
         return new byte[0];
     }
-    //return pos or age or null - if not found
-    private byte[] searchPos(byte key, byte[] sPos) throws IOException {
-        long pos = Longs.fromByteArray(sPos);
-        ChildsMap childsMap = new ChildsMap(32);
-        byte[] result = null;
-        //Если размер файла == 0  то вернем null
-        if(app.trie.length()>0) {
-            //если это корень то переместим курсор на позицию в массиве детей = первый байт ключа * 8 - 8
-            //если содержимое != 0 то  начинаем искать там и вернем то что нашли + корень, иначе вернем корень
-            byte[] childPos = new byte[8];
-            if (pos == 0L) {
-                app.trie.seek(22 + getChildPosInROOT(key&0xFF));
-            } else {
-                //иначе переместимся на позицию pos пропустим возраст
-                app.trie.seek(2 + pos);
-                //прочитаем ключ, карту дочерей, число дочерей, суфикс вносимого ключа
-                byte type = app.trie.readByte();
-                byte keyNodeSize = app.trie.readByte();
-                byte[] keyNode = new byte[keyNodeSize];
-                app.trie.read(keyNode, 0, keyNodeSize);
-                app.trie.seek(pos + 4 + keyNodeSize + 20); //skip hash
 
-                app.trie.read(childsMap.value, 0, 32);
-                int childPosInMap = childsMap.getPos(key & 0xFF);
 
-                if(type==BRANCH) {//ret pos
-                    app.trie.seek(pos + 4 + keyNodeSize + 20 + 32 + ((childPosInMap * 8L) - 8));
-                }
-            }
-            app.trie.read(childPos, 0, 8);
-            if (Longs.fromByteArray(childPos) != 0) {
-                result = childPos;
-            }
-        }
-        return result;
-    }
-
-    private long addRecordInFile(byte[] age, byte[] typeAndKeySize, byte[] key, byte[] hash, ChildsMap childsMap, byte[] childArray) throws IOException {
-        byte[] record;
-        if (age.length<2){
-            Log.d("app.trie", "ERROR! age to small");
-        }
-        if (typeAndKeySize.length<2){
-            Log.d("app.trie", "ERROR! typeAndKeySize to small");
-        }
-        if (key.length != (typeAndKeySize[1]&0xFF)){
-            Log.d("app.trie", "ERROR! typeAndKeySize != key.length");
-        }
-        if (hash.length<20){
-            Log.d("app.trie", "ERROR! hash to small");
-        }
-        if (childsMap.value.length<32){
-            Log.d("app.trie", "ERROR! childsMap to small");
-        }
-        if (childsMap.getCount() != childArray.length/(typeAndKeySize[0]==LEAF? 2 : 8)){
-            Log.d("app.trie", "ERROR! childArray <> CountInMap");
-        }
-
-        if(typeAndKeySize[1]==0){
-            record = Bytes.concat(age, typeAndKeySize, hash, childsMap.value, childArray);
-        }else{
-            record = Bytes.concat(age, typeAndKeySize, key, hash, childsMap.value, childArray);
-        }
-        Cursor query = app.getFreeSpace(record.length);
-        app.trie.seek(app.trie.length());
-        long pos = app.trie.getFilePointer();
-
-        if (query.getCount() > 0 && query.moveToFirst()) {
-            int id  = query.getInt(query.getColumnIndex("id"));
-            int posColIndex = query.getColumnIndex("pos");
-            int spaceColIndex = query.getColumnIndex("space");
-            long p = query.getLong(posColIndex);
-            int s = query.getInt(spaceColIndex);
-            if( p > 0 ) {
-                app.deleteFreeSpace(id, p, record.length, s);
-                app.trie.seek(p);
-                pos=p;
-            }
-        }
-        query.close();
-
-        app.trie.write(record);
-        if (pos == 0L){
-            Log.d("app.trie", "ERROR! age to small");
-        }
-        return pos;
-    }
-
-    private byte[] getHash(long pos) throws IOException {
-        byte[] hash = new byte[20];
-        if (pos == 0L) {
-            app.trie.seek(pos+2);
-        } else {
-            app.trie.seek(pos+3);
-            byte keySize = app.trie.readByte();
-            app.trie.seek(pos+ 4 + keySize);
-        }
-        app.trie.read(hash, 0, 20);
-        return hash;
-    }
-
-    private byte[] calcHash(byte type, byte[] digest, byte[] childArray) throws IOException {
-        if(type==BRANCH || type==ROOT) {
-            for (int i = 0; i < childArray.length; ) {
-                byte[] pos = getBytesPart(childArray, i, 8);
-                if (pos.length > 0) {
-                    digest = Bytes.concat(digest, getHash(Longs.fromByteArray(pos)));
-                }
-                i = i + (type == BRANCH || type == ROOT ? 8 : 2);
-            }
-            return sha256hash160(digest);
-        }
-        return sha256hash160(Bytes.concat(digest,childArray));
-    }
 */
     @NonNull
     @TargetApi(26)

@@ -6,10 +6,7 @@ import com.infoman.liquideconomycs.Core;
 import com.infoman.liquideconomycs.Utils;
 
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Date;
 
-import static com.infoman.liquideconomycs.Utils.ageToBytes;
 import static org.bitcoinj.core.Utils.sha256hash160;
 
 
@@ -19,7 +16,6 @@ public class Node extends ChildMap {
             ROOT        = 1,
             BRANCH      = 2,
             LEAF        = 3;
-
     public Core app;
     public long position;
     public byte[] age, hash;
@@ -27,7 +23,6 @@ public class Node extends ChildMap {
     public byte type;
     public boolean change;
     public int space;
-
 
     public Node(Core context, NodeParams nodeParams) throws IOException {
         super(32);
@@ -37,7 +32,6 @@ public class Node extends ChildMap {
         nodeKey = new PubKey(type, nodeParams.pubKey);
         position = nodeParams.pos;
         hash = nodeParams.hash;
-        age = ageToBytes(new Date());//for new node set new date, for old loaded in loadNode()
         if(!nodeParams.newble){
             loadNode();
         }else{
@@ -45,19 +39,25 @@ public class Node extends ChildMap {
         }
     }
 
+
     private void loadNode() throws IOException {
-        byte[] pubKey;
+
         if ((type == ROOT && position != 0L)) throw new AssertionError();
 
+        app.file.get(age, position, 0, 2);
+
         if(type == ROOT) {
+            app.file.get(hash, position + 2, 0, 20);
             loadRootMap();
-            loadChilds();
+            //loadChilds();
         }else {
-            app.file.get(age, position, 0, 2);
             type = app.file.readByte();
-            pubKey = new byte[app.file.readByte()];
-            app.file.get(pubKey, position, 4, pubKey.length);
-            app.file.get(mapBytes, position + 4 + pubKey.length + 20, 0, mapSize);
+            int pubKeySize = app.file.readByte();
+            byte[] pubKey = new byte[pubKeySize];
+            app.file.get(pubKey, position + 4, 0, pubKeySize);
+            nodeKey = new PubKey(type, pubKey);
+            app.file.get(mapBytes, position + 4 + pubKeySize + 20, 0, mapSize);
+            calcSpace();
             //child no need auto load childs because they loaded in constructTrieByKey()
         }
 
@@ -86,6 +86,7 @@ public class Node extends ChildMap {
                 }else {
                     long pos = Longs.fromByteArray(b);
                     NodeParams nodeParams = new NodeParams();
+                    nodeParams.age = new byte[2];
                     nodeParams.type = BRANCH;
                     nodeParams.pos = pos;
                     nodeParams.hash = getHash(pos);
@@ -107,28 +108,34 @@ public class Node extends ChildMap {
     //and insert free space in database
     //if change rewrite node
     protected void insert(byte[] pubKey, byte[] newAge) throws IOException {
+        boolean newSpace = false;
         if (type == ROOT) {
             constructTrieByKey(pubKey);
         }else{
-            nodeKey.initNodeKyeByNewKey(pubKey);
+            nodeKey.initNodeKyeFieldsByNewKey(pubKey);
         }
-
-        if(Arrays.equals(nodeKey.prefix, nodeKey.nodePubKey) || type == ROOT) {
-            int intForChild = nodeKey.getKeyIntForChild(pubKey);
+        if(nodeKey.getEqualsPrefixFromNewKeyAndNodePubKey() || type == ROOT) {
+            int intForChild = nodeKey.getPlaceIntForChildFromNewKeySuffix(pubKey);
             if (type == LEAF) {
                 if (getInMap(intForChild)) {
                     if (Utils.compareDate(newAge, mapAges[intForChild], 0L)) {
                         mapAges[intForChild] = age;
+                        if (Utils.compareDate(age, newAge, 0L)) {
+                            age = newAge;
+                        }
                         calcHash();
                         change = true;
+                        app.file.saveNodeNewStateBlobInDB(this, false);
                     }
                 } else {
                     setInMap(intForChild, true);
-                    mapAges[intForChild] = age;
+                    mapAges[intForChild] = newAge;
+                    age = newAge;
                     calcHash();
+                    calcSpace();
                     change = true;
-                    app.insertFreeSpaceWitchCompressTrieFile(position, calcSpace());
-                    position = 0L;
+                    app.insertFreeSpaceWitchCompressTrieFile(position, space);
+                    app.file.saveNodeNewStateBlobInDB(this, true);
                 }
             }else{//get/set child ref
                 Node ref;
@@ -138,8 +145,9 @@ public class Node extends ChildMap {
                     setInMap(intForChild, true);
 
                     NodeParams nodeParams = new NodeParams();
+                    nodeParams.age = newAge;
                     nodeParams.type = LEAF;
-                    nodeParams.pubKey = nodeKey.getKeyNewChild();
+                    nodeParams.pubKey = nodeKey.getKeyForNewChildFromNewPubKey();
                     nodeParams.pos = 0L;
                     nodeParams.hash = new byte[20];
                     nodeParams.newble = true;
@@ -148,50 +156,62 @@ public class Node extends ChildMap {
 
                     mapChilds[intForChild] = ref;
                     if (type != ROOT) {
-                        app.insertFreeSpaceWitchCompressTrieFile(position, calcSpace());
+                        calcSpace();
+                        app.insertFreeSpaceWitchCompressTrieFile(position, space);
+                        newSpace = true;
                     }
-                    position = 0L;
+
                 }
-                ref.insert(nodeKey.getKeyChild(), newAge);
+                ref.insert(nodeKey.getKeyForAddInChildFromNewKeySuffix(), newAge);
                 change = ref.change;
-                calcHash();
+                if(change){
+                    if (Utils.compareDate(age, newAge, 0L)) {
+                        age = newAge;
+                    }
+                    calcHash();
+                    app.file.saveNodeNewStateBlobInDB(this, newSpace);
+                }
             }
         }else{
             //reconstruct this node(leaf or branch)
             //get int
-            int intForNewChild = nodeKey.getKeyIntForChild(pubKey);
-            int intForOldChild = nodeKey.getNodeIntForChild(pubKey);
+            int intForNewChild = nodeKey.getPlaceIntForChildFromNewKeySuffix(pubKey);
+            int intForOldChild = nodeKey.getPlaceIntForChildFromNodeKeySuffix(pubKey);
 
             //create new node and copy this node to new node
             NodeParams nodeParams = new NodeParams();
+            nodeParams.age = age;
             nodeParams.type = type;
-            nodeParams.pubKey = nodeKey.getNodeNewChild();
+            nodeParams.pubKey = nodeKey.getKeyForNewChildFromNodeKey();
             nodeParams.pos = 0L;
             nodeParams.hash = new byte[20];
-            nodeParams.newble = true;//todo
+            nodeParams.newble = true;
 
             Node ref = new Node(app, nodeParams);
-            ref.age = age;
+            loadChilds();
             ref.mapBytes = mapBytes;
             ref.mapChilds = mapChilds;
             ref.mapAges = mapAges;
             ref.calcHash();
+            ref.calcSpace();
+            app.file.saveNodeNewStateBlobInDB(ref, true);
 
             //create new node and insert suffix key and age
             nodeParams = new NodeParams();
+            nodeParams.age = newAge;
             nodeParams.type = LEAF;
-            nodeParams.pubKey = nodeKey.getKeyNewChild();
+            nodeParams.pubKey = nodeKey.getKeyForNewChildFromNewPubKey();
             nodeParams.pos = 0L;
             nodeParams.hash = new byte[20];
             nodeParams.newble = true;
 
             Node newRef = new Node(app, nodeParams);
-            newRef.insert(nodeKey.getKeyChild(), newAge);
+            newRef.insert(nodeKey.getKeyForAddInChildFromNewKeySuffix(), newAge);
 
             //change this node to common node
-            nodeKey = new PubKey(BRANCH, nodeKey.common);;
+            nodeKey = new PubKey(BRANCH, nodeKey.commonKey);;
             type = BRANCH;
-            //clear map
+            //clear map ch ag
             mapBytes = new byte[mapSize];
             mapChilds = new Node[mapSize * 8];
             mapAges = new byte[mapSize * 8][2];
@@ -201,25 +221,30 @@ public class Node extends ChildMap {
             mapChilds[intForNewChild] = newRef;
             mapChilds[intForOldChild] = ref;
             change = true;
-            app.insertFreeSpaceWitchCompressTrieFile(position, calcSpace());
+            app.insertFreeSpaceWitchCompressTrieFile(position, space);
+            if (Utils.compareDate(age, newAge, 0L)) {
+                age = newAge;
+            }
             calcHash();
-            position = 0L;
+            calcSpace();
+
+            app.file.saveNodeNewStateBlobInDB(this, true);
         }
-        //for all node type compare age and change if node is younger
-        if (Utils.compareDate(age, newAge, 0L) && change) {
-            age = newAge;
+        if(type==ROOT && change){
+            app.file.transaction();
         }
     }
 
     private void constructTrieByKey(byte[] pubKey) throws IOException {
-        nodeKey.initNodeKyeByNewKey(pubKey);
-        if(Arrays.equals(nodeKey.prefix, nodeKey.nodePubKey)) {
-            int pubKeyInt = nodeKey.getKeyIntForChild(pubKey);
-            byte[] keyChild = nodeKey.getKeyChild();
+        nodeKey.initNodeKyeFieldsByNewKey(pubKey);
+        if(nodeKey.getEqualsPrefixFromNewKeyAndNodePubKey()) {
+            loadChilds();
+            int pubKeyInt = nodeKey.getPlaceIntForChildFromNewKeySuffix(pubKey);
+            byte[] keyChild = nodeKey.getKeyForAddInChildFromNewKeySuffix();
             if (getInMap(pubKeyInt)) {
-                if (type != ROOT) {//root loaded in constructor
-                    loadChilds();
-                }
+                //if (type != ROOT) {//root loaded in constructor
+                app.file.saveNodeOldStateBlobInDB(position, type == ROOT ? 2070 : space);
+                //}
                 if (type != LEAF) {//leaf have no childs
                     mapChilds[pubKeyInt].constructTrieByKey(keyChild);
                 }
@@ -227,10 +252,8 @@ public class Node extends ChildMap {
         }
     }
 
-    private int calcSpace() {
-        //todo
-        space = 0;
-        return space;
+    private void calcSpace() {
+        space = 4 + nodeKey.nodePubKey.length + 20 + mapSize + (getCountInMap() * type == LEAF ? 2 : 8);
     }
 
     private void calcHash() {
@@ -260,4 +283,5 @@ public class Node extends ChildMap {
         app.file.read(hash, 0, 20);
         return hash;
     }
- }
+
+}

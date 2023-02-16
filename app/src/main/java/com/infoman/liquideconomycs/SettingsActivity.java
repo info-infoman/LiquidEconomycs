@@ -78,7 +78,7 @@ public class SettingsActivity extends AppCompatActivity {
             app.startActionInsert(myPubKey, age);
         }
 
-        app.startActionStopTrie();
+        //app.startActionStopTrie();
 
         //delete Oldest Key
 

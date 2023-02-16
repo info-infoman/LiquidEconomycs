@@ -17,29 +17,41 @@ public class DBHelper extends SQLiteOpenHelper {
         @Override
         public void onCreate(SQLiteDatabase db) {
             Log.d(LOG_TAG, "--- onCreate database ---");
-            // создаем таблицу с полями
+            //our pubKeys
             db.execSQL("create table users ("
                     + "id integer primary key autoincrement,"
                     + "pubKey BLOB,"
                     + "privKey BLOB" + ");");
+            //table for free space in trie file
             db.execSQL("create table freeSpace ("
                     + "id integer primary key autoincrement,"
                     + "pos LONG,"
                     + "space int" + ");");
+            //cache pubKeys for insert after sync
             db.execSQL("create table sync ("
                     + "id integer primary key autoincrement,"
                     + "pos LONG,"
                     + "prefix BLOB,"
                     + "age BLOB,"
                     + "exist integer" + ");");
-            //таблица потребителей услуг в рамках сессии
+            //clients on session
             db.execSQL("create table clients ("
                     + "id integer primary key autoincrement,"
                     + "pubKey BLOB" + ");");
-            //таблица кеша удаления старых узлов
+            //cache pubKeys for delete
             db.execSQL("create table forDelete ("
                     + "id integer primary key autoincrement,"
                     + "pubKey BLOB" + ");");
+            //cache node in blob for save in trie file
+            db.execSQL("create table cacheNewNodeBlobs ("
+                    + "id integer primary key autoincrement,"
+                    + "pos LONG,"
+                    + "node BLOB" + ");");
+            //cache backup node in blob for recovery trie file
+            db.execSQL("create table cacheOldNodeBlobs ("
+                    + "id integer primary key autoincrement,"
+                    + "pos LONG,"
+                    + "node BLOB" + ");");
         }
 
         @Override

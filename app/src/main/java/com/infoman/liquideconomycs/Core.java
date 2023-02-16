@@ -74,6 +74,17 @@ public class Core extends Application {
     }
 
     /////////TRIE//////////////////////////////////////////////////////////////////////////////////
+    public void insertNodeBlob(long position, byte[] blob, String table) {
+        cv.put("pos", position);
+        cv.put("node", blob);
+        db.insert(table, null, cv);
+        cv.clear();
+    }
+
+    public Cursor getNodeBlobs(String table) {
+        return db.rawQuery("SELECT * FROM " + table + " AS tableNodeBlobs", null);
+    }
+
     public Cursor getFreeSpace(int recordlength) {
         return db.rawQuery("SELECT * FROM freeSpace where space>=" + recordlength + " ORDER BY space ASC Limit 1", null);
     }
@@ -105,24 +116,26 @@ public class Core extends Application {
     }
 
     public void insertFreeSpaceWitchCompressTrieFile(long pos, int space) {
-        Cursor query = getFreeSpaceWitchCompress(pos, space);
-        if (query.moveToFirst()) {
-            long p  = query.getLong(query.getColumnIndex("pos"));
-            int s   = query.getInt(query.getColumnIndex("space"));
-            int id   = query.getInt(query.getColumnIndex("id"));
-            cv.put("pos", p);
-            cv.put("space", s);
-            // обновляем по id
-            db.update("freeSpace", cv, "id = ?",
-                    new String[] {String.valueOf(id)});
-            cv.clear();
-        }else{
-            cv.put("pos", pos);
-            cv.put("space", space);
-            db.insert("freeSpace", null, cv);
-            cv.clear();
+        if (pos > 2070) {
+            Cursor query = getFreeSpaceWitchCompress(pos, space);
+            if (query.moveToFirst()) {
+                long p = query.getLong(query.getColumnIndex("pos"));
+                int s = query.getInt(query.getColumnIndex("space"));
+                int id = query.getInt(query.getColumnIndex("id"));
+                cv.put("pos", p);
+                cv.put("space", s);
+                // обновляем по id
+                db.update("freeSpace", cv, "id = ?",
+                        new String[]{String.valueOf(id)});
+                cv.clear();
+            } else {
+                cv.put("pos", pos);
+                cv.put("space", space);
+                db.insert("freeSpace", null, cv);
+                cv.clear();
+            }
+            query.close();
         }
-        query.close();
     }
 
     public void addForDelete(byte[] pubKey) {
@@ -208,6 +221,10 @@ public class Core extends Application {
 
     public void clearPrefixTable() {
         db.delete("sync", null, null);
+    }
+
+    public void clearTable(String table) {
+        db.delete(table, null, null);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -298,5 +315,7 @@ public class Core extends Application {
                 .putExtra(EXTRA_ANSWER, answer);
         sendBroadcast(intent);
     }
+
+
 
 }
