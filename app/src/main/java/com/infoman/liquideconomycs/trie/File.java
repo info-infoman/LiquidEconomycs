@@ -90,7 +90,8 @@ public class File extends RandomAccessFile {
                 }
             }
         }
-        app.insertNodeBlob(pos, blob, "cacheNewNodeBlobs");
+        seek(pos);
+        write(blob);
         node.position = pos;
     }
 
@@ -114,19 +115,8 @@ public class File extends RandomAccessFile {
     }
 
     public void transaction() throws IOException {
-        Cursor query = app.getNodeBlobs("cacheNewNodeBlobs");
-        while(query.moveToNext()) {
-            int posColIndex = query.getColumnIndex("pos");
-            int nodeColIndex = query.getColumnIndex("node");
-            long pos = query.getLong(posColIndex);
-            byte[] blob = query.getBlob(nodeColIndex);
-            seek(pos);
-            write(blob);
-        }
-        query.close();
         app.file.virtualFilePointer = app.file.length();
         app.clearTable("cacheOldNodeBlobs");
-        app.clearTable("cacheNewNodeBlobs");
     }
 
     public void recovery() throws IOException {

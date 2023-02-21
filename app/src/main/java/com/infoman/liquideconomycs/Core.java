@@ -45,7 +45,6 @@ public class Core extends Application {
 
     private DBHelper dbHelper;
     private SQLiteDatabase db;
-    private ContentValues cv;
     public Pair myKey;
     public byte[] clientPubKey;
     public WebSocketClient mClient;
@@ -59,7 +58,6 @@ public class Core extends Application {
         Context context = getApplicationContext();
         dbHelper = new DBHelper(context);
         db = dbHelper.getWritableDatabase();
-        cv = new ContentValues();
         waitingIntentCount = 0;
         //isSynchronized = false;
         setMyKey();
@@ -75,6 +73,7 @@ public class Core extends Application {
 
     /////////TRIE//////////////////////////////////////////////////////////////////////////////////
     public void insertNodeBlob(long position, byte[] blob, String table) {
+        ContentValues cv = new ContentValues();
         cv.put("pos", position);
         cv.put("node", blob);
         db.insert(table, null, cv);
@@ -116,6 +115,7 @@ public class Core extends Application {
     }
 
     public void insertFreeSpaceWitchCompressTrieFile(long pos, int space) {
+        ContentValues cv = new ContentValues();
         if (pos > 2070) {
             Cursor query = getFreeSpaceWitchCompress(pos, space);
             if (query.moveToFirst()) {
@@ -139,12 +139,14 @@ public class Core extends Application {
     }
 
     public void addForDelete(byte[] pubKey) {
+        ContentValues cv = new ContentValues();
         cv.put("pubKey", pubKey);
         db.insert("forDelete", null, cv);
         cv.clear();
     }
 
     public void deleteFreeSpace(int id, long pos, int recordLength, int space) {
+        ContentValues cv = new ContentValues();
         if (recordLength < space) {
             cv.put("pos", pos + recordLength);
             cv.put("space", space - recordLength);
@@ -168,6 +170,7 @@ public class Core extends Application {
     }
 
     public void setMyKey() {
+        ContentValues cv = new ContentValues();
         Cursor query = db.rawQuery("SELECT * FROM users where privKey IS NOT NULL", null);
         if (query.moveToFirst()) {
             int pubKeyColIndex = query.getColumnIndex("pubKey"), privKeyColIndex = query.getColumnIndex("privKey");
@@ -191,6 +194,7 @@ public class Core extends Application {
     /////////Sync/////////////////////////////////////////////////////////////////////////////////
 
     public void addClient(byte[] pubKey) {
+        ContentValues cv = new ContentValues();
         cv.put("pubKey", pubKey);
         db.insert("clients", null, cv);
         cv.clear();
@@ -211,6 +215,7 @@ public class Core extends Application {
     }
 
     public void addPrefixByPos(long pos, byte[] key, byte[] age, boolean exist) {
+        ContentValues cv = new ContentValues();
         cv.put("pos", pos);
         cv.put("prefix", key);
         cv.put("age", age);
@@ -243,12 +248,11 @@ public class Core extends Application {
         Utils.startIntent(this, intent);
     }
 
-    public void startActionFind(String master, byte[] pubKey, long pos) {
+    public void startActionFind(String master, byte[] pubKey) {
         Intent intent = new Intent(this, com.infoman.liquideconomycs.trie.ServiceIntent.class)
                 .setAction(ACTION_FIND)
                 .putExtra(EXTRA_MASTER, master)
-                .putExtra(EXTRA_PUBKEY, pubKey)
-                .putExtra(EXTRA_POS, pos);
+                .putExtra(EXTRA_PUBKEY, pubKey);
         Utils.startIntent(this, intent);
     }
 

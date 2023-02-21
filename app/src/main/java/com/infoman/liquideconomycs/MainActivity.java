@@ -424,7 +424,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             else{
                 byte[] accepterPubKey = Utils.hexToByte(fields[0]);
                 if(chekSig(accepterPubKey, decodeFromDER(Utils.hexToByte(fields[1])), accepterPubKey)) {
-                        app.startActionFind("Main", ECKey.fromPublicOnly(accepterPubKey).getPubKeyHash(), 0L);
+                        app.startActionFind("Main", ECKey.fromPublicOnly(accepterPubKey).getPubKeyHash());
                 }
                 //TODO add uncheck msg
             }

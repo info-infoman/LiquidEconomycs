@@ -1,11 +1,16 @@
 package com.infoman.liquideconomycs.trie;
 
+import android.content.SharedPreferences;
+
 import com.google.common.primitives.Bytes;
 import com.google.common.primitives.Longs;
 import com.infoman.liquideconomycs.Core;
 import com.infoman.liquideconomycs.Utils;
 
 import java.io.IOException;
+import java.util.Date;
+
+import androidx.preference.PreferenceManager;
 
 import static org.bitcoinj.core.Utils.sha256hash160;
 
@@ -17,7 +22,7 @@ public class Node extends ChildMap {
             BRANCH      = 2,
             LEAF        = 3;
     public Core app;
-    public long position;
+    public long position, maxAge;
     public byte[] age, hash;
     public PubKey nodeKey;
     public byte type;
@@ -27,6 +32,8 @@ public class Node extends ChildMap {
     public Node(Core context, NodeParams nodeParams) throws IOException {
         super(32);
         app = context;
+        SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(app);
+        maxAge = Long.parseLong(sharedPref.getString("maxAge", "30"));
         age = nodeParams.age;
         type = nodeParams.type;
         nodeKey = new PubKey(type, nodeParams.pubKey);
@@ -102,6 +109,27 @@ public class Node extends ChildMap {
             }
         }
         calcHash();
+    }
+
+    private void loadChild(int pubKeyInt) throws IOException {
+        long positionInFile = type == ROOT ? position + 22 : position + (4 + nodeKey.nodePubKey.length + 20 + mapSize);
+        if (getInMap(pubKeyInt)) {
+            int posInArray = type == ROOT ? pubKeyInt : getPos(pubKeyInt) - 1;
+            byte[] b = new byte[type == LEAF ? 2 : 8];
+            app.file.get(b, positionInFile + (posInArray * (type == LEAF ? 2 : 8)), 0, (type == LEAF ? 2 : 8));
+            if(type == LEAF){
+                mapAges[pubKeyInt] = b;
+            }else {
+                long pos = Longs.fromByteArray(b);
+                NodeParams nodeParams = new NodeParams();
+                nodeParams.age = new byte[2];
+                nodeParams.type = BRANCH;
+                nodeParams.pos = pos;
+                nodeParams.hash = getHash(pos);
+                nodeParams.newble = false;
+                mapChilds[pubKeyInt] = new Node(app, nodeParams);
+            }
+        }
     }
 
     //if position is clear/new, (replace old node/put new node/delete node),  on new place
@@ -254,6 +282,43 @@ public class Node extends ChildMap {
         }
     }
 
+    public byte[] find(byte[] pubKey) throws IOException {
+        nodeKey.initNodeKyeFieldsByNewKey(pubKey);
+        if(nodeKey.getEqualsPrefixFromNewKeyAndNodePubKey()) {
+            int pubKeyInt = nodeKey.getPlaceIntForChildFromNewKeySuffix(pubKey);
+            loadChild(pubKeyInt);
+            byte[] keyChild = nodeKey.getKeyForAddInChildFromNewKeySuffix();
+            if (getInMap(pubKeyInt)) {
+                if (type != LEAF) {//leaf have no childs
+                    mapChilds[pubKeyInt].find(keyChild);
+                }else{
+                    return mapAges[pubKeyInt];
+                }
+            }
+        }
+        return new byte[0];
+    }
+
+    public void findOldestNode(byte[] key) throws IOException {
+        if (Utils.compareDate(Utils.ageToBytes(new Date()), age, maxAge)) {
+            loadChilds();
+            byte[] fullKey = Bytes.concat(key, nodeKey.nodePubKey);
+            for(int i=0; i < mapSize * 8; i++) {
+                if (getInMap(i)) {
+                    byte[] sKey=new byte[1];
+                    sKey[0] = (byte) i;
+                    if (type != LEAF) {//leaf have no childs
+                        mapChilds[i].findOldestNode(Bytes.concat(fullKey, sKey));
+                    }else{
+                        if (Utils.compareDate(Utils.ageToBytes(new Date()), mapAges[i], maxAge)) {
+                            app.addForDelete(Bytes.concat(fullKey, sKey));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     public void calcSpace() {
         space = 4 + nodeKey.nodePubKey.length + 20 + mapSize + (getCountInMap() * (type == LEAF ? 2 : 8));
     }
@@ -287,3 +352,5 @@ public class Node extends ChildMap {
     }
 
 }
+
+

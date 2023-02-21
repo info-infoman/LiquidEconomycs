@@ -27,6 +27,7 @@ import static com.infoman.liquideconomycs.Utils.ACTION_GENERATE_ANSWER;
 import static com.infoman.liquideconomycs.Utils.ACTION_GET_HASH;
 import static com.infoman.liquideconomycs.Utils.ACTION_INSERT;
 import static com.infoman.liquideconomycs.Utils.ACTION_INSERT_FREE_SPACE_IN_MAP;
+import static com.infoman.liquideconomycs.Utils.ACTION_STOP_TRIE;
 import static com.infoman.liquideconomycs.Utils.EXTRA_AGE;
 import static com.infoman.liquideconomycs.Utils.EXTRA_MASTER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_MSG_TYPE;
@@ -166,13 +167,12 @@ public class ServiceIntent extends IntentService {
             if (ACTION_FIND.equals(action)) {
                 final String master = intent.getStringExtra(EXTRA_MASTER), cmd = "Find";
                 final byte[] key = intent.getByteArrayExtra(EXTRA_PUBKEY);
-                final long pos = intent.getLongExtra(EXTRA_POS, 0L);
                 ////////////////////////////////////////////////////////////////
-                /*try {
-                    //app.broadcastActionMsg(master, cmd, find(key, pos));
+                try {
+                    app.broadcastActionMsg(master, cmd, node.find(key));
                 } catch (IOException e) {
                     e.printStackTrace();
-                }*/
+                }
                 ////////////////////////////////////////////////////////////////
             }
 
@@ -208,7 +208,7 @@ public class ServiceIntent extends IntentService {
                 app.insertFreeSpaceWitchCompressTrieFile(pos, space);
                 ////////////////////////////////////////////////////////////////
             }
-/*
+
             if (ACTION_STOP_TRIE.equals(action)) {
                 try {
                     while(app.waitingIntentCount!=0){}
@@ -216,16 +216,16 @@ public class ServiceIntent extends IntentService {
                     //get Oldest Key
                     app.clearTableForDelete();
 
-                    deleteOldest(0L, new byte[1]);
-
+                    node.findOldestNode(new byte[0]);
+/*
                     Cursor query = app.getPubKeysForDelete();
                     while (query.moveToNext()) {
                         int pubKeyColIndex = query.getColumnIndex("pubKey");
                         delete(query.getBlob(pubKeyColIndex), 0L);
                     }
                     query.close();
-
-                    app.clearTableForDelete();
+*/
+                    //app.clearTableForDelete();
                     app.clearPrefixTable();
                     app.waitingIntentCount--;
                 } catch (IOException e) {
@@ -234,7 +234,7 @@ public class ServiceIntent extends IntentService {
                 ////////////////////////////////////////////////////////////////
             }
 
- */
+
         }
     }
 
@@ -396,64 +396,7 @@ public class ServiceIntent extends IntentService {
         return answer;
     }
 
-    private void deleteOldest(long pos, byte[] key) throws IOException {
-        SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(app);
 
-        long maxAge = Long.parseLong(sharedPref.getString("maxAge", "30"));
-        byte[] nodeAge = new byte[2];
-        app.trie.seek(pos);
-        app.trie.read(nodeAge, 0, 2);
-        if (Utils.compareDate(new Date(), Utils.reconstructAgeFromBytes(nodeAge)) > maxAge) {
-            if (pos == 0L) {
-                byte[] childPos = new byte[8];
-                for(int i=0; i < 256; i++) {
-                    app.trie.seek(22 + i * 8);
-                    app.trie.read(childPos, 0, 8);
-                    if (Longs.fromByteArray(childPos) != 0) {
-                        key[0] = (byte) i;
-                        deleteOldest(Longs.fromByteArray(childPos), key);
-                    }
-                }
-            }else{
-                ChildsMap childsMap = new ChildsMap(32);
-                byte type = app.trie.readByte();
-                byte keyNodeSize = app.trie.readByte();
-                byte[] keyNode = new byte[keyNodeSize];
-                app.trie.read(keyNode, 0, keyNodeSize);
-                byte[] fullKey = Bytes.concat(key, keyNode);
-                app.trie.seek(pos + 4 + keyNodeSize + 20); //skip hash
-                app.trie.read(childsMap.value, 0, 32);
-                int childPosInMap = 0;
-                for(int i=0; i < 256; i++) {
-                    if(childsMap.get(i)){
-                        childPosInMap = childsMap.getPos(i);
-                        if(childPosInMap>0) {
-                            byte[] sKey=new byte[1];
-                            sKey[0] = (byte) i;
-                            app.trie.seek(pos + 4 + keyNodeSize + 20 + 32 + ((childPosInMap * (type == LEAF ? 2 : 8)) - (type == LEAF ? 2 : 8)));
-                            byte[] childPos = new byte[(type == LEAF ? 2 : 8)];
-                            app.trie.read(childPos, 0, (type == LEAF ? 2 : 8));
-                            if(type==LEAF){
-                                if (Utils.compareDate(new Date(), Utils.reconstructAgeFromBytes(childPos)) > maxAge) {
-                                    // insert in delete  bd
-                                    if(Bytes.concat(fullKey, sKey).length<20){
-                                        Log.d("app.trie", "ERROR! deleteOldest key to small");
-                                        return;
-                                    }
-                                    if(find(Bytes.concat(fullKey, sKey), 0L).length == 0){
-                                        Log.d("app.trie", "ERROR! key not found");
-                                    }
-                                    //app.addForDelete(Bytes.concat(fullKey, sKey));
-                                }
-                            }else{
-                                deleteOldest(Longs.fromByteArray(childPos), Bytes.concat(fullKey, sKey));
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
 
     //return byte[8] if deleted or not found, or pos in file if change or hash if root
     private byte[] delete(byte[] key, long pos) throws IOException {
