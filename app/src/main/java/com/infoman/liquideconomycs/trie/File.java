@@ -2,7 +2,6 @@ package com.infoman.liquideconomycs.trie;
 
 import android.content.Context;
 import android.database.Cursor;
-import android.util.Log;
 
 import com.google.common.primitives.Bytes;
 import com.google.common.primitives.Longs;
@@ -45,25 +44,28 @@ public class File extends RandomAccessFile {
             virtualFilePointer = app.file.length();
         }
         if(node.type != ROOT){
-            Cursor query = app.getFreeSpace(node.space);
-            seek(length());
-            pos = app.file.virtualFilePointer;
+            if(newPlace) {
+                Cursor query = app.getFreeSpace(node.space);
+                seek(length());
+                pos = app.file.virtualFilePointer;
 
-            if (query.getCount() > 0 && query.moveToFirst()) {
-                int id  = query.getInt(query.getColumnIndex("id"));
-                int posColIndex = query.getColumnIndex("pos");
-                int spaceColIndex = query.getColumnIndex("space");
-                long p = query.getLong(posColIndex);
-                int s = query.getInt(spaceColIndex);
-                if( p > 0 ) {
-                    app.deleteFreeSpace(id, p, node.space, s);
-                    pos=p;
+                if (query.getCount() > 0 && query.moveToFirst()) {
+                    int id = query.getInt(query.getColumnIndex("id"));
+                    int posColIndex = query.getColumnIndex("pos");
+                    int spaceColIndex = query.getColumnIndex("space");
+                    long p = query.getLong(posColIndex);
+                    int s = query.getInt(spaceColIndex);
+                    if (p > 0) {
+                        app.deleteFreeSpace(id, p, node.space, s);
+                        pos = p;
+                    }
+                } else {
+                    app.file.virtualFilePointer = app.file.virtualFilePointer + node.space;
                 }
+                query.close();
             }else{
-                app.file.virtualFilePointer = app.file.virtualFilePointer + node.space;
+                pos = node.position;
             }
-            query.close();
-
             byte[] typeAndKeySze = new byte[2];
             typeAndKeySze[0] = node.type;
             typeAndKeySze[1] = (byte) node.nodeKey.nodePubKey.length;
@@ -88,7 +90,6 @@ public class File extends RandomAccessFile {
                 }
             }
         }
-        Log.d("Trie insert PubKey", String.valueOf(pos));
         app.insertNodeBlob(pos, blob, "cacheNewNodeBlobs");
         node.position = pos;
     }

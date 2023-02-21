@@ -134,7 +134,7 @@ public class ServiceIntent extends IntentService {
     protected void onHandleIntent(Intent intent) {
         if (intent != null) {
 
-            Log.d("app.trie", "onHandleIntent!"+app.waitingIntentCount+" "+intent.getAction());
+            //Log.d("app.trie", "onHandleIntent!"+app.waitingIntentCount+" "+intent.getAction());
             final String action = intent.getAction();
 
             if (ACTION_GET_HASH.equals(action)) {
@@ -155,22 +155,6 @@ public class ServiceIntent extends IntentService {
                 final byte[] pubKey = intent.getByteArrayExtra(EXTRA_PUBKEY), age = intent.getByteArrayExtra(EXTRA_AGE);
                 ////////////////////////////////////////////////////////////////
                 try {
-
-/*
-                    NodeParams nodeParams = new NodeParams();
-                    nodeParams.age = new byte[2];
-                    nodeParams.type = ROOT;
-                    nodeParams.pubKey = new byte[0];
-                    nodeParams.pos = 0L;
-                    nodeParams.hash = new byte[20];
-                    nodeParams.newble = false;
-
-                    try {
-                        node = new Node(app, nodeParams);
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-*/
                     node.insert(pubKey, age);
                 } catch (IOException e) {
                     e.printStackTrace();

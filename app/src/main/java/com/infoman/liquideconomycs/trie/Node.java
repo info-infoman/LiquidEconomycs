@@ -39,7 +39,6 @@ public class Node extends ChildMap {
         }
     }
 
-
     private void loadNode() throws IOException {
 
         if ((type == ROOT && position != 0L)) throw new AssertionError();
@@ -79,8 +78,9 @@ public class Node extends ChildMap {
         long positionInFile = type == ROOT ? position + 22 : position + (4 + nodeKey.nodePubKey.length + 20 + mapSize);
         for(int i = 0; i < (mapSize * 8); i++) {
             if (getInMap(i)) {
+                int posInArray = type == ROOT ? i : getPos(i) - 1;
                 byte[] b = new byte[type == LEAF ? 2 : 8];
-                app.file.get(b, positionInFile + (i * (type == LEAF ? 2 : 8)), 0, (type == LEAF ? 2 : 8));
+                app.file.get(b, positionInFile + (posInArray * (type == LEAF ? 2 : 8)), 0, (type == LEAF ? 2 : 8));
                 if(type == LEAF){
                     mapAges[i] = b;
                 }else {
@@ -130,7 +130,9 @@ public class Node extends ChildMap {
                 } else {
                     setInMap(intForChild, true);
                     mapAges[intForChild] = newAge;
-                    age = newAge;
+                    if (Utils.compareDate(age, newAge, 0L)) {
+                        age = newAge;
+                    }
                     calcHash();
                     calcSpace();
                     change = true;
@@ -157,7 +159,6 @@ public class Node extends ChildMap {
                     mapChilds[intForChild] = ref;
                     if (type != ROOT) {
                         calcSpace();
-                        app.insertFreeSpaceWitchCompressTrieFile(position, space);
                         newSpace = true;
                     }
 
@@ -209,7 +210,8 @@ public class Node extends ChildMap {
             newRef.insert(nodeKey.getKeyForAddInChildFromNewKeySuffix(), newAge);
 
             //change this node to common node
-            nodeKey = new PubKey(BRANCH, nodeKey.commonKey);;
+            app.insertFreeSpaceWitchCompressTrieFile(position, space);
+            nodeKey = new PubKey(BRANCH, nodeKey.commonKey);
             type = BRANCH;
             //clear map ch ag
             mapBytes = new byte[mapSize];
@@ -221,7 +223,6 @@ public class Node extends ChildMap {
             mapChilds[intForNewChild] = newRef;
             mapChilds[intForOldChild] = ref;
             change = true;
-            app.insertFreeSpaceWitchCompressTrieFile(position, space);
             if (Utils.compareDate(age, newAge, 0L)) {
                 age = newAge;
             }
@@ -238,6 +239,7 @@ public class Node extends ChildMap {
     private void constructTrieByKey(byte[] pubKey) throws IOException {
         nodeKey.initNodeKyeFieldsByNewKey(pubKey);
         if(nodeKey.getEqualsPrefixFromNewKeyAndNodePubKey()) {
+            change = false;
             loadChilds();
             int pubKeyInt = nodeKey.getPlaceIntForChildFromNewKeySuffix(pubKey);
             byte[] keyChild = nodeKey.getKeyForAddInChildFromNewKeySuffix();
@@ -252,8 +254,8 @@ public class Node extends ChildMap {
         }
     }
 
-    private void calcSpace() {
-        space = 4 + nodeKey.nodePubKey.length + 20 + mapSize + (getCountInMap() * type == LEAF ? 2 : 8);
+    public void calcSpace() {
+        space = 4 + nodeKey.nodePubKey.length + 20 + mapSize + (getCountInMap() * (type == LEAF ? 2 : 8));
     }
 
     private void calcHash() {

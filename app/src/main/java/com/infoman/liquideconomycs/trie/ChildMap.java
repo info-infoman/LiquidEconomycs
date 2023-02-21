@@ -34,7 +34,7 @@ public class ChildMap{
         prepare = BitSet.valueOf(mapBytes);
         int count = getCountInMap();
         for(int i = 0; i < index + 1; i++){
-            if(i == count) break;
+            //if(i == count) break;
             if(prepare.get(i)) result = result + 1;
         }
         return result;
