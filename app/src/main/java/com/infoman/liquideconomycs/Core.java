@@ -39,7 +39,6 @@ import static com.infoman.liquideconomycs.Utils.EXTRA_PUBKEY;
 import static com.infoman.liquideconomycs.Utils.EXTRA_SIGNAL_SERVER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_SPACE;
 import static com.infoman.liquideconomycs.Utils.EXTRA_TOKEN;
-import static com.infoman.liquideconomycs.Utils.copyAssetFolder;
 
 public class Core extends Application {
 
@@ -50,7 +49,7 @@ public class Core extends Application {
     public WebSocketClient mClient;
     public long dateTimeLastSync;
     public int waitingIntentCount;
-    public File file;
+    public File[] files;
 
     @Override
     public void onCreate() {
@@ -65,15 +64,17 @@ public class Core extends Application {
         String nodeDir = context.getFilesDir().getAbsolutePath() + "/trie";
         java.io.File nodeDirReference = new java.io.File(nodeDir);
         while (!nodeDirReference.exists()) {
-            copyAssetFolder(context.getAssets(), "trie", nodeDir);
+            new java.io.File(nodeDir).mkdirs();
+            //copyAssetFolder(context.getAssets(), "trie", nodeDir);
         }
         /////////////////////////////////////////////////////////////////////////////
         //MySingleton.initInstance();
     }
 
     /////////TRIE//////////////////////////////////////////////////////////////////////////////////
-    public void insertNodeBlob(long position, byte[] blob, String table) {
+    public void insertNodeBlob(long file, long position, byte[] blob, String table) {
         ContentValues cv = new ContentValues();
+        cv.put("file", file);
         cv.put("pos", position);
         cv.put("node", blob);
         db.insert(table, null, cv);
@@ -84,11 +85,11 @@ public class Core extends Application {
         return db.rawQuery("SELECT * FROM " + table + " AS tableNodeBlobs", null);
     }
 
-    public Cursor getFreeSpace(int recordlength) {
-        return db.rawQuery("SELECT * FROM freeSpace where space>=" + recordlength + " ORDER BY space ASC Limit 1", null);
+    public Cursor getFreeSpace(long file, int recordlength) {
+        return db.rawQuery("SELECT * FROM freeSpace where space>=" + recordlength + " AND file = "+file+" ORDER BY space ASC Limit 1", null);
     }
 
-    public Cursor getFreeSpaceWitchCompress(long pos, int space) {
+    public Cursor getFreeSpaceWitchCompress(long file, long pos, int space) {
         return db.rawQuery("SELECT " +
                 "freeSpace.id," +
                 " CASE WHEN " + pos + " < freeSpace.pos "+
@@ -109,15 +110,15 @@ public class Core extends Application {
                     " end " +
                 " end as space " +
                 " FROM freeSpace AS freeSpace " +
-                " where (freeSpace.pos < " + pos + " AND freeSpace.pos + freeSpace.space  BETWEEN " + pos + " AND " + (pos + space) + ")"+
+                " where freeSpace.file = "+file+" AND((freeSpace.pos < " + pos + " AND freeSpace.pos + freeSpace.space  BETWEEN " + pos + " AND " + (pos + space) + ")"+
                 " or (" + pos + " < freeSpace.pos AND " + (pos + space) + " BETWEEN freeSpace.pos AND freeSpace.pos + freeSpace.space)" +
-                " or ("+ pos + " < freeSpace.pos AND freeSpace.pos + freeSpace.space < " + (pos + space) + ") limit 1", null);
+                " or ("+ pos + " < freeSpace.pos AND freeSpace.pos + freeSpace.space < " + (pos + space) + ")) limit 1", null);
     }
 
-    public void insertFreeSpaceWitchCompressTrieFile(long pos, int space) {
+    public void insertFreeSpaceWitchCompressTrieFile(long file, long pos, int space) {
         ContentValues cv = new ContentValues();
         if (pos > 2070) {
-            Cursor query = getFreeSpaceWitchCompress(pos, space);
+            Cursor query = getFreeSpaceWitchCompress(file, pos, space);
             if (query.moveToFirst()) {
                 long p = query.getLong(query.getColumnIndex("pos"));
                 int s = query.getInt(query.getColumnIndex("space"));
@@ -129,6 +130,7 @@ public class Core extends Application {
                         new String[]{String.valueOf(id)});
                 cv.clear();
             } else {
+                cv.put("file", file);
                 cv.put("pos", pos);
                 cv.put("space", space);
                 db.insert("freeSpace", null, cv);
@@ -145,9 +147,10 @@ public class Core extends Application {
         cv.clear();
     }
 
-    public void deleteFreeSpace(int id, long pos, int recordLength, int space) {
+    public void deleteFreeSpace(long file, int id, long pos, int recordLength, int space) {
         ContentValues cv = new ContentValues();
         if (recordLength < space) {
+            cv.put("file", file);
             cv.put("pos", pos + recordLength);
             cv.put("space", space - recordLength);
             db.update("freeSpace", cv, "id = ?",

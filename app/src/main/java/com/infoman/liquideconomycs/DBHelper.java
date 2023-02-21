@@ -25,6 +25,7 @@ public class DBHelper extends SQLiteOpenHelper {
             //table for free space in trie file
             db.execSQL("create table freeSpace ("
                     + "id integer primary key autoincrement,"
+                    + "file LONG,"
                     + "pos LONG,"
                     + "space int" + ");");
             //cache pubKeys for insert after sync
@@ -38,18 +39,16 @@ public class DBHelper extends SQLiteOpenHelper {
             db.execSQL("create table clients ("
                     + "id integer primary key autoincrement,"
                     + "pubKey BLOB" + ");");
-            //cache pubKeys for delete
-            db.execSQL("create table forDelete ("
-                    + "id integer primary key autoincrement,"
-                    + "pubKey BLOB" + ");");
             //cache node in blob for save in trie file
             db.execSQL("create table cacheNewNodeBlobs ("
                     + "id integer primary key autoincrement,"
+                    + "file LONG,"
                     + "pos LONG,"
                     + "node BLOB" + ");");
             //cache backup node in blob for recovery trie file
             db.execSQL("create table cacheOldNodeBlobs ("
                     + "id integer primary key autoincrement,"
+                    + "file LONG,"
                     + "pos LONG,"
                     + "node BLOB" + ");");
         }

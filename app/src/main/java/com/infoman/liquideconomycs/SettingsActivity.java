@@ -59,7 +59,7 @@ public class SettingsActivity extends AppCompatActivity {
         byte[] myPubKey, age, newPubKey, myPubKey_;
         age = Utils.ageToBytesTest();
         Date b = Utils.reconstructAgeFromBytes(age);
-        for(int i=0;i<10;i++) {
+        for(int i=0;i<1000;i++) {
             myECKey = new ECKey();
             myPubKey = myECKey.getPubKeyHash();
             if(Bytes.concat(myPubKey).length != 20){
@@ -69,7 +69,7 @@ public class SettingsActivity extends AppCompatActivity {
         }
         age = Utils.ageToBytes(new Date());
         b = Utils.reconstructAgeFromBytes(age);
-        for(int i=0;i<10;i++) {
+        for(int i=0;i<1000;i++) {
             myECKey = new ECKey();
             myPubKey = myECKey.getPubKeyHash();
             if(Bytes.concat(myPubKey).length != 20){

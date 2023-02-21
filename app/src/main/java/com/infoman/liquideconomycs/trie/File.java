@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.Date;
 
+import static com.infoman.liquideconomycs.Utils.getDayByIndex;
 import static com.infoman.liquideconomycs.trie.Node.LEAF;
 import static com.infoman.liquideconomycs.trie.Node.ROOT;
 
@@ -26,7 +27,7 @@ public class File extends RandomAccessFile {
         try {
             if (length() == 0L) {
                 setLength(0L);
-                byte[] trieTmp = new byte[2070];
+                byte[] trieTmp = new byte[2068];
                 write(trieTmp);
                 seek(0L);
                 write(Utils.ageToBytes(new Date()));
@@ -41,13 +42,13 @@ public class File extends RandomAccessFile {
         byte[] blob;
         long pos = 0L;
         if(virtualFilePointer == 0L){
-            virtualFilePointer = app.file.length();
+            virtualFilePointer = this.length();
         }
         if(node.type != ROOT){
             if(newPlace) {
-                Cursor query = app.getFreeSpace(node.space);
+                Cursor query = app.getFreeSpace(getDayByIndex(node.index).getTime(), node.space);
                 seek(length());
-                pos = app.file.virtualFilePointer;
+                pos = this.virtualFilePointer;
 
                 if (query.getCount() > 0 && query.moveToFirst()) {
                     int id = query.getInt(query.getColumnIndex("id"));
@@ -56,11 +57,11 @@ public class File extends RandomAccessFile {
                     long p = query.getLong(posColIndex);
                     int s = query.getInt(spaceColIndex);
                     if (p > 0) {
-                        app.deleteFreeSpace(id, p, node.space, s);
+                        app.deleteFreeSpace(getDayByIndex(node.index).getTime(), id, p, node.space, s);
                         pos = p;
                     }
                 } else {
-                    app.file.virtualFilePointer = app.file.virtualFilePointer + node.space;
+                    this.virtualFilePointer = this.virtualFilePointer + node.space;
                 }
                 query.close();
             }else{
@@ -69,19 +70,17 @@ public class File extends RandomAccessFile {
             byte[] typeAndKeySze = new byte[2];
             typeAndKeySze[0] = node.type;
             typeAndKeySze[1] = (byte) node.nodeKey.nodePubKey.length;
-            blob = Bytes.concat(node.age, typeAndKeySze, node.nodeKey.nodePubKey, node.hash, node.mapBytes);
+            blob = Bytes.concat(typeAndKeySze, node.nodeKey.nodePubKey, node.hash, node.mapBytes);
 
-            for(int i = 0; i < (node.mapSize * 8); i++) {
-                if (node.getInMap(i)) {
-                    if(node.type != LEAF) {
+            if(node.type != LEAF) {
+                for(int i = 0; i < (node.mapSize * 8); i++) {
+                    if (node.getInMap(i)) {
                         blob = Bytes.concat(blob, Longs.toByteArray(node.mapChilds[i].position));
-                    }else{
-                        blob = Bytes.concat(blob, node.mapAges[i]);
                     }
                 }
             }
         }else{
-            blob = Bytes.concat(node.age, node.hash);
+            blob = node.hash;
             for(int i = 0; i < (node.mapSize * 8); i++) {
                 if (node.getInMap(i)) {
                     blob = Bytes.concat(blob, Longs.toByteArray(node.mapChilds[i].position));
@@ -95,11 +94,11 @@ public class File extends RandomAccessFile {
         node.position = pos;
     }
 
-    public void saveNodeOldStateBlobInDB(long pos, int len) throws IOException {
+    public void saveNodeOldStateBlobInDB(long file, long pos, int len) throws IOException {
         byte[] blob = new byte[len];
         seek(pos);
         read(blob, 0, len);
-        app.insertNodeBlob(pos, blob, "cacheOldNodeBlobs");
+        app.insertNodeBlob(file, pos, blob, "cacheOldNodeBlobs");
     }
 
     public void get(byte[] b, long pos, int off, int len) throws IOException {
@@ -115,7 +114,7 @@ public class File extends RandomAccessFile {
     }
 
     public void transaction() throws IOException {
-        app.file.virtualFilePointer = app.file.length();
+        this.virtualFilePointer = this.length();
         app.clearTable("cacheOldNodeBlobs");
     }
 
@@ -132,7 +131,7 @@ public class File extends RandomAccessFile {
                 write(blob);
             }
             query.close();
-            app.file.virtualFilePointer = app.file.length();
+            this.virtualFilePointer = this.length();
             app.clearTable("cacheOldNodeBlobs");
         }
     }

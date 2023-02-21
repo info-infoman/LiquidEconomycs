@@ -7,6 +7,7 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Build;
 import android.util.Log;
@@ -14,11 +15,18 @@ import android.util.Log;
 import com.infoman.liquideconomycs.Core;
 import com.infoman.liquideconomycs.Utils;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.nio.file.DirectoryIteratorException;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Date;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.RequiresApi;
 import androidx.core.app.NotificationCompat;
+import androidx.preference.PreferenceManager;
 
 import static androidx.core.app.NotificationCompat.PRIORITY_LOW;
 import static com.infoman.liquideconomycs.Utils.ACTION_DELETE;
@@ -35,29 +43,76 @@ import static com.infoman.liquideconomycs.Utils.EXTRA_PAYLOAD;
 import static com.infoman.liquideconomycs.Utils.EXTRA_POS;
 import static com.infoman.liquideconomycs.Utils.EXTRA_PUBKEY;
 import static com.infoman.liquideconomycs.Utils.EXTRA_SPACE;
+import static com.infoman.liquideconomycs.Utils.compareDate;
+import static com.infoman.liquideconomycs.Utils.getDayByIndex;
 import static com.infoman.liquideconomycs.trie.Node.ROOT;
+import static java.lang.Long.parseLong;
 //TODO add max age field in leaf and branch node = max age in childs, for automate delete to old pubKey
 
 public class ServiceIntent extends IntentService {
 
     protected Core app;
-    protected Node node;
+    protected Node[] nodes;
 
     public ServiceIntent() {
         super("TrieServiceIntent");
     }
 
+    @RequiresApi(api = Build.VERSION_CODES.O)
     @Override
     public void onCreate() {
         super.onCreate();
         //android.os.Debug.waitForDebugger();
         app = (Core) getApplicationContext();
-
+        SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(app);
+        long maxAge = parseLong(sharedPref.getString("maxAge", "30"));
         if(app.waitingIntentCount !=0) return;
+        nodes = new Node[(int) maxAge];
+        app.files = new File[(int) maxAge];
+
         Log.d("TrieServiceIntent", "Create!"+app.waitingIntentCount);
 
         //init trie file class
+
+        Path dir = Paths.get(app.getFilesDir().getAbsolutePath() + "/trie");
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir)) {
+            for (Path file: stream) {
+                long fileDate = parseLong(file.getFileName().toString());
+                if(compareDate(new Date(), new Date(fileDate))>30){
+                    Files.delete(file.getFileName());
+                }
+            }
+        } catch (IOException | DirectoryIteratorException x) {
+            // IOException can never be thrown by the iteration.
+            // In this snippet, it can only be thrown by newDirectoryStream.
+            System.err.println(x);
+        }
+
         try {
+            for(int i = 0; i < nodes.length; i++){
+                Log.d("TrieServiceIntent", "init file "+i);
+                long fileName = getDayByIndex(i).getTime();
+                Log.d("TrieServiceIntent", "init file "+fileName);
+                Path path = Paths.get(app.getFilesDir().getAbsolutePath() + "/trie/"+fileName);
+                if (!Files.exists(path)) {
+                    Files.createFile(path);
+                }
+                app.files[i] = new File(app,app.getFilesDir().getAbsolutePath() + "/trie" + "/" + fileName, "rw");
+                NodeParams nodeParams = new NodeParams();
+                nodeParams.index = i;
+                nodeParams.type = ROOT;
+                nodeParams.pubKey = new byte[0];
+                nodeParams.pos = 0L;
+                nodeParams.hash = new byte[20];
+                nodeParams.newble = false;
+                nodes[i] = new Node(app, nodeParams);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        /*try {
+
             app.file = new File(app,app.getFilesDir().getAbsolutePath() + "/trie" + "/trie.dat", "rw");
         } catch (FileNotFoundException e) {
             e.printStackTrace();
@@ -82,18 +137,18 @@ public class ServiceIntent extends IntentService {
             node = new Node(app, nodeParams);
         } catch (IOException e) {
             e.printStackTrace();
-        }
+        }*/
         //android.os.Debug.waitForDebugger();
         //TODO cut down childMap 4 bytes sector mask and 2-32 bytes map? total 5-36 bytes
         //ROOT(content BRANCHs & LEAFs)
-        //age(2)/hash sha256hash160(20) /child point array(1-256*8)
-        //0000  /00*20                  /0000000000000000 max 2070 byte
+        //hash sha256hash160(20) /child point array(1-256*8)
+        //00*20                  /0000000000000000 max 2068 byte
         //BRANCH(content child BRANCHs & LEAFs)
-        //age(2)/type(1)/key size(1)/key(0-18)/hash sha256hash160(20)/childsMap(32)  /nodePointArray(1-256*8)
-        //0000  /00     /00         /00*18    /00*20                 /00*32         /00*8               max 2104 byte (ideal ‭153 185(branchs) =~307Mb)
+        //type(1)/key size(1)/key(0-18)/hash sha256hash160(20)/childsMap(32)  /nodePointArray(1-256*8)
+        //00     /00         /00*18    /00*20                 /00*32         /00*8               max 2102 byte (ideal 153 185(branchs) =~307Mb)
         //LEAF(content accounts key suffix & age)
-        //age(2)/type(1)/key size(1)/key(0-18)/hash sha256hash160(20)/childsMap(32)  /age Array(1-256*2)/
-        //0000  /00     /00         /00*18    /00*20                 /00*32          /00*2               max 568 byte (ideal ‭39 062 500‬(leafs)=20GB)
+        //type(1)/key size(1)/key(0-18)/hash sha256hash160(20)/childsMap(32)
+        //00     /00         /00*18    /00*20                 /00*32                       max 72 byte (ideal 39 062 500(leafs)=2GB)
         //total 21GB(ideal trie for 10 000 000 000 accounts)
         //
         ////////////////////////////////////////////////////////////////
@@ -106,7 +161,7 @@ public class ServiceIntent extends IntentService {
         }
 
         NotificationCompat.Builder builder = null; // display indeterminate progress
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             builder = new NotificationCompat.Builder(getBaseContext(), channel)
                     .setTicker("TrieIntent") // use something from something from R.string
                     .setContentTitle("LE trie service") // use something from something from
@@ -142,11 +197,12 @@ public class ServiceIntent extends IntentService {
                 final String master = intent.getStringExtra(EXTRA_MASTER), cmd = "GetHash";
                 final long pos = intent.getLongExtra(EXTRA_POS,0L);
                 ////////////////////////////////////////////////////////////////
+                /*
                 try {
                     app.broadcastActionMsg(master, cmd, node.getHash(pos));
                 } catch (IOException e) {
                     e.printStackTrace();
-                }
+                }*/
                 ////////////////////////////////////////////////////////////////
             }
 
@@ -155,8 +211,11 @@ public class ServiceIntent extends IntentService {
                 app.waitingIntentCount++;
                 final byte[] pubKey = intent.getByteArrayExtra(EXTRA_PUBKEY), age = intent.getByteArrayExtra(EXTRA_AGE);
                 ////////////////////////////////////////////////////////////////
+                int index = (int) compareDate(new Date(), Utils.reconstructAgeFromBytes(age));
                 try {
-                    node.insert(pubKey, age);
+                    if(index <= nodes.length) {
+                        nodes[index].insert(pubKey);
+                    }
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -168,11 +227,11 @@ public class ServiceIntent extends IntentService {
                 final String master = intent.getStringExtra(EXTRA_MASTER), cmd = "Find";
                 final byte[] key = intent.getByteArrayExtra(EXTRA_PUBKEY);
                 ////////////////////////////////////////////////////////////////
-                try {
+                /*try {
                     app.broadcastActionMsg(master, cmd, node.find(key));
                 } catch (IOException e) {
                     e.printStackTrace();
-                }
+                }*/
                 ////////////////////////////////////////////////////////////////
             }
 
@@ -205,32 +264,33 @@ public class ServiceIntent extends IntentService {
                 final long pos = intent.getLongExtra(EXTRA_POS, 0L);
                 final int space = intent.getIntExtra(EXTRA_SPACE,0);
                 ////////////////////////////////////////////////////////////////
-                app.insertFreeSpaceWitchCompressTrieFile(pos, space);
+                //app.insertFreeSpaceWitchCompressTrieFile(pos, space);
                 ////////////////////////////////////////////////////////////////
             }
 
             if (ACTION_STOP_TRIE.equals(action)) {
-                try {
+               /* try {
                     while(app.waitingIntentCount!=0){}
                     app.waitingIntentCount++;
-                    //get Oldest Key
+
                     app.clearTableForDelete();
 
                     node.findOldestNode(new byte[0]);
-/*
+
                     Cursor query = app.getPubKeysForDelete();
                     while (query.moveToNext()) {
                         int pubKeyColIndex = query.getColumnIndex("pubKey");
                         delete(query.getBlob(pubKeyColIndex), 0L);
                     }
                     query.close();
-*/
-                    //app.clearTableForDelete();
+
+                    app.clearTableForDelete();
                     app.clearPrefixTable();
                     app.waitingIntentCount--;
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
+            */
                 ////////////////////////////////////////////////////////////////
             }
 

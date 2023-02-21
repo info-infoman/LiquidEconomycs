@@ -86,6 +86,14 @@ public class Utils {
         return res;
     }
 
+    public static Date getDay(Date date){
+        return reconstructAgeFromBytes(ageToBytes(date));
+    }
+
+    public static Date getDayByIndex(int index){
+        return new Date(getDay(new Date()).getTime() - (86400000*index));
+    }
+
     public static byte[] ageToBytesTest(){
         long time = new Date().getTime()-3456000000L;  // time in ms since epoch
         time /= 86400000; // ms in a day
