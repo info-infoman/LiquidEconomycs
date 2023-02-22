@@ -16,6 +16,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Calendar;
 import java.util.Date;
 
 
@@ -89,9 +90,15 @@ public class Utils {
     public static Date getDay(Date date){
         return reconstructAgeFromBytes(ageToBytes(date));
     }
-
-    public static Date getDayByIndex(int index){
-        return new Date(getDay(new Date()).getTime() - (86400000*index));
+    
+    public static long getDayMilliByIndex(int index){
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTime(new Date());
+        calendar.set(Calendar.HOUR_OF_DAY, 0);
+        calendar.set(Calendar.MINUTE, 0);
+        calendar.set(Calendar.SECOND, 0);
+        calendar.set(Calendar.MILLISECOND, 0);
+        return calendar.getTime().getTime()-(86400000L*index);
     }
 
     public static byte[] ageToBytesTest(){

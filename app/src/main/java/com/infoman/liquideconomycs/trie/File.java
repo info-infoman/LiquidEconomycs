@@ -13,7 +13,7 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.Date;
 
-import static com.infoman.liquideconomycs.Utils.getDayByIndex;
+import static com.infoman.liquideconomycs.Utils.getDayMilliByIndex;
 import static com.infoman.liquideconomycs.trie.Node.LEAF;
 import static com.infoman.liquideconomycs.trie.Node.ROOT;
 
@@ -46,7 +46,7 @@ public class File extends RandomAccessFile {
         }
         if(node.type != ROOT){
             if(newPlace) {
-                Cursor query = app.getFreeSpace(getDayByIndex(node.index).getTime(), node.space);
+                Cursor query = app.getFreeSpace(getDayMilliByIndex(node.index), node.space);
                 seek(length());
                 pos = this.virtualFilePointer;
 
@@ -57,7 +57,7 @@ public class File extends RandomAccessFile {
                     long p = query.getLong(posColIndex);
                     int s = query.getInt(spaceColIndex);
                     if (p > 0) {
-                        app.deleteFreeSpace(getDayByIndex(node.index).getTime(), id, p, node.space, s);
+                        app.deleteFreeSpace(getDayMilliByIndex(node.index), id, p, node.space, s);
                         pos = p;
                     }
                 } else {

@@ -10,7 +10,7 @@ import java.io.IOException;
 
 import androidx.preference.PreferenceManager;
 
-import static com.infoman.liquideconomycs.Utils.getDayByIndex;
+import static com.infoman.liquideconomycs.Utils.getDayMilliByIndex;
 import static org.bitcoinj.core.Utils.sha256hash160;
 
 
@@ -217,7 +217,7 @@ public class Node extends ChildMap {
             newRef.insert(nodeKey.getKeyForAddInChildFromNewKeySuffix());
 
             //change this node to common node
-            app.insertFreeSpaceWitchCompressTrieFile(getDayByIndex(index).getTime(), position, space);
+            app.insertFreeSpaceWitchCompressTrieFile(getDayMilliByIndex(index), position, space);
             nodeKey = new PubKey(BRANCH, nodeKey.commonKey);
             type = BRANCH;
             //clear map ch ag
@@ -250,7 +250,7 @@ public class Node extends ChildMap {
             byte[] keyChild = nodeKey.getKeyForAddInChildFromNewKeySuffix();
             if (getInMap(pubKeyInt)) {
                 //if (type != ROOT) {//root loaded in constructor
-                app.files[index].saveNodeOldStateBlobInDB(getDayByIndex(index).getTime(), position, type == ROOT ? 2068 : space);
+                app.files[index].saveNodeOldStateBlobInDB(getDayMilliByIndex(index), position, type == ROOT ? 2068 : space);
                 //}
                 if (type != LEAF) {//leaf have no childs
                     mapChilds[pubKeyInt].constructTrieByKey(keyChild);

@@ -16,15 +16,9 @@ import com.infoman.liquideconomycs.Core;
 import com.infoman.liquideconomycs.Utils;
 
 import java.io.IOException;
-import java.nio.file.DirectoryIteratorException;
-import java.nio.file.DirectoryStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Date;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.RequiresApi;
 import androidx.core.app.NotificationCompat;
 import androidx.preference.PreferenceManager;
 
@@ -44,7 +38,7 @@ import static com.infoman.liquideconomycs.Utils.EXTRA_POS;
 import static com.infoman.liquideconomycs.Utils.EXTRA_PUBKEY;
 import static com.infoman.liquideconomycs.Utils.EXTRA_SPACE;
 import static com.infoman.liquideconomycs.Utils.compareDate;
-import static com.infoman.liquideconomycs.Utils.getDayByIndex;
+import static com.infoman.liquideconomycs.Utils.getDayMilliByIndex;
 import static com.infoman.liquideconomycs.trie.Node.ROOT;
 import static java.lang.Long.parseLong;
 //TODO add max age field in leaf and branch node = max age in childs, for automate delete to old pubKey
@@ -58,7 +52,7 @@ public class ServiceIntent extends IntentService {
         super("TrieServiceIntent");
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.O)
+
     @Override
     public void onCreate() {
         super.onCreate();
@@ -74,28 +68,21 @@ public class ServiceIntent extends IntentService {
 
         //init trie file class
 
-        Path dir = Paths.get(app.getFilesDir().getAbsolutePath() + "/trie");
-        try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir)) {
-            for (Path file: stream) {
-                long fileDate = parseLong(file.getFileName().toString());
-                if(compareDate(new Date(), new Date(fileDate))>30){
-                    Files.delete(file.getFileName());
-                }
+        java.io.File nodeDirReference = new java.io.File(app.getFilesDir().getAbsolutePath() + "/trie");
+        java.io.File[] files = nodeDirReference.listFiles();
+        for(java.io.File file: files){
+            long fileDate = parseLong(file.getName());
+            if(compareDate(new Date(), new Date(fileDate))>30){
+                file.delete();
             }
-        } catch (IOException | DirectoryIteratorException x) {
-            // IOException can never be thrown by the iteration.
-            // In this snippet, it can only be thrown by newDirectoryStream.
-            System.err.println(x);
         }
 
         try {
             for(int i = 0; i < nodes.length; i++){
-                Log.d("TrieServiceIntent", "init file "+i);
-                long fileName = getDayByIndex(i).getTime();
-                Log.d("TrieServiceIntent", "init file "+fileName);
-                Path path = Paths.get(app.getFilesDir().getAbsolutePath() + "/trie/"+fileName);
-                if (!Files.exists(path)) {
-                    Files.createFile(path);
+                long fileName = getDayMilliByIndex(i);
+                java.io.File nodeFileReference = new java.io.File(app.getFilesDir().getAbsolutePath() + "/trie/" + fileName);
+                if (!nodeFileReference.exists()) {
+                    nodeFileReference.createNewFile();
                 }
                 app.files[i] = new File(app,app.getFilesDir().getAbsolutePath() + "/trie" + "/" + fileName, "rw");
                 NodeParams nodeParams = new NodeParams();
@@ -111,33 +98,6 @@ public class ServiceIntent extends IntentService {
             e.printStackTrace();
         }
 
-        /*try {
-
-            app.file = new File(app,app.getFilesDir().getAbsolutePath() + "/trie" + "/trie.dat", "rw");
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        }
-
-        try {
-            app.file.recovery();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        //load root
-        NodeParams nodeParams = new NodeParams();
-        nodeParams.age = new byte[2];
-        nodeParams.type = ROOT;
-        nodeParams.pubKey = new byte[0];
-        nodeParams.pos = 0L;
-        nodeParams.hash = new byte[20];
-        nodeParams.newble = false;
-
-        try {
-            node = new Node(app, nodeParams);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }*/
         //android.os.Debug.waitForDebugger();
         //TODO cut down childMap 4 bytes sector mask and 2-32 bytes map? total 5-36 bytes
         //ROOT(content BRANCHs & LEAFs)
@@ -145,10 +105,10 @@ public class ServiceIntent extends IntentService {
         //00*20                  /0000000000000000 max 2068 byte
         //BRANCH(content child BRANCHs & LEAFs)
         //type(1)/key size(1)/key(0-18)/hash sha256hash160(20)/childsMap(32)  /nodePointArray(1-256*8)
-        //00     /00         /00*18    /00*20                 /00*32         /00*8               max 2102 byte (ideal 153 185(branchs) =~307Mb)
+        //00     /00         /00*18    /00*20                 /00*32         /00*8    max 2102 byte (ideal 153 185(branchs) =~307Mb)
         //LEAF(content accounts key suffix & age)
         //type(1)/key size(1)/key(0-18)/hash sha256hash160(20)/childsMap(32)
-        //00     /00         /00*18    /00*20                 /00*32                       max 72 byte (ideal 39 062 500(leafs)=2GB)
+        //00     /00         /00*18    /00*20                 /00*32                  max 72 byte (ideal 39 062 500(leafs)=2GB)
         //total 21GB(ideal trie for 10 000 000 000 accounts)
         //
         ////////////////////////////////////////////////////////////////
@@ -213,7 +173,7 @@ public class ServiceIntent extends IntentService {
                 ////////////////////////////////////////////////////////////////
                 int index = (int) compareDate(new Date(), Utils.reconstructAgeFromBytes(age));
                 try {
-                    if(index <= nodes.length) {
+                    if(index < nodes.length) {
                         nodes[index].insert(pubKey);
                     }
                 } catch (IOException e) {
