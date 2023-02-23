@@ -57,7 +57,6 @@ import static com.infoman.liquideconomycs.Utils.BROADCAST_ACTION_ANSWER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_ANSWER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_CMD;
 import static com.infoman.liquideconomycs.Utils.EXTRA_MASTER;
-import static com.infoman.liquideconomycs.Utils.ageToBytes;
 import static com.infoman.liquideconomycs.Utils.chekSig;
 import static com.infoman.liquideconomycs.Utils.hexToByte;
 import static org.bitcoinj.core.ECKey.ECDSASignature.decodeFromDER;
@@ -434,7 +433,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                Toast.makeText(getApplicationContext(), getResources().getString(R.string.ErrorReceivingPartnerData),Toast.LENGTH_LONG).show();
             }else{
                 byte[] providerPubKey = hexToByte(fields[0]);
-                app.startActionInsert(ECKey.fromPublicOnly(providerPubKey).getPubKeyHash(), ageToBytes(new Date()));
+                app.startActionInsert(ECKey.fromPublicOnly(providerPubKey).getPubKeyHash(), 0);
                 app.addClient(providerPubKey);
                 app.startActionSync("Main", fields[1], fields[2],false);
             }

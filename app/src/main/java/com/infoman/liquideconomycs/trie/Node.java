@@ -276,6 +276,30 @@ public class Node extends ChildMap {
         return false;
     }
 
+    public Node findPath(byte[] pubKey) throws IOException {
+        nodeKey.initNodeKyeFieldsByNewKey(pubKey);
+        if(nodeKey.getEqualsPrefixFromNewKeyAndNodePubKey()) {
+            int pubKeyInt = nodeKey.getPlaceIntForChildFromNewKeySuffix(pubKey);
+            byte[] keyChild = new byte[0];
+            if(pubKey.length > 1){
+                keyChild = nodeKey.getKeyForAddInChildFromNewKeySuffix();
+            }
+            if (getInMap(pubKeyInt)) {
+                if (type != LEAF) {//leaf have no childs
+                    loadChild(pubKeyInt);
+                    if(pubKey.length > 1){
+                        return mapChilds[pubKeyInt].findPath(keyChild);
+                    }else{
+                        return mapChilds[pubKeyInt];
+                    }
+                }else{
+                    return this;
+                }
+            }
+        }
+        return this;
+    }
+
     public void calcSpace() {
         space = 4 + nodeKey.nodePubKey.length + 20 + mapSize + (getCountInMap() * (type == LEAF ? 0 : 8));
     }
@@ -306,6 +330,33 @@ public class Node extends ChildMap {
         return hash;
     }
 
+    public byte[] getBlob(){
+        byte[] blob;
+        if(type != ROOT){
+            byte[] typeAndKeySze = new byte[2];
+            typeAndKeySze[0] = type;
+            typeAndKeySze[1] = (byte) nodeKey.nodePubKey.length;
+            blob = Bytes.concat(typeAndKeySze, nodeKey.nodePubKey, hash, mapBytes);
+
+            if(type != LEAF) {
+                for(int i = 0; i < (mapSize * 8); i++) {
+                    if (getInMap(i)) {
+                        blob = Bytes.concat(blob, Longs.toByteArray(mapChilds[i].position), mapChilds[i].hash);
+                    }
+                }
+            }
+        }else{
+            blob = hash;
+            for(int i = 0; i < (mapSize * 8); i++) {
+                if (getInMap(i)) {
+                    blob = Bytes.concat(blob, Longs.toByteArray(mapChilds[i].position), mapChilds[i].hash);
+                }else{
+                    blob = Bytes.concat(blob, new byte[28]);
+                }
+            }
+        }
+        return blob;
+    }
 }
 
 

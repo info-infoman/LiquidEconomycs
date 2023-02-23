@@ -36,6 +36,13 @@
             android:key="maxAge"
             android:summary="@string/maxAge_summ"
             android:title="@string/maxAge" />
+        <EditTextPreference
+            android:defaultValue="10000"
+            android:dialogTitle="@string/maxSyncPubKeyInSession"
+            android:inputType="number"
+            android:key="maxSyncPubKeyInSession"
+            android:summary="@string/maxSyncPubKeyInSession_summ"
+            android:title="@string/maxSyncPubKeyInSession" />
    </PreferenceCategory>
 
 

@@ -53,11 +53,5 @@
             android:enabled="true"
             android:exported="true"
             android:process=".liquideconomycs_trieServiceIntent" />
-
-        <receiver android:enabled="true" android:name=".autoStartBroadcastReceiver">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED"/>
-            </intent-filter>
-        </receiver>
     </application>
 </manifest>

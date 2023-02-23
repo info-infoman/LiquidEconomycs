@@ -33,7 +33,7 @@ public class DBHelper extends SQLiteOpenHelper {
                     + "id integer primary key autoincrement,"
                     + "pos LONG,"
                     + "prefix BLOB,"
-                    + "age BLOB,"
+                    + "age int,"
                     + "exist integer" + ");");
             //clients on session
             db.execSQL("create table clients ("

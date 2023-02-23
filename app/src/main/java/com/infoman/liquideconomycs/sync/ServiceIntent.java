@@ -9,6 +9,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.graphics.Color;
 import android.os.Build;
@@ -32,6 +33,7 @@ import java.util.Objects;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
+import androidx.preference.PreferenceManager;
 
 import static androidx.core.app.NotificationCompat.PRIORITY_LOW;
 import static com.infoman.liquideconomycs.Utils.ACTION_START_SYNC;
@@ -42,6 +44,7 @@ import static com.infoman.liquideconomycs.Utils.EXTRA_MASTER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_PROVIDE_SERVICE;
 import static com.infoman.liquideconomycs.Utils.EXTRA_SIGNAL_SERVER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_TOKEN;
+import static java.lang.Long.parseLong;
 import static org.bitcoinj.core.ECKey.ECDSASignature.decodeFromDER;
 
 public class ServiceIntent extends IntentService {
@@ -119,8 +122,11 @@ public class ServiceIntent extends IntentService {
         if (intent != null) {
             action = intent.getAction();
             if (ACTION_START_SYNC.equals(action) /*&& !app.isSynchronized*/) {
+                app.insertedPubKeyInSession = 0;
+                app.clearTable("sync");
                 //app.isSynchronized = true;
                 app.dateTimeLastSync = new Date().getTime();
+                int lastIndex = 0;
                 final String TAG = "WebSocketClient";
                 Cursor query = app.getClients();
 
@@ -150,7 +156,8 @@ public class ServiceIntent extends IntentService {
                             // //    broadcastActionMsg(master, "Sync", getResources().getString(R.string.onCheckToken));
                             //     //если получатель услуг то запросим хеш корня базы
                             if (!Provide_service) {
-                                sendMsg(Utils.getHashs, new byte[8]);
+                                byte[] ask = Bytes.concat(Ints.toByteArray(0), new byte[8]);
+                                sendMsg(Utils.getHashs, ask);
                             }
                             app.dateTimeLastSync = new Date().getTime();
                         } else {
@@ -217,10 +224,25 @@ public class ServiceIntent extends IntentService {
 
                 //Таймер проверки ответов
                 while ((new Date().getTime() - app.dateTimeLastSync) / 1000 < 300){
-                    if(app.waitingIntentCount>0) {
-                        app.dateTimeLastSync = new Date().getTime();
+                    for( int i : app.waitingIntentCounts) {
+                        if(i!=0){
+                            app.dateTimeLastSync = new Date().getTime();
+                        }
+                    }
+                    //start sync in next node trie file
+                    if (!Provide_service && (new Date().getTime() - app.dateTimeLastSync) / 1000 < 250) {
+                        SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(app);
+                        long maxAge = parseLong(sharedPref.getString("maxAge", "30"));
+                        long maxPubKeyToInsert = parseLong(sharedPref.getString("maxSyncPubKeyInSession", "10000"));
+                        if(lastIndex < maxAge-1 && app.insertedPubKeyInSession < maxPubKeyToInsert) {
+                            lastIndex = lastIndex++;
+                            byte[] ask = Bytes.concat(Ints.toByteArray(lastIndex), new byte[8]);
+                            sendMsg(Utils.getHashs, ask);
+                            app.dateTimeLastSync = new Date().getTime();
+                        }
                     }
                 }
+
                 //если публичный ключ опоределен, ещ удалить его в базе в таблице clients
                 if(!Arrays.equals(app.clientPubKey, new byte[32])) {
                     app.deleteClient(app.clientPubKey);
@@ -228,8 +250,9 @@ public class ServiceIntent extends IntentService {
                 //app.isSynchronized=false;
                 query.close();
                 app.mClient.disconnect();
+                app.insertedPubKeyInSession = 0;
                 //app.startActionDeleteOldest(app);
-                app.startActionStopTrie();
+                //app.startActionStopTrie();
                 stopSelf();
                 stopForeground(true);
             }

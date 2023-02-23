@@ -50,4 +50,6 @@
     <string name="getFOREGROUND_SERVICEPermission">getFOREGROUND_SERVICEPermission</string>
     <string name="permission_is_not_available_FOREGROUND_SERVICE">permission_is_not_available_FOREGROUND_SERVICE</string>
     <string name="QR_generator_consumer">QR_generator_consumer</string>
+    <string name="maxSyncPubKeyInSession">Maximum number of identifiers updated at a time</string>
+    <string name="maxSyncPubKeyInSession_summ">This parameter determines the maximum number of identifiers allowed to be updated when synchronizing between people within the same session</string>
 </resources>

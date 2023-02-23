@@ -3,18 +3,13 @@ package com.infoman.liquideconomycs.trie;
 import android.content.Context;
 import android.database.Cursor;
 
-import com.google.common.primitives.Bytes;
-import com.google.common.primitives.Longs;
 import com.infoman.liquideconomycs.Core;
-import com.infoman.liquideconomycs.Utils;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.util.Date;
 
 import static com.infoman.liquideconomycs.Utils.getDayMilliByIndex;
-import static com.infoman.liquideconomycs.trie.Node.LEAF;
 import static com.infoman.liquideconomycs.trie.Node.ROOT;
 
 public class File extends RandomAccessFile {
@@ -29,8 +24,6 @@ public class File extends RandomAccessFile {
                 setLength(0L);
                 byte[] trieTmp = new byte[2068];
                 write(trieTmp);
-                seek(0L);
-                write(Utils.ageToBytes(new Date()));
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -67,28 +60,8 @@ public class File extends RandomAccessFile {
             }else{
                 pos = node.position;
             }
-            byte[] typeAndKeySze = new byte[2];
-            typeAndKeySze[0] = node.type;
-            typeAndKeySze[1] = (byte) node.nodeKey.nodePubKey.length;
-            blob = Bytes.concat(typeAndKeySze, node.nodeKey.nodePubKey, node.hash, node.mapBytes);
-
-            if(node.type != LEAF) {
-                for(int i = 0; i < (node.mapSize * 8); i++) {
-                    if (node.getInMap(i)) {
-                        blob = Bytes.concat(blob, Longs.toByteArray(node.mapChilds[i].position));
-                    }
-                }
-            }
-        }else{
-            blob = node.hash;
-            for(int i = 0; i < (node.mapSize * 8); i++) {
-                if (node.getInMap(i)) {
-                    blob = Bytes.concat(blob, Longs.toByteArray(node.mapChilds[i].position));
-                }else{
-                    blob = Bytes.concat(blob, new byte[8]);
-                }
-            }
         }
+        blob = node.getBlob();
         seek(pos);
         write(blob);
         node.position = pos;

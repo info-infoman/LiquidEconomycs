@@ -15,17 +15,16 @@ import com.infoman.liquideconomycs.trie.File;
 
 import org.bitcoinj.core.ECKey;
 
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.util.Date;
+
 import androidx.core.util.Pair;
 
-import static com.infoman.liquideconomycs.Utils.ACTION_DELETE;
 import static com.infoman.liquideconomycs.Utils.ACTION_FIND;
 import static com.infoman.liquideconomycs.Utils.ACTION_GENERATE_ANSWER;
-import static com.infoman.liquideconomycs.Utils.ACTION_GET_HASH;
 import static com.infoman.liquideconomycs.Utils.ACTION_INSERT;
-import static com.infoman.liquideconomycs.Utils.ACTION_INSERT_FREE_SPACE_IN_MAP;
 import static com.infoman.liquideconomycs.Utils.ACTION_START_SYNC;
-import static com.infoman.liquideconomycs.Utils.ACTION_STOP_SERVICE;
-import static com.infoman.liquideconomycs.Utils.ACTION_STOP_TRIE;
 import static com.infoman.liquideconomycs.Utils.BROADCAST_ACTION_ANSWER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_AGE;
 import static com.infoman.liquideconomycs.Utils.EXTRA_ANSWER;
@@ -33,12 +32,13 @@ import static com.infoman.liquideconomycs.Utils.EXTRA_CMD;
 import static com.infoman.liquideconomycs.Utils.EXTRA_MASTER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_MSG_TYPE;
 import static com.infoman.liquideconomycs.Utils.EXTRA_PAYLOAD;
-import static com.infoman.liquideconomycs.Utils.EXTRA_POS;
 import static com.infoman.liquideconomycs.Utils.EXTRA_PROVIDE_SERVICE;
 import static com.infoman.liquideconomycs.Utils.EXTRA_PUBKEY;
 import static com.infoman.liquideconomycs.Utils.EXTRA_SIGNAL_SERVER;
-import static com.infoman.liquideconomycs.Utils.EXTRA_SPACE;
 import static com.infoman.liquideconomycs.Utils.EXTRA_TOKEN;
+import static com.infoman.liquideconomycs.Utils.compareDate;
+import static com.infoman.liquideconomycs.Utils.getDayMilliByIndex;
+import static java.lang.Long.parseLong;
 
 public class Core extends Application {
 
@@ -48,27 +48,53 @@ public class Core extends Application {
     public byte[] clientPubKey;
     public WebSocketClient mClient;
     public long dateTimeLastSync;
-    public int waitingIntentCount;
+    public int[] waitingIntentCounts;
+    public long insertedPubKeyInSession;
     public File[] files;
 
     @Override
     public void onCreate() {
         super.onCreate();
         Context context = getApplicationContext();
+        SharedPreferences sharedPref = androidx.preference.PreferenceManager.getDefaultSharedPreferences(context);
+        long maxAge = parseLong(sharedPref.getString("maxAge", "30"));
+        files = new File[(int) maxAge];
         dbHelper = new DBHelper(context);
         db = dbHelper.getWritableDatabase();
-        waitingIntentCount = 0;
-        //isSynchronized = false;
+        waitingIntentCounts = new int[(int) maxAge];
+        insertedPubKeyInSession = 0L;
         setMyKey();
         ///////////create trie file//////////////////////////////////////////////////////
         String nodeDir = context.getFilesDir().getAbsolutePath() + "/trie";
         java.io.File nodeDirReference = new java.io.File(nodeDir);
         while (!nodeDirReference.exists()) {
             new java.io.File(nodeDir).mkdirs();
-            //copyAssetFolder(context.getAssets(), "trie", nodeDir);
+        }
+        java.io.File[] trieFiles = nodeDirReference.listFiles();
+        for(java.io.File file: trieFiles){
+            long fileDate = parseLong(file.getName());
+            if(compareDate(new Date(), new Date(fileDate))>maxAge){
+                file.delete();
+            }
+        }
+
+        for(int i = 0; i < maxAge; i++){
+            long fileName = getDayMilliByIndex(i);
+            java.io.File nodeFileReference = new java.io.File(getFilesDir().getAbsolutePath() + "/trie/" + fileName);
+            if (!nodeFileReference.exists()) {
+                try {
+                    nodeFileReference.createNewFile();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+            try {
+                files[i] = new File(context,getFilesDir().getAbsolutePath() + "/trie" + "/" + fileName, "rw");
+            } catch (FileNotFoundException e) {
+                e.printStackTrace();
+            }
         }
         /////////////////////////////////////////////////////////////////////////////
-        //MySingleton.initInstance();
     }
 
     /////////TRIE//////////////////////////////////////////////////////////////////////////////////
@@ -140,13 +166,6 @@ public class Core extends Application {
         }
     }
 
-    public void addForDelete(byte[] pubKey) {
-        ContentValues cv = new ContentValues();
-        cv.put("pubKey", pubKey);
-        db.insert("forDelete", null, cv);
-        cv.clear();
-    }
-
     public void deleteFreeSpace(long file, int id, long pos, int recordLength, int space) {
         ContentValues cv = new ContentValues();
         if (recordLength < space) {
@@ -157,14 +176,6 @@ public class Core extends Application {
                     new String[] {String.valueOf(id)});
             cv.clear();
         }
-    }
-
-    public Cursor getPubKeysForDelete() {
-        return db.rawQuery("SELECT * FROM forDelete", null);
-    }
-
-    public void clearTableForDelete() {
-        db.delete("forDelete", null, null);
     }
 
     /////////MyKey/////////////////////////////////////////////////////////////////////////////////
@@ -213,11 +224,11 @@ public class Core extends Application {
         db.delete("clients", "pubKey = ?", new String[]{String.valueOf(pubKey)});
     }
 
-    public Cursor getPrefixByPos(long pos) {
-        return db.rawQuery("SELECT * FROM sync where pos=" + pos, null);
+    public Cursor getPrefixByPos(int index, long pos) {
+        return db.rawQuery("SELECT * FROM sync where age = "+index+" AND pos = " + pos, null);
     }
 
-    public void addPrefixByPos(long pos, byte[] key, byte[] age, boolean exist) {
+    public void addPrefixByPos(long pos, byte[] key, int age, boolean exist) {
         ContentValues cv = new ContentValues();
         cv.put("pos", pos);
         cv.put("prefix", key);
@@ -225,10 +236,6 @@ public class Core extends Application {
         cv.put("exist", exist ? 1 : 0);
         db.insert("sync", null, cv);
         cv.clear();
-    }
-
-    public void clearPrefixTable() {
-        db.delete("sync", null, null);
     }
 
     public void clearTable(String table) {
@@ -239,9 +246,6 @@ public class Core extends Application {
     //intents
     //start
     //Trie
-    public void startActionStopTrie(){
-        Utils.startIntent(this, new Intent(this, com.infoman.liquideconomycs.trie.ServiceIntent.class).setAction(ACTION_STOP_TRIE));
-    }
 
     public void startActionGenerateAnswer(byte msgType, byte[] payload) {
         Intent intent = new Intent(this, com.infoman.liquideconomycs.trie.ServiceIntent.class)
@@ -259,37 +263,12 @@ public class Core extends Application {
         Utils.startIntent(this, intent);
     }
 
-    public void startActionInsert(byte[] pubKey, byte[] age) {
+    public void startActionInsert(byte[] pubKey, int age) {
         Intent intent = new Intent(this, com.infoman.liquideconomycs.trie.ServiceIntent.class)
                 .setAction(ACTION_INSERT)
                 .putExtra(EXTRA_PUBKEY, pubKey)
                 .putExtra(EXTRA_AGE, age);
         Utils.startIntent(this, intent);
-    }
-
-    public void startActionInsertFreeSpaceInMap(long pos, int space) {
-        Intent intent = new Intent(this, com.infoman.liquideconomycs.trie.ServiceIntent.class)
-                .setAction(ACTION_INSERT_FREE_SPACE_IN_MAP)
-                .putExtra(EXTRA_POS, pos)
-                .putExtra(EXTRA_SPACE, space);
-        Utils.startIntent(this, intent);
-    }
-
-    public void startActionGetHash(Context context, String master, long pos) {
-        Intent intent = new Intent(context, com.infoman.liquideconomycs.trie.ServiceIntent.class)
-                .setAction(ACTION_GET_HASH)
-                .putExtra(EXTRA_MASTER, master)
-                .putExtra(EXTRA_POS, pos);
-        Utils.startIntent(context, intent);
-    }
-
-    public void startActionDelete(Context context, String master, byte[] pubKey, long pos) {
-        Intent intent = new Intent(context, com.infoman.liquideconomycs.trie.ServiceIntent.class)
-                .setAction(ACTION_DELETE)
-                .putExtra(EXTRA_MASTER, master)
-                .putExtra(EXTRA_PUBKEY, pubKey)
-                .putExtra(EXTRA_POS, pos);
-        Utils.startIntent(context, intent);
     }
 
     //Sync
@@ -308,11 +287,6 @@ public class Core extends Application {
         Utils.startIntent(this, intent);
     }
 
-    public void startActionStopSync(Context context) {
-        Intent intent = new Intent(context, ServiceIntent.class).setAction(ACTION_STOP_SERVICE);
-        Utils.startIntent(context, intent);
-    }
-
     ///////////////////////////////////////////////////////////////////////////////////////////////
     //broadcast
     public void broadcastActionMsg(String master, String cmd, byte[] answer) {
@@ -322,7 +296,5 @@ public class Core extends Application {
                 .putExtra(EXTRA_ANSWER, answer);
         sendBroadcast(intent);
     }
-
-
 
 }
