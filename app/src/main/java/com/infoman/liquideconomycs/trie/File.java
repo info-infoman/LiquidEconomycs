@@ -61,7 +61,7 @@ public class File extends RandomAccessFile {
                 pos = node.position;
             }
         }
-        blob = node.getBlob();
+        blob = node.getBlob(false);
         seek(pos);
         write(blob);
         node.position = pos;

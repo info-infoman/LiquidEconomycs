@@ -11,9 +11,9 @@ import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.graphics.Color;
 import android.os.Build;
+import android.util.Log;
 
 import com.google.common.primitives.Bytes;
-import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
 import com.infoman.liquideconomycs.Core;
 import com.infoman.liquideconomycs.Utils;
@@ -132,7 +132,7 @@ public class ServiceIntent extends IntentService {
     protected void onHandleIntent(Intent intent) {
         if (intent != null) {
             final String action = intent.getAction();
-
+            Log.d("trie!", String.format("trie! %s", action));
             if (ACTION_INSERT.equals(action)) {
                 final byte[] pubKey = intent.getByteArrayExtra(EXTRA_PUBKEY);
                 final int index = intent.getIntExtra(EXTRA_AGE, 0);
@@ -173,6 +173,7 @@ public class ServiceIntent extends IntentService {
                 final byte msgType = intent.getByteExtra(EXTRA_MSG_TYPE, Utils.getHashs);
                 final byte[] payload = intent.getByteArrayExtra(EXTRA_PAYLOAD);
                 ////////////////////////////////////////////////////////////////
+                Log.d("trie!", String.format("trie! %s", Arrays.toString(payload)));
                 try {
                     app.broadcastActionMsg("Trie", "Answer", generateAnswer(msgType, payload));
                 } catch (IOException | SignatureDecodeException e) {
@@ -187,9 +188,9 @@ public class ServiceIntent extends IntentService {
         int index = 0;
         byte[] answer = new byte[0];
         boolean exist, existSelfChild;
-        if (null != payload && payload.length > 9){
+        if (null != payload && payload.length > 8){
             answer = Utils.getBytesPart(payload,0, 1);
-            index = Ints.fromByteArray(answer);
+            index = answer[0] & 0xFF;
             if(index < 0 || index > nodes.length - 1){
                 return new byte[0];
             }
@@ -205,7 +206,8 @@ public class ServiceIntent extends IntentService {
                 long pos = Longs.fromByteArray(posInByte);
                 NodeParams nodeParams = new NodeParams();
                 nodeParams.index = index;
-                nodeParams.type = BRANCH;
+                nodeParams.type = (pos == 0L ? ROOT: BRANCH);
+                nodeParams.pubKey = new byte[0];
                 nodeParams.pos = pos;
                 nodeParams.hash = new byte[20];
                 nodeParams.newble = false;
@@ -213,7 +215,7 @@ public class ServiceIntent extends IntentService {
                 if(node.type != LEAF){
                     node.loadChilds();
                 }
-                answer = Bytes.concat(answer, posInByte, node.getBlob());
+                answer = Bytes.concat(answer, posInByte, node.getBlob(true));
             }
             byte[] type = new byte[1];
             type[0] = Utils.hashs;

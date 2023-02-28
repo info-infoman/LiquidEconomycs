@@ -61,16 +61,6 @@ public class Utils {
         return new Date(timestampRecovered);
     }
 
-    public static byte[] ageToBytes(Date date){
-        Date defDate = new Date(00000000);
-        long time = date.equals(defDate) ? new Date().getTime(): date.getTime();  // time in ms since epoch
-        time /= 86400000; // ms in a day
-        byte[]res = new byte[2];
-        res[0] = (byte)(time >>> 8);
-        res[1] = (byte)(time);
-        return res;
-    }
-    
     public static long getDayMilliByIndex(int index){
         Calendar calendar = Calendar.getInstance();
         calendar.setTime(new Date());
@@ -79,15 +69,6 @@ public class Utils {
         calendar.set(Calendar.SECOND, 0);
         calendar.set(Calendar.MILLISECOND, 0);
         return calendar.getTime().getTime()-(86400000L*index);
-    }
-
-    public static byte[] ageToBytesTest(){
-        long time = new Date().getTime()-1056000000L;  // time in ms since epoch
-        time /= 86400000; // ms in a day
-        byte[]res = new byte[2];
-        res[0] = (byte)(time >>> 8);
-        res[1] = (byte)(time);
-        return res;
     }
 
     public static byte[] Sig(byte[] privKey, byte[] digest) {

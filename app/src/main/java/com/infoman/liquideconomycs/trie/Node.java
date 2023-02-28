@@ -330,7 +330,7 @@ public class Node extends ChildMap {
         return hash;
     }
 
-    public byte[] getBlob(){
+    public byte[] getBlob(boolean addHash){
         byte[] blob;
         if(type != ROOT){
             byte[] typeAndKeySze = new byte[2];
@@ -341,7 +341,7 @@ public class Node extends ChildMap {
             if(type != LEAF) {
                 for(int i = 0; i < (mapSize * 8); i++) {
                     if (getInMap(i)) {
-                        blob = Bytes.concat(blob, Longs.toByteArray(mapChilds[i].position), mapChilds[i].hash);
+                        blob = Bytes.concat(blob, Longs.toByteArray(mapChilds[i].position), addHash ? mapChilds[i].hash : new byte[0]);
                     }
                 }
             }
@@ -349,9 +349,9 @@ public class Node extends ChildMap {
             blob = hash;
             for(int i = 0; i < (mapSize * 8); i++) {
                 if (getInMap(i)) {
-                    blob = Bytes.concat(blob, Longs.toByteArray(mapChilds[i].position), mapChilds[i].hash);
+                    blob = Bytes.concat(blob, Longs.toByteArray(mapChilds[i].position), addHash ? mapChilds[i].hash : new byte[0]);
                 }else{
-                    blob = Bytes.concat(blob, new byte[28]);
+                    blob = Bytes.concat(blob, addHash ? new byte[28] : new byte[8]);
                 }
             }
         }

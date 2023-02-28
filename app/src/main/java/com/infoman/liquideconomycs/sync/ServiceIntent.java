@@ -126,6 +126,7 @@ public class ServiceIntent extends IntentService {
                 app.clearTable("sync");
                 //app.isSynchronized = true;
                 app.dateTimeLastSync = new Date().getTime();
+                app.clientPubKey = new byte[32];
                 int lastIndex = 0;
                 final String TAG = "WebSocketClient";
                 Cursor query = app.getClients();
@@ -156,7 +157,7 @@ public class ServiceIntent extends IntentService {
                             // //    broadcastActionMsg(master, "Sync", getResources().getString(R.string.onCheckToken));
                             //     //если получатель услуг то запросим хеш корня базы
                             if (!Provide_service) {
-                                byte[] ask = Bytes.concat(Ints.toByteArray(0), new byte[8]);
+                                byte[] ask = Bytes.concat(new byte[1], new byte[8]);
                                 sendMsg(Utils.getHashs, ask);
                             }
                             app.dateTimeLastSync = new Date().getTime();
@@ -205,7 +206,9 @@ public class ServiceIntent extends IntentService {
 
                         //Проверка типа сообщения
                         if ((Provide_service && msgType == Utils.getHashs) || (!Provide_service && msgType == Utils.hashs)) {
+                            Log.d(TAG, String.format("OK! %s", Arrays.toString(payload)));
                             app.startActionGenerateAnswer(msgType, payload);
+
                         }
                     }
 
@@ -230,13 +233,15 @@ public class ServiceIntent extends IntentService {
                         }
                     }
                     //start sync in next node trie file
-                    if (!Provide_service && (new Date().getTime() - app.dateTimeLastSync) / 1000 < 250) {
+                    if (!Provide_service && (new Date().getTime() - app.dateTimeLastSync) / 1000 > 250) {
                         SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(app);
                         long maxAge = parseLong(sharedPref.getString("maxAge", "30"));
                         long maxPubKeyToInsert = parseLong(sharedPref.getString("maxSyncPubKeyInSession", "10000"));
                         if(lastIndex < maxAge-1 && app.insertedPubKeyInSession < maxPubKeyToInsert) {
                             lastIndex = lastIndex++;
-                            byte[] ask = Bytes.concat(Ints.toByteArray(lastIndex), new byte[8]);
+
+                            byte[] ask = Bytes.concat(new byte[1], new byte[8]);
+                            ask[0] = (byte) lastIndex;
                             sendMsg(Utils.getHashs, ask);
                             app.dateTimeLastSync = new Date().getTime();
                         }

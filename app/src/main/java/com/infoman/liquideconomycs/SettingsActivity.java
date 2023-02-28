@@ -10,8 +10,6 @@ import com.google.common.primitives.Bytes;
 
 import org.bitcoinj.core.ECKey;
 
-import java.util.Date;
-
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.preference.PreferenceFragmentCompat;
@@ -58,9 +56,8 @@ public class SettingsActivity extends AppCompatActivity {
     private void insertDemoInTrie(){
         Context c = getApplicationContext();
         ECKey myECKey;
-        byte[] myPubKey, age, newPubKey, myPubKey_;
-        age = Utils.ageToBytesTest();
-        Date b = Utils.reconstructAgeFromBytes(age);
+        byte[] myPubKey;
+
         for(int i=0;i<1000;i++) {
             myECKey = new ECKey();
             myPubKey = myECKey.getPubKeyHash();
@@ -69,8 +66,7 @@ public class SettingsActivity extends AppCompatActivity {
             }
             app.startActionInsert(myPubKey, 2);
         }
-        age = Utils.ageToBytes(new Date());
-        b = Utils.reconstructAgeFromBytes(age);
+
         for(int i=0;i<1000;i++) {
             myECKey = new ECKey();
             myPubKey = myECKey.getPubKeyHash();
