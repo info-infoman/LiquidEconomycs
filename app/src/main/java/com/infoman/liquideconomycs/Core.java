@@ -43,14 +43,14 @@ import static java.lang.Long.parseLong;
 public class Core extends Application {
 
     private DBHelper dbHelper;
-    private SQLiteDatabase db;
-    public Pair myKey;
+    private static SQLiteDatabase db;
+    public static Pair myKey;
     public byte[] clientPubKey;
     public WebSocketClient mClient;
     public long dateTimeLastSync;
-    public int[] waitingIntentCounts;
+    public static int[] waitingIntentCounts;
     public long insertedPubKeyInSession;
-    public File[] files;
+    public static File[] files;
 
     @Override
     public void onCreate() {
@@ -208,10 +208,21 @@ public class Core extends Application {
     /////////Sync/////////////////////////////////////////////////////////////////////////////////
 
     public void addClient(byte[] pubKey) {
+        boolean clientIsFound = false;
         ContentValues cv = new ContentValues();
-        cv.put("pubKey", pubKey);
-        db.insert("clients", null, cv);
-        cv.clear();
+        Cursor query = db.rawQuery("SELECT clients.pubKey FROM clients", null);
+        while (query.moveToNext()) {
+            byte[] pk = query.getBlob(query.getColumnIndex("pubKey"));
+            if (pubKey == pk) {
+                clientIsFound = true;
+                break;
+            }
+        }
+        if (!clientIsFound) {
+            cv.put("pubKey", pubKey);
+            db.insert("clients", null, cv);
+            cv.clear();
+        }
     }
 
     public Cursor getClients() {
@@ -220,8 +231,8 @@ public class Core extends Application {
                 "FROM clients AS clients", null);
     }
 
-    public void deleteClient(byte[] pubKey) {
-        db.delete("clients", "pubKey = ?", new String[]{String.valueOf(pubKey)});
+    public Cursor getSyncTable() {
+        return db.rawQuery("SELECT * FROM sync AS sync", null);
     }
 
     public Cursor getPrefixByPos(int index, long pos) {

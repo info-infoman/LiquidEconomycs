@@ -122,8 +122,16 @@ public class ServiceIntent extends IntentService {
         if (intent != null) {
             action = intent.getAction();
             if (ACTION_START_SYNC.equals(action) /*&& !app.isSynchronized*/) {
+                final boolean Provide_service = intent.getBooleanExtra(EXTRA_PROVIDE_SERVICE, true);
+
+                if(!Provide_service) {
+                    Cursor sync = app.getSyncTable();
+                    if(sync.moveToNext()){
+                        return;
+                    }
+                }
+
                 app.insertedPubKeyInSession = 0;
-                app.clearTable("sync");
                 //app.isSynchronized = true;
                 app.dateTimeLastSync = new Date().getTime();
                 app.clientPubKey = new byte[32];
@@ -135,8 +143,6 @@ public class ServiceIntent extends IntentService {
                         token = intent.getStringExtra(EXTRA_TOKEN),
                         master = intent.getStringExtra(EXTRA_MASTER);
 
-                final boolean Provide_service = intent.getBooleanExtra(EXTRA_PROVIDE_SERVICE, true);
-
                 //todo sync processor
                 List<BasicNameValuePair> mExtraHeaders = Collections.singletonList(new BasicNameValuePair("Cookie", "session=abcd"));
 
@@ -145,17 +151,14 @@ public class ServiceIntent extends IntentService {
                     @Override
                     public void onConnect() {
                         Log.d(TAG, "Connected!");
-                        //app.broadcastActionMsg(master, "Sync", getResources().getString(R.string.onConnection));
                         //first send information about as for signal server
                         app.mClient.send(token);
                     }
 
                     @Override
                     public void onMessage(String message) {
-                        //  Log.d(TAG, String.format("Got string message! %s", message));
                         if (message.equals("Completed")) {
-                            // //    broadcastActionMsg(master, "Sync", getResources().getString(R.string.onCheckToken));
-                            //     //если получатель услуг то запросим хеш корня базы
+                            //get hash of root in first trie
                             if (!Provide_service) {
                                 byte[] ask = Bytes.concat(new byte[1], new byte[8]);
                                 sendMsg(Utils.getHashs, ask);
@@ -172,11 +175,23 @@ public class ServiceIntent extends IntentService {
                         Log.d(TAG, String.format("Got binary message! %s", Arrays.toString(data)));
                         app.dateTimeLastSync = new Date().getTime();
 
-                        if (data.length < 7)
-                            app.mClient.disconnect();
+                        if (data.length < 5) {
+                            if(!Provide_service) {
+                                app.mClient.disconnect();
+                            }
+                            return;
+                        }
 
                         byte msgType = Utils.getBytesPart(data, 0, 1)[0];
                         int sigLength = Ints.fromByteArray(Utils.getBytesPart(data, 1, 4));
+
+                        if (data.length < 5+sigLength+9) {
+                            if(!Provide_service) {
+                                app.mClient.disconnect();
+                            }
+                            return;
+                        }
+
                         byte[] sig = Utils.getBytesPart(data, 5, sigLength), payload = Utils.getBytesPart(data, 5 + sigLength, data.length - (5 + sigLength));
 
                         //Проверка подписи
@@ -192,16 +207,27 @@ public class ServiceIntent extends IntentService {
                                     if (Utils.chekSig(pk, decodeFromDER(sig), digest)) {
                                         app.clientPubKey = pk;
                                         break;
-                                    }else{
-                                        app.mClient.disconnect();
                                     }
                                 }
+                                if(Arrays.equals(app.clientPubKey, new byte[32])){
+                                    if(!Provide_service) {
+                                        app.mClient.disconnect();
+                                    }
+                                    return;
+                                }
                             }else{
-                                if (!Utils.chekSig(app.clientPubKey, decodeFromDER(sig), digest))
-                                    app.mClient.disconnect();
+                                if (!Utils.chekSig(app.clientPubKey, decodeFromDER(sig), digest)) {
+                                    if (!Provide_service) {
+                                        app.mClient.disconnect();
+                                    }
+                                    return;
+                                }
                             }
                         } catch (SignatureDecodeException e) {
-                            app.mClient.disconnect();
+                            if(!Provide_service) {
+                                app.mClient.disconnect();
+                            }
+                            return;
                         }
 
                         //Проверка типа сообщения
@@ -209,6 +235,10 @@ public class ServiceIntent extends IntentService {
                             Log.d(TAG, String.format("OK! %s", Arrays.toString(payload)));
                             app.startActionGenerateAnswer(msgType, payload);
 
+                        }else{
+                            if(!Provide_service) {
+                                app.mClient.disconnect();
+                            }
                         }
                     }
 
@@ -238,8 +268,7 @@ public class ServiceIntent extends IntentService {
                         long maxAge = parseLong(sharedPref.getString("maxAge", "30"));
                         long maxPubKeyToInsert = parseLong(sharedPref.getString("maxSyncPubKeyInSession", "10000"));
                         if(lastIndex < maxAge-1 && app.insertedPubKeyInSession < maxPubKeyToInsert) {
-                            lastIndex = lastIndex++;
-
+                            lastIndex++;
                             byte[] ask = Bytes.concat(new byte[1], new byte[8]);
                             ask[0] = (byte) lastIndex;
                             sendMsg(Utils.getHashs, ask);
@@ -247,17 +276,11 @@ public class ServiceIntent extends IntentService {
                         }
                     }
                 }
-
-                //если публичный ключ опоределен, ещ удалить его в базе в таблице clients
-                if(!Arrays.equals(app.clientPubKey, new byte[32])) {
-                    app.deleteClient(app.clientPubKey);
-                }
                 //app.isSynchronized=false;
                 query.close();
+                app.clearTable("sync");
                 app.mClient.disconnect();
                 app.insertedPubKeyInSession = 0;
-                //app.startActionDeleteOldest(app);
-                //app.startActionStopTrie();
                 stopSelf();
                 stopForeground(true);
             }

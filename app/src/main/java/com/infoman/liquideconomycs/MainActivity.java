@@ -99,6 +99,10 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                                 FragmentTransaction transaction = manager.beginTransaction();
                                 alert.show(transaction, "dialog");
                             }
+                            //restart sync for provider
+                            if((new Date().getTime() - app.dateTimeLastSync) / 1000 > 300){
+                                app.startActionSync("Main", "","", true);
+                            }
                         }
                     }/*else if(cmd.equals("Sync")){
                         final String answer = intent.getStringExtra(EXTRA_ANSWER);
