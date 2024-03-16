@@ -1,5 +1,6 @@
 package com.infoman.liquideconomycs;
 
+import android.annotation.SuppressLint;
 import android.app.Application;
 import android.content.ContentValues;
 import android.content.Context;
@@ -45,7 +46,6 @@ public class Core extends Application {
     private DBHelper dbHelper;
     private static SQLiteDatabase db;
     public static Pair myKey;
-    public byte[] clientPubKey;
     public WebSocketClient mClient;
     public long dateTimeLastSync;
     public static int[] waitingIntentCounts;
@@ -75,6 +75,7 @@ public class Core extends Application {
             long fileDate = parseLong(file.getName());
             if(compareDate(new Date(), new Date(fileDate))>maxAge){
                 file.delete();
+                //TODO delete free spase by file index
             }
         }
 
@@ -146,9 +147,9 @@ public class Core extends Application {
         if (pos > 2070) {
             Cursor query = getFreeSpaceWitchCompress(file, pos, space);
             if (query.moveToFirst()) {
-                long p = query.getLong(query.getColumnIndex("pos"));
-                int s = query.getInt(query.getColumnIndex("space"));
-                int id = query.getInt(query.getColumnIndex("id"));
+                @SuppressLint("Range") long p = query.getLong(query.getColumnIndex("pos"));
+                @SuppressLint("Range") int s = query.getInt(query.getColumnIndex("space"));
+                @SuppressLint("Range") int id = query.getInt(query.getColumnIndex("id"));
                 cv.put("pos", p);
                 cv.put("space", s);
                 // обновляем по id
@@ -212,7 +213,7 @@ public class Core extends Application {
         ContentValues cv = new ContentValues();
         Cursor query = db.rawQuery("SELECT clients.pubKey FROM clients", null);
         while (query.moveToNext()) {
-            byte[] pk = query.getBlob(query.getColumnIndex("pubKey"));
+            @SuppressLint("Range") byte[] pk = query.getBlob(query.getColumnIndex("pubKey"));
             if (pubKey == pk) {
                 clientIsFound = true;
                 break;

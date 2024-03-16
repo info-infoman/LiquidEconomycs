@@ -58,16 +58,16 @@ public class SettingsActivity extends AppCompatActivity {
         ECKey myECKey;
         byte[] myPubKey;
 
-        for(int i=0;i<1000;i++) {
+        /*for(int i=0;i<1000;i++) {
             myECKey = new ECKey();
             myPubKey = myECKey.getPubKeyHash();
             if(Bytes.concat(myPubKey).length != 20){
                 Log.d("app.trie", "ERROR! inserted key to small");
             }
             app.startActionInsert(myPubKey, 2);
-        }
+        }*/
 
-        for(int i=0;i<1000;i++) {
+        for(int i=0;i<1000000;i++) {
             myECKey = new ECKey();
             myPubKey = myECKey.getPubKeyHash();
             if(Bytes.concat(myPubKey).length != 20){

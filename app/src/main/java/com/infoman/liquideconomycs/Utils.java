@@ -2,14 +2,12 @@ package com.infoman.liquideconomycs;
 
 import android.content.Context;
 import android.content.Intent;
-import android.nfc.NdefRecord;
 import android.os.Build;
 
 import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.Sha256Hash;
 import org.bitcoinj.core.SignatureDecodeException;
 
-import java.nio.charset.StandardCharsets;
 import java.util.Calendar;
 import java.util.Date;
 
@@ -105,23 +103,6 @@ public class Utils {
             val[i] = (byte) j;
         }
         return val;
-    }
-
-    public static NdefRecord[] createNFCRecords(String msg) {
-
-        NdefRecord[] records = new NdefRecord[1];
-
-        byte[] payload = msg.getBytes(StandardCharsets.UTF_8);
-
-        NdefRecord record = new NdefRecord(
-                NdefRecord.TNF_WELL_KNOWN,  //Our 3-bit Type name format
-                NdefRecord.RTD_TEXT,        //Description of our payload
-                new byte[0],                //The optional id for our Record
-                payload);                   //Our payload for the Record
-
-        records[0] = record;
-
-        return records;
     }
 
     public static void startIntent(Context context, Intent intent) {

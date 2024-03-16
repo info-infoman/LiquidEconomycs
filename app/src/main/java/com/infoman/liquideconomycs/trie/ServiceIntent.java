@@ -1,5 +1,6 @@
 package com.infoman.liquideconomycs.trie;
 
+import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.app.IntentService;
 import android.app.Notification;
@@ -52,6 +53,7 @@ public class ServiceIntent extends IntentService {
     }
 
 
+    @SuppressLint("ForegroundServiceType")
     @Override
     public void onCreate() {
         super.onCreate();
@@ -184,6 +186,7 @@ public class ServiceIntent extends IntentService {
         }
     }
 
+    @SuppressLint("Range")
     private byte[] generateAnswer(byte msgType, byte[] payload) throws IOException, SignatureDecodeException {
         int index = 0;
         byte[] answer = new byte[0];

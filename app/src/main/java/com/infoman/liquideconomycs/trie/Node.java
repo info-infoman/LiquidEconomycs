@@ -1,18 +1,13 @@
 package com.infoman.liquideconomycs.trie;
 
 import android.content.SharedPreferences;
-
 import com.google.common.primitives.Bytes;
 import com.google.common.primitives.Longs;
 import com.infoman.liquideconomycs.Core;
-
 import java.io.IOException;
-
 import androidx.preference.PreferenceManager;
-
 import static com.infoman.liquideconomycs.Utils.getDayMilliByIndex;
 import static org.bitcoinj.core.Utils.sha256hash160;
-
 
 public class Node extends ChildMap {
 

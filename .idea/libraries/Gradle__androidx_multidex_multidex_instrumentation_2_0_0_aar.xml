@@ -1,11 +1,8 @@
 <component name="libraryTable">
-  <library name="Gradle: androidx.multidex:multidex-instrumentation:2.0.0@aar">
+  <library name="Gradle: androidx.multidex:multidex-instrumentation:2.0.0@aar" external-system-id="GRADLE">
     <CLASSES>
-      <root url="file://$USER_HOME$/.gradle/caches/transforms-2/files-2.1/292d5be1ad15dd806c63da81a2664bbe/multidex-instrumentation-2.0.0/res" />
-      <root url="file://$USER_HOME$/.gradle/caches/transforms-3/019880482cdf01a34ff9045fcd553197/transformed/multidex-instrumentation-2.0.0/res" />
-      <root url="file://$USER_HOME$/.gradle/caches/transforms-3/cbaed72f7547b78116ccccb431e1e03e/transformed/multidex-instrumentation-2.0.0/AndroidManifest.xml" />
-      <root url="jar://$USER_HOME$/.gradle/caches/transforms-3/cbaed72f7547b78116ccccb431e1e03e/transformed/multidex-instrumentation-2.0.0/jars/classes.jar!/" />
-      <root url="file://$USER_HOME$/.gradle/caches/transforms-3/cbaed72f7547b78116ccccb431e1e03e/transformed/multidex-instrumentation-2.0.0/res" />
+      <root url="file://$USER_HOME$/.gradle/caches/transforms-3/bfce9ca21841aa4477f025e9c0e23664/transformed/multidex-instrumentation-2.0.0/AndroidManifest.xml" />
+      <root url="jar://$USER_HOME$/.gradle/caches/transforms-3/bfce9ca21841aa4477f025e9c0e23664/transformed/multidex-instrumentation-2.0.0/jars/classes.jar!/" />
     </CLASSES>
     <JAVADOC />
     <SOURCES />

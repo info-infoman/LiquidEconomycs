@@ -1,5 +1,5 @@
 <component name="libraryTable">
-  <library name="Gradle: org.bitcoinj:bitcoinj-core:0.15.5">
+  <library name="Gradle: org.bitcoinj:bitcoinj-core:0.15.5" external-system-id="GRADLE">
     <CLASSES>
       <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.bitcoinj/bitcoinj-core/0.15.5/34f6e72fad8712d1491830ce1ed39e518e2fea8f/bitcoinj-core-0.15.5.jar!/" />
     </CLASSES>

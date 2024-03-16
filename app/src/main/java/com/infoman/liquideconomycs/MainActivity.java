@@ -198,15 +198,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         provideService = false;
         role_capture.setText(getResources().getString(R.string.Accept_service));
         stopScanner();
-
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.NFC) == PackageManager.PERMISSION_GRANTED) {
-            NfcAdapter mNfcAdapter = NfcAdapter.getDefaultAdapter(this);
-            if(mNfcAdapter != null) {
-                mNfcAdapter.setNdefPushMessageCallback(this, this);
-            }
-        } else {
-            requestNFCPermission();
-        }
     }
 
     @Override protected void onDestroy() {
@@ -249,7 +240,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     }
 
     @Override public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        AtomicBoolean ret= new AtomicBoolean(true);
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        AtomicBoolean ret = new AtomicBoolean(true);
         if (requestCode == MY_PERMISSION_REQUEST_CAMERA) {
             ret.set(false);
         }
@@ -262,19 +254,13 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         if (requestCode == MY_PERMISSION_REQUEST_FOREGROUND_SERVICE) {
             ret.set(false);
         }
-        if(ret.get()){
+        if (ret.get()) {
             return;
         }
         if (grantResults.length == 1 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
             Snackbar.make(mainLayout, "Permission was granted.", Snackbar.LENGTH_SHORT).show();
             if (requestCode == MY_PERMISSION_REQUEST_CAMERA) {
                 initQRCodeReaderView();
-            }
-            if (requestCode == MY_PERMISSION_REQUEST_NFC) {
-                NfcAdapter mNfcAdapter = NfcAdapter.getDefaultAdapter(this);
-                if(mNfcAdapter != null) {
-                    mNfcAdapter.setNdefPushMessageCallback(this, this);
-                }
             }
         } else {
             Snackbar.make(mainLayout, "Permission request was denied.", Snackbar.LENGTH_SHORT)

@@ -1,5 +1,6 @@
 package com.infoman.liquideconomycs.trie;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.database.Cursor;
 
@@ -31,6 +32,7 @@ public class File extends RandomAccessFile {
         virtualFilePointer = 0L;
     }
 
+    //Сохраняет новый узел
     public void saveNodeNewStateBlobInDB(Node node, boolean newPlace) throws IOException {
         byte[] blob;
         long pos = 0L;
@@ -44,7 +46,7 @@ public class File extends RandomAccessFile {
                 pos = this.virtualFilePointer;
 
                 if (query.getCount() > 0 && query.moveToFirst()) {
-                    int id = query.getInt(query.getColumnIndex("id"));
+                    @SuppressLint("Range") int id = query.getInt(query.getColumnIndex("id"));
                     int posColIndex = query.getColumnIndex("pos");
                     int spaceColIndex = query.getColumnIndex("space");
                     long p = query.getLong(posColIndex);
@@ -69,11 +71,11 @@ public class File extends RandomAccessFile {
 
     public void saveNodeOldStateBlobInDB(long file, long pos, int len) throws IOException {
         byte[] blob = new byte[len];
-        seek(pos);
-        read(blob, 0, len);
+        get(blob, pos, 0, len);
         app.insertNodeBlob(file, pos, blob, "cacheOldNodeBlobs");
     }
 
+    //Зачитывает кусок байтов по позиции
     public void get(byte[] b, long pos, int off, int len) throws IOException {
         seek(pos);
         read(b, off, len);

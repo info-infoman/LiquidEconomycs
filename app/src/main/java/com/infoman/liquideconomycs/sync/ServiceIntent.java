@@ -1,5 +1,6 @@
 package com.infoman.liquideconomycs.sync;
 
+import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.app.IntentService;
 import android.app.Notification;
@@ -16,13 +17,10 @@ import android.os.Build;
 import android.util.Log;
 
 import com.google.common.primitives.Bytes;
-import com.google.common.primitives.Ints;
 import com.infoman.liquideconomycs.Core;
 import com.infoman.liquideconomycs.Utils;
 
 import org.apache.http.message.BasicNameValuePair;
-import org.bitcoinj.core.Sha256Hash;
-import org.bitcoinj.core.SignatureDecodeException;
 
 import java.net.URI;
 import java.util.Arrays;
@@ -45,7 +43,6 @@ import static com.infoman.liquideconomycs.Utils.EXTRA_PROVIDE_SERVICE;
 import static com.infoman.liquideconomycs.Utils.EXTRA_SIGNAL_SERVER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_TOKEN;
 import static java.lang.Long.parseLong;
-import static org.bitcoinj.core.ECKey.ECDSASignature.decodeFromDER;
 
 public class ServiceIntent extends IntentService {
 
@@ -71,6 +68,7 @@ public class ServiceIntent extends IntentService {
         super("SyncServiceIntent");
     }
 
+    @SuppressLint("ForegroundServiceType")
     @Override
     public void onCreate() {
         super.onCreate();
@@ -124,6 +122,7 @@ public class ServiceIntent extends IntentService {
             if (ACTION_START_SYNC.equals(action) /*&& !app.isSynchronized*/) {
                 final boolean Provide_service = intent.getBooleanExtra(EXTRA_PROVIDE_SERVICE, true);
 
+                //запрет на синхронизацию если не завершена предыдущая(для потребителей)
                 if(!Provide_service) {
                     Cursor sync = app.getSyncTable();
                     if(sync.moveToNext()){
@@ -132,9 +131,7 @@ public class ServiceIntent extends IntentService {
                 }
 
                 app.insertedPubKeyInSession = 0;
-                //app.isSynchronized = true;
                 app.dateTimeLastSync = new Date().getTime();
-                app.clientPubKey = new byte[32];
                 int lastIndex = 0;
                 final String TAG = "WebSocketClient";
                 Cursor query = app.getClients();
@@ -170,71 +167,25 @@ public class ServiceIntent extends IntentService {
                         }
                     }
 
+                    @SuppressLint("Range")
                     @Override
                     public void onMessage(byte[] data) {
                         Log.d(TAG, String.format("Got binary message! %s", Arrays.toString(data)));
                         app.dateTimeLastSync = new Date().getTime();
 
-                        if (data.length < 5) {
-                            if(!Provide_service) {
-                                app.mClient.disconnect();
-                            }
+                        if(!Provide_service && data.length < 44 || Provide_service && data.length < 10) {
+                            app.mClient.disconnect();
                             return;
                         }
 
                         byte msgType = Utils.getBytesPart(data, 0, 1)[0];
-                        int sigLength = Ints.fromByteArray(Utils.getBytesPart(data, 1, 4));
 
-                        if (data.length < 5+sigLength+9) {
-                            if(!Provide_service) {
-                                app.mClient.disconnect();
-                            }
-                            return;
-                        }
-
-                        byte[] sig = Utils.getBytesPart(data, 5, sigLength), payload = Utils.getBytesPart(data, 5 + sigLength, data.length - (5 + sigLength));
-
-                        //Проверка подписи
-                        try {
-                            byte[] digest = new byte[1];
-                            digest[0] = msgType;
-                            digest = Sha256Hash.hash(Bytes.concat(digest, Utils.getBytesPart(payload, 0, 8)));
-                            //если публичный ключ не поределен, найти его в базе путем перебора таблицы clients
-                            if(Arrays.equals(app.clientPubKey, new byte[32])) {
-                                byte[] pk;
-                                while (query.moveToNext()) {
-                                    pk = query.getBlob(query.getColumnIndex("pubKey"));
-                                    if (Utils.chekSig(pk, decodeFromDER(sig), digest)) {
-                                        app.clientPubKey = pk;
-                                        break;
-                                    }
-                                }
-                                if(Arrays.equals(app.clientPubKey, new byte[32])){
-                                    if(!Provide_service) {
-                                        app.mClient.disconnect();
-                                    }
-                                    return;
-                                }
-                            }else{
-                                if (!Utils.chekSig(app.clientPubKey, decodeFromDER(sig), digest)) {
-                                    if (!Provide_service) {
-                                        app.mClient.disconnect();
-                                    }
-                                    return;
-                                }
-                            }
-                        } catch (SignatureDecodeException e) {
-                            if(!Provide_service) {
-                                app.mClient.disconnect();
-                            }
-                            return;
-                        }
+                        byte[] payload = Utils.getBytesPart(data, 2, data.length);
 
                         //Проверка типа сообщения
                         if ((Provide_service && msgType == Utils.getHashs) || (!Provide_service && msgType == Utils.hashs)) {
                             Log.d(TAG, String.format("OK! %s", Arrays.toString(payload)));
                             app.startActionGenerateAnswer(msgType, payload);
-
                         }else{
                             if(!Provide_service) {
                                 app.mClient.disconnect();
@@ -291,11 +242,7 @@ public class ServiceIntent extends IntentService {
         if (app.mClient.mListener != null && app.mClient.isConnected() && payload.length > 0) {
             byte[] type = new byte[1];
             type[0] = msgType;
-            byte[] sig = Utils.Sig(
-                    (byte[]) app.getMyKey().second,
-                    Sha256Hash.hash(Bytes.concat(type, Utils.getBytesPart(payload, 0, 8)))
-            );
-            app.mClient.send(Bytes.concat(type, Ints.toByteArray(sig.length), sig, payload));
+            app.mClient.send(Bytes.concat(type, payload));
         }
     }
 

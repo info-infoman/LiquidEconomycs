@@ -5,8 +5,6 @@ import android.app.Dialog;
 import android.content.Context;
 import android.os.Bundle;
 
-import java.util.Objects;
-
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatDialogFragment;
 
@@ -37,7 +35,7 @@ public class DialogsFragment extends AppCompatDialogFragment {
     @Override
     public Dialog onCreateDialog(Bundle savedInstanceState) {
         app = (Core) getActivity().getApplicationContext();
-        AlertDialog.Builder builder = new AlertDialog.Builder(Objects.requireNonNull(getActivity()));
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireActivity());
         builder.setTitle(dialogHead).setMessage(dialogMsg);
 
                 //.setIcon(R.drawable.ic_launcher_cat)
@@ -45,7 +43,7 @@ public class DialogsFragment extends AppCompatDialogFragment {
                     builder.setPositiveButton(getResources().getString(android.R.string.yes), (dialog, id) -> {
                         if (dialogActivity.equals("MainActivity")) {
                             //в базе добавить потребителя
-                            app.addClient(Utils.hexToByte(Utils.parseQRString(((MainActivity) Objects.requireNonNull(getActivity())).resultTextView.getText().toString())[0]));
+                            app.addClient(Utils.hexToByte(Utils.parseQRString(((MainActivity) requireActivity()).resultTextView.getText().toString())[0]));
                             /*app.startActionSync(getActivity(),
                                     "Main",
                                     "",

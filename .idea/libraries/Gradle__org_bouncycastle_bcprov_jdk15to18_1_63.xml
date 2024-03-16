@@ -1,5 +1,5 @@
 <component name="libraryTable">
-  <library name="Gradle: org.bouncycastle:bcprov-jdk15to18:1.63">
+  <library name="Gradle: org.bouncycastle:bcprov-jdk15to18:1.63" external-system-id="GRADLE">
     <CLASSES>
       <root url="jar://$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.bouncycastle/bcprov-jdk15to18/1.63/19dee617b027f38dac0f1c40a3b0db7dbd1e722f/bcprov-jdk15to18-1.63.jar!/" />
     </CLASSES>
