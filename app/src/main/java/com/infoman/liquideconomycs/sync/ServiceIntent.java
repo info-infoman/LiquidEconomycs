@@ -39,7 +39,6 @@ import static com.infoman.liquideconomycs.Utils.BROADCAST_ACTION_ANSWER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_ANSWER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_CMD;
 import static com.infoman.liquideconomycs.Utils.EXTRA_MASTER;
-import static com.infoman.liquideconomycs.Utils.EXTRA_PROVIDE_SERVICE;
 import static com.infoman.liquideconomycs.Utils.EXTRA_SIGNAL_SERVER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_TOKEN;
 import static java.lang.Long.parseLong;
@@ -120,21 +119,21 @@ public class ServiceIntent extends IntentService {
         if (intent != null) {
             action = intent.getAction();
             if (ACTION_START_SYNC.equals(action) /*&& !app.isSynchronized*/) {
-                final boolean Provide_service = intent.getBooleanExtra(EXTRA_PROVIDE_SERVICE, true);
 
                 //запрет на синхронизацию если не завершена предыдущая(для потребителей)
-                if(!Provide_service) {
+                if(!app.provideService) {
                     Cursor sync = app.getSyncTable();
                     if(sync.moveToNext()){
                         return;
                     }
                 }
 
-                app.insertedPubKeyInSession = 0;
+                if(!app.pubKeysForInsert.isEmpty()) {
+                    app.pubKeysForInsert.clear();
+                }
                 app.dateTimeLastSync = new Date().getTime();
                 int lastIndex = 0;
                 final String TAG = "WebSocketClient";
-                Cursor query = app.getClients();
 
                 final String signalServer = intent.getStringExtra(EXTRA_SIGNAL_SERVER),
                         token = intent.getStringExtra(EXTRA_TOKEN),
@@ -156,7 +155,7 @@ public class ServiceIntent extends IntentService {
                     public void onMessage(String message) {
                         if (message.equals("Completed")) {
                             //get hash of root in first trie
-                            if (!Provide_service) {
+                            if (!app.provideService) {
                                 byte[] ask = Bytes.concat(new byte[1], new byte[8]);
                                 sendMsg(Utils.getHashs, ask);
                             }
@@ -173,7 +172,7 @@ public class ServiceIntent extends IntentService {
                         Log.d(TAG, String.format("Got binary message! %s", Arrays.toString(data)));
                         app.dateTimeLastSync = new Date().getTime();
 
-                        if(!Provide_service && data.length < 44 || Provide_service && data.length < 10) {
+                        if(!app.provideService && data.length < 44 || app.provideService && data.length < 10) {
                             app.mClient.disconnect();
                             return;
                         }
@@ -183,11 +182,11 @@ public class ServiceIntent extends IntentService {
                         byte[] payload = Utils.getBytesPart(data, 2, data.length);
 
                         //Проверка типа сообщения
-                        if ((Provide_service && msgType == Utils.getHashs) || (!Provide_service && msgType == Utils.hashs)) {
+                        if ((app.provideService && msgType == Utils.getHashs) || (!app.provideService && msgType == Utils.hashs)) {
                             Log.d(TAG, String.format("OK! %s", Arrays.toString(payload)));
                             app.startActionGenerateAnswer(msgType, payload);
                         }else{
-                            if(!Provide_service) {
+                            if(!app.provideService) {
                                 app.mClient.disconnect();
                             }
                         }
@@ -214,11 +213,14 @@ public class ServiceIntent extends IntentService {
                         }
                     }
                     //start sync in next node trie file
-                    if (!Provide_service && (new Date().getTime() - app.dateTimeLastSync) / 1000 > 250) {
+                    if (!app.provideService && (new Date().getTime() - app.dateTimeLastSync) / 1000 > 250) {
                         SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(app);
                         long maxAge = parseLong(sharedPref.getString("maxAge", "30"));
                         long maxPubKeyToInsert = parseLong(sharedPref.getString("maxSyncPubKeyInSession", "10000"));
-                        if(lastIndex < maxAge-1 && app.insertedPubKeyInSession < maxPubKeyToInsert) {
+
+                        app.insertNewPubKeys();
+
+                        if(lastIndex < maxAge-1 && app.pubKeysForInsert.size() < maxPubKeyToInsert) {
                             lastIndex++;
                             byte[] ask = Bytes.concat(new byte[1], new byte[8]);
                             ask[0] = (byte) lastIndex;
@@ -228,10 +230,11 @@ public class ServiceIntent extends IntentService {
                     }
                 }
                 //app.isSynchronized=false;
-                query.close();
                 app.clearTable("sync");
                 app.mClient.disconnect();
-                app.insertedPubKeyInSession = 0;
+                if(!app.pubKeysForInsert.isEmpty()) {
+                    app.pubKeysForInsert.clear();
+                }
                 stopSelf();
                 stopForeground(true);
             }

@@ -67,7 +67,7 @@ public class SettingsActivity extends AppCompatActivity {
             app.startActionInsert(myPubKey, 2);
         }*/
 
-        for(int i=0;i<1000000;i++) {
+        for(int i=0;i<10000;i++) {
             myECKey = new ECKey();
             myPubKey = myECKey.getPubKeyHash();
             if(Bytes.concat(myPubKey).length != 20){

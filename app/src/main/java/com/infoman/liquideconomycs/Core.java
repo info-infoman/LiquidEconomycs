@@ -8,7 +8,6 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
-import android.preference.PreferenceManager;
 
 import com.infoman.liquideconomycs.sync.ServiceIntent;
 import com.infoman.liquideconomycs.sync.WebSocketClient;
@@ -19,9 +18,12 @@ import org.bitcoinj.core.ECKey;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.Date;
+import java.util.List;
+import java.util.ListIterator;
 
 import androidx.core.util.Pair;
 
+import static android.preference.PreferenceManager.getDefaultSharedPreferences;
 import static com.infoman.liquideconomycs.Utils.ACTION_FIND;
 import static com.infoman.liquideconomycs.Utils.ACTION_GENERATE_ANSWER;
 import static com.infoman.liquideconomycs.Utils.ACTION_INSERT;
@@ -33,7 +35,6 @@ import static com.infoman.liquideconomycs.Utils.EXTRA_CMD;
 import static com.infoman.liquideconomycs.Utils.EXTRA_MASTER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_MSG_TYPE;
 import static com.infoman.liquideconomycs.Utils.EXTRA_PAYLOAD;
-import static com.infoman.liquideconomycs.Utils.EXTRA_PROVIDE_SERVICE;
 import static com.infoman.liquideconomycs.Utils.EXTRA_PUBKEY;
 import static com.infoman.liquideconomycs.Utils.EXTRA_SIGNAL_SERVER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_TOKEN;
@@ -49,9 +50,9 @@ public class Core extends Application {
     public WebSocketClient mClient;
     public long dateTimeLastSync;
     public static int[] waitingIntentCounts;
-    public long insertedPubKeyInSession;
+    public List<Pair> pubKeysForInsert;
     public static File[] files;
-
+    public boolean provideService;
     @Override
     public void onCreate() {
         super.onCreate();
@@ -62,7 +63,6 @@ public class Core extends Application {
         dbHelper = new DBHelper(context);
         db = dbHelper.getWritableDatabase();
         waitingIntentCounts = new int[(int) maxAge];
-        insertedPubKeyInSession = 0L;
         setMyKey();
         ///////////create trie file//////////////////////////////////////////////////////
         String nodeDir = context.getFilesDir().getAbsolutePath() + "/trie";
@@ -284,16 +284,15 @@ public class Core extends Application {
     }
 
     //Sync
-    public void startActionSync(String master, String signalServer, String token, boolean Provide_service) {
-        if(Provide_service) {
-            SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(this);
+    public void startActionSync(String master, String signalServer, String token) {
+        if(provideService) {
+            SharedPreferences sharedPref = getDefaultSharedPreferences(this);
             signalServer = sharedPref.getString("Signal_server_URL", "");
             token = sharedPref.getString("Signal_server_Token", "");
         }
         Intent intent = new Intent(this, ServiceIntent.class)
                 .setAction(ACTION_START_SYNC)
                 .putExtra(EXTRA_SIGNAL_SERVER, signalServer)
-                .putExtra(EXTRA_PROVIDE_SERVICE, Provide_service)
                 .putExtra(EXTRA_TOKEN, token)
                 .putExtra(EXTRA_MASTER, master);
         Utils.startIntent(this, intent);
@@ -309,4 +308,9 @@ public class Core extends Application {
         sendBroadcast(intent);
     }
 
+    public void insertNewPubKeys() {
+        ListIterator<Pair> itr = pubKeysForInsert.listIterator();
+        while (itr.hasNext())
+            startActionInsert((byte[]) itr.next().first, (Integer) itr.next().second);
+    }
 }

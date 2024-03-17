@@ -26,6 +26,7 @@ import java.util.Arrays;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
+import androidx.core.util.Pair;
 import androidx.preference.PreferenceManager;
 
 import static androidx.core.app.NotificationCompat.PRIORITY_LOW;
@@ -300,28 +301,30 @@ public class ServiceIntent extends IntentService {
                     int posInMap = node.getPos(c);
                     int selfPosInMap = selfNode.getPos(c);
                     byte[] newPrefix;
+                    //Если такой узел есть или это корень то
                     if(exist || selfNode.type == ROOT) {
                         newPrefix = selfNode.type != ROOT ? Bytes.concat(selfPrefix, node.nodeKey.nodePubKey, c_) : c_;
                         existSelfChild = selfNode.getInMap(c);
                         if (node.type == LEAF) {
                             if (!existSelfChild){
-                                //todo add check newPrefix length
-                                app.insertedPubKeyInSession++;
-                                app.startActionInsert(newPrefix, index);
+                                //Если лист и на листе не найден конец ключа то добавим новый ключ
+                                app.pubKeysForInsert.add(new Pair(newPrefix, index));
+                                //app.startActionInsert(newPrefix, index);
                             }
                         } else {
                             if (!existSelfChild || !Arrays.equals(
                                     Utils.getBytesPart(childsArray, (posInMap * 28) - offLen, offLen),
                                     selfNode.hash
                             )){
-                                //todo add to table sync add to list new ask
+                                //если это корень или ветвь  и если ненайден дочерний узел
+                                // или хеш дочернего узла не равен хешу узла//todo?????????????
                                 long pos_ = Longs.fromByteArray(Utils.getBytesPart(childsArray, (posInMap * 28) - 28, 8));
                                 app.addPrefixByPos(pos_, newPrefix, index, existSelfChild);
                                 ask = Bytes.concat(ask, Longs.toByteArray(pos_));
                             }
                         }
                     }else{
-                        //если это новый узел то если это ветвь то продолжаем запросы
+                        //если это новый узел  и не корень то если это ветвь то продолжаем запросы
                         if(node.type != LEAF) {
                             long pos_ = Longs.fromByteArray(Utils.getBytesPart(childsArray, (selfPosInMap * 28) - 28, 8));
                             app.addPrefixByPos(pos_, Bytes.concat(selfPrefix, node.nodeKey.nodePubKey, c_), index, false);
@@ -329,8 +332,8 @@ public class ServiceIntent extends IntentService {
                         }else{
                             // иначе добавляем новые ключи с возрастами
                             //todo add check newPrefix length
-                            app.insertedPubKeyInSession++;
-                            app.startActionInsert(Bytes.concat(selfPrefix, node.nodeKey.nodePubKey, c_), index);
+                            app.pubKeysForInsert.add(new Pair(Bytes.concat(selfPrefix, node.nodeKey.nodePubKey, c_), index));
+                            //app.startActionInsert(Bytes.concat(selfPrefix, node.nodeKey.nodePubKey, c_), index);
                         }
                     }
                 }
