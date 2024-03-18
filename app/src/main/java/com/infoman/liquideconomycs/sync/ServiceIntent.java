@@ -31,14 +31,17 @@ import java.util.Objects;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
+import androidx.core.util.Pair;
 import androidx.preference.PreferenceManager;
 
+import static com.infoman.liquideconomycs.Utils.EXTRA_INDEX;
 import static androidx.core.app.NotificationCompat.PRIORITY_LOW;
 import static com.infoman.liquideconomycs.Utils.ACTION_START_SYNC;
 import static com.infoman.liquideconomycs.Utils.BROADCAST_ACTION_ANSWER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_ANSWER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_CMD;
 import static com.infoman.liquideconomycs.Utils.EXTRA_MASTER;
+import static com.infoman.liquideconomycs.Utils.EXTRA_PROVIDE_SERVICE;
 import static com.infoman.liquideconomycs.Utils.EXTRA_SIGNAL_SERVER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_TOKEN;
 import static java.lang.Long.parseLong;
@@ -56,6 +59,10 @@ public class ServiceIntent extends IntentService {
                         final byte[] answer = intent.getByteArrayExtra(EXTRA_ANSWER);
                         if (answer.length > 1)
                             sendMsg(answer[0], Utils.getBytesPart(answer, 1, (answer.length)-1));
+                    } else if(cmd.equals("AddPubKeyForInsert")){
+                        final int index = intent.getIntExtra(EXTRA_INDEX, 0);
+                        final byte[] pubKey = intent.getByteArrayExtra(EXTRA_ANSWER);
+                        app.pubKeysForInsert.add(new Pair(pubKey, index));
                     }
                     //resultTextView.setText(param);
                 }
@@ -107,18 +114,14 @@ public class ServiceIntent extends IntentService {
         unregisterReceiver(mBroadcastReceiver);
     }
 
-    //@Override
-    //public int onStartCommand(Intent intent, int flags, int startId) {
-    //    //waitingIntentCount++;
-    //    return super.onStartCommand(intent, flags, startId);
-    //}
-
     @Override
     protected void onHandleIntent(Intent intent) {
         String action = null;
         if (intent != null) {
             action = intent.getAction();
             if (ACTION_START_SYNC.equals(action) /*&& !app.isSynchronized*/) {
+
+                app.provideService = intent.getBooleanExtra(EXTRA_PROVIDE_SERVICE, true);
 
                 //запрет на синхронизацию если не завершена предыдущая(для потребителей)
                 if(!app.provideService) {
@@ -136,8 +139,7 @@ public class ServiceIntent extends IntentService {
                 final String TAG = "WebSocketClient";
 
                 final String signalServer = intent.getStringExtra(EXTRA_SIGNAL_SERVER),
-                        token = intent.getStringExtra(EXTRA_TOKEN),
-                        master = intent.getStringExtra(EXTRA_MASTER);
+                        token = intent.getStringExtra(EXTRA_TOKEN);
 
                 //todo sync processor
                 List<BasicNameValuePair> mExtraHeaders = Collections.singletonList(new BasicNameValuePair("Cookie", "session=abcd"));
@@ -178,8 +180,9 @@ public class ServiceIntent extends IntentService {
                         }
 
                         byte msgType = Utils.getBytesPart(data, 0, 1)[0];
-
-                        byte[] payload = Utils.getBytesPart(data, 2, data.length);
+                        Log.d(TAG, String.format("OK! %s", msgType));
+                        byte[] payload = Utils.getBytesPart(data, 1, data.length - 1);
+                        Log.d(TAG, String.format("OK! %s", Arrays.toString(payload)));
 
                         //Проверка типа сообщения
                         if ((app.provideService && msgType == Utils.getHashs) || (!app.provideService && msgType == Utils.hashs)) {
@@ -205,13 +208,11 @@ public class ServiceIntent extends IntentService {
 
                 app.mClient.connect(URI.create(signalServer));
 
+                while ((new Date().getTime() - app.dateTimeLastSync) / 1000 < 10){
+
+                }
                 //Таймер проверки ответов
-                while ((new Date().getTime() - app.dateTimeLastSync) / 1000 < 300){
-                    for( int i : app.waitingIntentCounts) {
-                        if(i!=0){
-                            app.dateTimeLastSync = new Date().getTime();
-                        }
-                    }
+                while ((new Date().getTime() - app.dateTimeLastSync) / 1000 < 300 && app.mClient.isConnected()){
                     //start sync in next node trie file
                     if (!app.provideService && (new Date().getTime() - app.dateTimeLastSync) / 1000 > 250) {
                         SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(app);
@@ -229,7 +230,6 @@ public class ServiceIntent extends IntentService {
                         }
                     }
                 }
-                //app.isSynchronized=false;
                 app.clearTable("sync");
                 app.mClient.disconnect();
                 if(!app.pubKeysForInsert.isEmpty()) {

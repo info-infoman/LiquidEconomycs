@@ -35,22 +35,6 @@ public class DBHelper extends SQLiteOpenHelper {
                     + "prefix BLOB,"
                     + "age int,"
                     + "exist integer" + ");");
-            //clients on session
-            db.execSQL("create table clients ("
-                    + "id integer primary key autoincrement,"
-                    + "pubKey BLOB" + ");");
-            //cache node in blob for save in trie file
-            db.execSQL("create table cacheNewNodeBlobs ("
-                    + "id integer primary key autoincrement,"
-                    + "file LONG,"
-                    + "pos LONG,"
-                    + "node BLOB" + ");");
-            //cache backup node in blob for recovery trie file
-            db.execSQL("create table cacheOldNodeBlobs ("
-                    + "id integer primary key autoincrement,"
-                    + "file LONG,"
-                    + "pos LONG,"
-                    + "node BLOB" + ");");
         }
 
         @Override

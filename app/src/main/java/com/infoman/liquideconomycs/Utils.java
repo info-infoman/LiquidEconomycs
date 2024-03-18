@@ -36,7 +36,8 @@ public class Utils {
         EXTRA_PAYLOAD       = "com.infoman.liquideconomycs.extra.payload",
 
         BROADCAST_ACTION_ANSWER = "com.infoman.liquideconomycs.broadcast_action.answer",
-        EXTRA_ANSWER        = "com.infoman.liquideconomycs.extra.answer";
+        EXTRA_ANSWER        = "com.infoman.liquideconomycs.extra.answer",
+        EXTRA_INDEX        = "com.infoman.liquideconomycs.extra.index";
 
     public static byte[] getBytesPart(byte[] src, int off, int len){
         byte[] result= new byte[len];

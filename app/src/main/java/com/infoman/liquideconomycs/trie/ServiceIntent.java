@@ -26,7 +26,6 @@ import java.util.Arrays;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.NotificationCompat;
-import androidx.core.util.Pair;
 import androidx.preference.PreferenceManager;
 
 import static androidx.core.app.NotificationCompat.PRIORITY_LOW;
@@ -62,11 +61,11 @@ public class ServiceIntent extends IntentService {
         app = (Core) getApplicationContext();
         SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(app);
         long maxAge = parseLong(sharedPref.getString("maxAge", "30"));
-        for( int i : app.waitingIntentCounts) {
-            if(i!=0){
-                return;
-            }
-        }
+//        for( int i : app.waitingIntentCounts) {
+//            if(i!=0){
+//                return;
+//            }
+//        }
         nodes = new Node[(int) maxAge];
 
         try {
@@ -140,8 +139,8 @@ public class ServiceIntent extends IntentService {
                 final byte[] pubKey = intent.getByteArrayExtra(EXTRA_PUBKEY);
                 final int index = intent.getIntExtra(EXTRA_AGE, 0);
                 if(index > -1 && index < nodes.length) {
-                    while (app.waitingIntentCounts[index] != 0) {}
-                    app.waitingIntentCounts[index]++;
+                    //while (app.waitingIntentCounts[index] != 0) {}
+                    //app.waitingIntentCounts[index]++;
 
                     ////////////////////////////////////////////////////////////////
                     try {
@@ -149,7 +148,7 @@ public class ServiceIntent extends IntentService {
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
-                    app.waitingIntentCounts[index]--;
+                    //app.waitingIntentCounts[index]--;
                 }
                 ////////////////////////////////////////////////////////////////
             }
@@ -233,22 +232,28 @@ public class ServiceIntent extends IntentService {
             for(int i = 0; i < payload.length;) {
                 exist                       = false;
                 //node from payload
+
                 byte[] nodeTypeAndKeySize   = Utils.getBytesPart(payload, i+8, 2);
                 nodeParams = new NodeParams();
                 nodeParams.index = index;
-                nodeParams.type = nodeTypeAndKeySize[0];
-                nodeParams.pubKey = Utils.getBytesPart(payload, i + 10, nodeTypeAndKeySize[1]);
                 nodeParams.pos = Longs.fromByteArray(Utils.getBytesPart(payload, i, 8));
-                nodeParams.hash = new byte[20];
+                nodeParams.type = nodeParams.pos == 0L ? ROOT : nodeTypeAndKeySize[0];
+                nodeParams.pubKey = nodeParams.type != ROOT ? Utils.getBytesPart(payload, i + 10, nodeTypeAndKeySize[1]) : new byte[0];
+                nodeParams.hash = nodeParams.type != ROOT ? new byte[20] : Utils.getBytesPart(payload, i + 8, 20);
                 nodeParams.newble = true;
                 Node node = new Node(app, nodeParams);
-                node.mapBytes = Utils.getBytesPart(payload, i + 10 + nodeTypeAndKeySize[1], 32);
+                if (nodeParams.type != ROOT) {
+                    node.mapBytes = Utils.getBytesPart(payload, i + 10 + nodeTypeAndKeySize[1], 32);
+                }else{
+                    node.loadRootMapForExtNode(Utils.getBytesPart(payload, i + 8, payload.length - 8));
+                }
                 int offLen                  = (node.type!=LEAF?20:0);
                 int len                     = node.getCountInMap() * (node.type==LEAF ? 0 : 28);
-                byte[] childsArray          = Utils.getBytesPart(payload, i + 10 + nodeTypeAndKeySize[1] + 32, len);
+                int off = nodeParams.type != ROOT ? i + 10 + nodeTypeAndKeySize[1] + 32 : i + 8;
+                byte[] childsArray          = Utils.getBytesPart(payload, off, len);
 
                 //next index of data-part in payload
-                i = i + 10 + nodeTypeAndKeySize[1] + 32 + len;
+                i = off + len;
 
                 //load self node
                 Node selfNode;
@@ -282,6 +287,10 @@ public class ServiceIntent extends IntentService {
                         selfNode.loadChilds();
                         selfNode.calcSpace();
                     }
+                }else{
+                    if (!Arrays.equals(node.hash, selfNode.hash)){
+                        return new byte[0];
+                    }
                 }
                 //todo В цикле  от 0 - 255 мы должны обойти все дочерние узлы
                 // 1) Если узел\возраст есть в полученой карте:
@@ -308,7 +317,8 @@ public class ServiceIntent extends IntentService {
                         if (node.type == LEAF) {
                             if (!existSelfChild){
                                 //Если лист и на листе не найден конец ключа то добавим новый ключ
-                                app.pubKeysForInsert.add(new Pair(newPrefix, index));
+                                app.broadcastActionMsg("Trie", "AddPubKeyForInsert", index, newPrefix);
+
                                 //app.startActionInsert(newPrefix, index);
                             }
                         } else {
@@ -331,9 +341,7 @@ public class ServiceIntent extends IntentService {
                             ask = Bytes.concat(ask, Longs.toByteArray(pos_));
                         }else{
                             // иначе добавляем новые ключи с возрастами
-                            //todo add check newPrefix length
-                            app.pubKeysForInsert.add(new Pair(Bytes.concat(selfPrefix, node.nodeKey.nodePubKey, c_), index));
-                            //app.startActionInsert(Bytes.concat(selfPrefix, node.nodeKey.nodePubKey, c_), index);
+                            app.broadcastActionMsg("Trie", "AddPubKeyForInsert", index, Bytes.concat(selfPrefix, node.nodeKey.nodePubKey, c_));
                         }
                     }
                 }

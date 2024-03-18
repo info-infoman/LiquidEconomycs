@@ -8,6 +8,7 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
+import android.util.Log;
 
 import com.infoman.liquideconomycs.sync.ServiceIntent;
 import com.infoman.liquideconomycs.sync.WebSocketClient;
@@ -17,12 +18,14 @@ import org.bitcoinj.core.ECKey;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.ListIterator;
 
 import androidx.core.util.Pair;
 
+import static com.infoman.liquideconomycs.Utils.EXTRA_INDEX;
 import static android.preference.PreferenceManager.getDefaultSharedPreferences;
 import static com.infoman.liquideconomycs.Utils.ACTION_FIND;
 import static com.infoman.liquideconomycs.Utils.ACTION_GENERATE_ANSWER;
@@ -35,6 +38,7 @@ import static com.infoman.liquideconomycs.Utils.EXTRA_CMD;
 import static com.infoman.liquideconomycs.Utils.EXTRA_MASTER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_MSG_TYPE;
 import static com.infoman.liquideconomycs.Utils.EXTRA_PAYLOAD;
+import static com.infoman.liquideconomycs.Utils.EXTRA_PROVIDE_SERVICE;
 import static com.infoman.liquideconomycs.Utils.EXTRA_PUBKEY;
 import static com.infoman.liquideconomycs.Utils.EXTRA_SIGNAL_SERVER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_TOKEN;
@@ -49,8 +53,8 @@ public class Core extends Application {
     public static Pair myKey;
     public WebSocketClient mClient;
     public long dateTimeLastSync;
-    public static int[] waitingIntentCounts;
-    public List<Pair> pubKeysForInsert;
+    //public static int[] waitingIntentCounts;
+    public List<Pair<byte[], Integer>> pubKeysForInsert;
     public static File[] files;
     public boolean provideService;
     @Override
@@ -62,7 +66,8 @@ public class Core extends Application {
         files = new File[(int) maxAge];
         dbHelper = new DBHelper(context);
         db = dbHelper.getWritableDatabase();
-        waitingIntentCounts = new int[(int) maxAge];
+        //waitingIntentCounts = new int[(int) maxAge];
+        pubKeysForInsert = new ArrayList<>();
         setMyKey();
         ///////////create trie file//////////////////////////////////////////////////////
         String nodeDir = context.getFilesDir().getAbsolutePath() + "/trie";
@@ -75,7 +80,7 @@ public class Core extends Application {
             long fileDate = parseLong(file.getName());
             if(compareDate(new Date(), new Date(fileDate))>maxAge){
                 file.delete();
-                //TODO delete free spase by file index
+                deleteFreeSpace(fileDate);
             }
         }
 
@@ -167,7 +172,7 @@ public class Core extends Application {
         }
     }
 
-    public void deleteFreeSpace(long file, int id, long pos, int recordLength, int space) {
+    public void updateFreeSpace(long file, int id, long pos, int recordLength, int space) {
         ContentValues cv = new ContentValues();
         if (recordLength < space) {
             cv.put("file", file);
@@ -177,6 +182,10 @@ public class Core extends Application {
                     new String[] {String.valueOf(id)});
             cv.clear();
         }
+    }
+
+    public void deleteFreeSpace(long file) {
+        db.delete("freeSpace", "file = ?", new String[] {String.valueOf(file)});
     }
 
     /////////MyKey/////////////////////////////////////////////////////////////////////////////////
@@ -207,31 +216,6 @@ public class Core extends Application {
     }
 
     /////////Sync/////////////////////////////////////////////////////////////////////////////////
-
-    public void addClient(byte[] pubKey) {
-        boolean clientIsFound = false;
-        ContentValues cv = new ContentValues();
-        Cursor query = db.rawQuery("SELECT clients.pubKey FROM clients", null);
-        while (query.moveToNext()) {
-            @SuppressLint("Range") byte[] pk = query.getBlob(query.getColumnIndex("pubKey"));
-            if (pubKey == pk) {
-                clientIsFound = true;
-                break;
-            }
-        }
-        if (!clientIsFound) {
-            cv.put("pubKey", pubKey);
-            db.insert("clients", null, cv);
-            cv.clear();
-        }
-    }
-
-    public Cursor getClients() {
-        return db.rawQuery("SELECT " +
-                "clients.pubKey " +
-                "FROM clients AS clients", null);
-    }
-
     public Cursor getSyncTable() {
         return db.rawQuery("SELECT * FROM sync AS sync", null);
     }
@@ -284,7 +268,7 @@ public class Core extends Application {
     }
 
     //Sync
-    public void startActionSync(String master, String signalServer, String token) {
+    public void startActionSync(String signalServer, String token) {
         if(provideService) {
             SharedPreferences sharedPref = getDefaultSharedPreferences(this);
             signalServer = sharedPref.getString("Signal_server_URL", "");
@@ -294,23 +278,33 @@ public class Core extends Application {
                 .setAction(ACTION_START_SYNC)
                 .putExtra(EXTRA_SIGNAL_SERVER, signalServer)
                 .putExtra(EXTRA_TOKEN, token)
-                .putExtra(EXTRA_MASTER, master);
+                .putExtra(EXTRA_PROVIDE_SERVICE, provideService);
         Utils.startIntent(this, intent);
+    }
+
+    public void insertNewPubKeys() {
+        ListIterator<Pair<byte[], Integer>> itr = pubKeysForInsert.listIterator();
+        Log.d("insert New PubKeys: ", String.format("%s", pubKeysForInsert.size()));
+        while (itr.hasNext())
+            startActionInsert((byte[]) itr.next().first, (Integer) itr.next().second);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////
     //broadcast
-    public void broadcastActionMsg(String master, String cmd, byte[] answer) {
+    public void broadcastActionMsg(String master, String cmd, byte[] byteArray) {
         Intent intent = new Intent(BROADCAST_ACTION_ANSWER)
                 .putExtra(EXTRA_MASTER, master)
                 .putExtra(EXTRA_CMD, cmd)
-                .putExtra(EXTRA_ANSWER, answer);
+                .putExtra(EXTRA_ANSWER, byteArray);
         sendBroadcast(intent);
     }
 
-    public void insertNewPubKeys() {
-        ListIterator<Pair> itr = pubKeysForInsert.listIterator();
-        while (itr.hasNext())
-            startActionInsert((byte[]) itr.next().first, (Integer) itr.next().second);
+    public void broadcastActionMsg(String master, String cmd, int index, byte[] byteArray) {
+        Intent intent = new Intent(BROADCAST_ACTION_ANSWER)
+                .putExtra(EXTRA_MASTER, master)
+                .putExtra(EXTRA_CMD, cmd)
+                .putExtra(EXTRA_INDEX, index)
+                .putExtra(EXTRA_ANSWER, byteArray);
+        sendBroadcast(intent);
     }
 }

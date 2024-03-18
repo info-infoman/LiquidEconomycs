@@ -37,7 +37,6 @@ import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.Sha256Hash;
 import org.bitcoinj.core.SignatureDecodeException;
 
-import java.util.Date;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -85,10 +84,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                             FragmentTransaction transaction = manager.beginTransaction();
                             alert.show(transaction, "dialog");
                         }
-                        //restart sync for provider
-                        if((new Date().getTime() - app.dateTimeLastSync) / 1000 > 300){
-                            app.startActionSync("Main", "","");
-                        }
+                        app.startActionSync("","");
                     }
                 }
             }
@@ -106,13 +102,16 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         mainLayout = findViewById(R.id.main_layout);
         notation = findViewById(R.id.notation);
 
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.INTERNET) == PackageManager.PERMISSION_GRANTED) {} else {
-            requestINTERNETPermission();
-        }
+        if (ActivityCompat.checkSelfPermission(this,
+                Manifest.permission.INTERNET) != PackageManager.PERMISSION_GRANTED) {
+                    requestINTERNETPermission();
+                }
 
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.FOREGROUND_SERVICE) == PackageManager.PERMISSION_GRANTED || Build.VERSION.SDK_INT < Build.VERSION_CODES.O ) {} else {
-            requestFOREGROUND_SERVICEPermission();
-        }
+        if (ActivityCompat.checkSelfPermission(this,
+                Manifest.permission.FOREGROUND_SERVICE) != PackageManager.PERMISSION_GRANTED
+                && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    requestFOREGROUND_SERVICEPermission();
+                }
 
         registerReceiver(mBroadcastReceiver, new IntentFilter(BROADCAST_ACTION_ANSWER));
 
@@ -134,9 +133,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 tbMade.setChecked(true);
                 app.provideService = true;
                 role_capture.setText(getResources().getString(R.string.Provide_service));
-                if((new Date().getTime() - app.dateTimeLastSync) / 1000 > 300){
-                    app.startActionSync("Main", "", "");
-                }
+                app.startActionSync("", "");
             }else{
                 tbResive.setChecked(true);
                 tbMade.setChecked(false);
@@ -186,8 +183,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
         stopScanner();
 
-        if((new Date().getTime() - app.dateTimeLastSync) / 1000 > 300 && app.provideService){
-            app.startActionSync("Main", "","");
+        if(app.provideService){
+            app.startActionSync("","");
         }
     }
 
@@ -330,10 +327,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             }else{
                 byte[] providerPubKey = hexToByte(fields[0]);
                 app.startActionInsert(ECKey.fromPublicOnly(providerPubKey).getPubKeyHash(), 0);
-                app.addClient(providerPubKey);
-                app.startActionSync("Main", fields[1], fields[2]);
+                app.startActionSync(fields[1], fields[2]);
             }
-
         }
     }
 

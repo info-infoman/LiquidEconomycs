@@ -4,6 +4,8 @@ import android.content.SharedPreferences;
 import com.google.common.primitives.Bytes;
 import com.google.common.primitives.Longs;
 import com.infoman.liquideconomycs.Core;
+import com.infoman.liquideconomycs.Utils;
+
 import java.io.IOException;
 import androidx.preference.PreferenceManager;
 import static com.infoman.liquideconomycs.Utils.getDayMilliByIndex;
@@ -69,6 +71,17 @@ public class Node extends ChildMap {
             byte[] b = new byte[8];
             app.files[index].get(b, p + (i * 8), 0, 8);
             long pos = Longs.fromByteArray(b);
+            if(pos > 0L){
+                setInMap(i, true);
+            }
+        }
+    }
+
+    public void loadRootMapForExtNode(byte[] payload) throws IOException {
+        int h = 0;
+        for(int i = 0; i < (mapSize * 8); i++) {
+            long pos = Longs.fromByteArray(Utils.getBytesPart(payload, (i * 8) + h, 8));
+            h = h + 20;
             if(pos > 0L){
                 setInMap(i, true);
             }
@@ -244,9 +257,6 @@ public class Node extends ChildMap {
             int pubKeyInt = nodeKey.getPlaceIntForChildFromNewKeySuffix(pubKey);
             byte[] keyChild = nodeKey.getKeyForAddInChildFromNewKeySuffix();
             if (getInMap(pubKeyInt)) {
-                //if (type != ROOT) {//root loaded in constructor
-                app.files[index].saveNodeOldStateBlobInDB(getDayMilliByIndex(index), position, type == ROOT ? 2068 : space);
-                //}
                 if (type != LEAF) {//leaf have no childs
                     mapChilds[pubKeyInt].constructTrieByKey(keyChild);
                 }

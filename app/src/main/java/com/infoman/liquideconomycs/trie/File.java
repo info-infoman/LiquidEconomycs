@@ -52,7 +52,7 @@ public class File extends RandomAccessFile {
                     long p = query.getLong(posColIndex);
                     int s = query.getInt(spaceColIndex);
                     if (p > 0) {
-                        app.deleteFreeSpace(getDayMilliByIndex(node.index), id, p, node.space, s);
+                        app.updateFreeSpace(getDayMilliByIndex(node.index), id, p, node.space, s);
                         pos = p;
                     }
                 } else {
@@ -64,15 +64,8 @@ public class File extends RandomAccessFile {
             }
         }
         blob = node.getBlob(false);
-        seek(pos);
-        write(blob);
+        set(pos, blob);
         node.position = pos;
-    }
-
-    public void saveNodeOldStateBlobInDB(long file, long pos, int len) throws IOException {
-        byte[] blob = new byte[len];
-        get(blob, pos, 0, len);
-        app.insertNodeBlob(file, pos, blob, "cacheOldNodeBlobs");
     }
 
     //Зачитывает кусок байтов по позиции
@@ -83,31 +76,11 @@ public class File extends RandomAccessFile {
 
     //todo изолировать запись
     public void set(long pos, byte[] b) throws IOException {
-        // app.insertFreeSpaceWitchCompressTrieFile(position, calcSpace());
         seek(pos);
         write(b);
     }
 
     public void transaction() throws IOException {
         this.virtualFilePointer = this.length();
-        app.clearTable("cacheOldNodeBlobs");
-    }
-
-    public void recovery() throws IOException {
-        app.clearTable("cacheNewNodeBlobs");
-        Cursor query = app.getNodeBlobs("cacheOldNodeBlobs");
-        if(query.getCount() > 0) {
-            while (query.moveToNext()) {
-                int posColIndex = query.getColumnIndex("pos");
-                int nodeColIndex = query.getColumnIndex("node");
-                long pos = query.getLong(posColIndex);
-                byte[] blob = query.getBlob(nodeColIndex);
-                seek(pos);
-                write(blob);
-            }
-            query.close();
-            this.virtualFilePointer = this.length();
-            app.clearTable("cacheOldNodeBlobs");
-        }
     }
 }
