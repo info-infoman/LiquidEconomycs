@@ -22,19 +22,13 @@ public class DBHelper extends SQLiteOpenHelper {
                     + "id integer primary key autoincrement,"
                     + "pubKey BLOB,"
                     + "privKey BLOB" + ");");
-            //table for free space in trie file
-            db.execSQL("create table freeSpace ("
-                    + "id integer primary key autoincrement,"
-                    + "file LONG,"
-                    + "pos LONG,"
-                    + "space int" + ");");
-            //cache pubKeys for insert after sync
-            db.execSQL("create table sync ("
-                    + "id integer primary key autoincrement,"
-                    + "pos LONG,"
-                    + "prefix BLOB,"
-                    + "age int,"
-                    + "exist integer" + ");");
+            db.execSQL("create table main ("
+                    + "pubKey blob primary key,"
+                    + "age integer);");
+            db.execSQL("CREATE INDEX idx_date ON main (age);");
+            db.execSQL("create table mainCount ("
+                    + "age integer primary key,"
+                    + "count Long);");
         }
 
         @Override

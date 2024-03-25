@@ -316,7 +316,19 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             else{
                 byte[] accepterPubKey = Utils.hexToByte(fields[0]);
                 if(chekSig(accepterPubKey, decodeFromDER(Utils.hexToByte(fields[1])), accepterPubKey)) {
-                        app.startActionFind("Main", ECKey.fromPublicOnly(accepterPubKey).getPubKeyHash());
+                    app.find(ECKey.fromPublicOnly(accepterPubKey).getPubKeyHash());
+                    if(app.provideService){
+                        shakeIt();
+                        if(app.find(ECKey.fromPublicOnly(accepterPubKey).getPubKeyHash())){
+                            Toast.makeText(getApplicationContext(), getResources().getString(R.string.pubKeyFound),Toast.LENGTH_LONG).show();
+                        }else{
+                            DialogsFragment alert = new DialogsFragment(getApplicationContext(), "MainActivity", 0);
+                            FragmentManager manager = getSupportFragmentManager();
+                            FragmentTransaction transaction = manager.beginTransaction();
+                            alert.show(transaction, "dialog");
+                        }
+                        app.startActionSync("","");
+                    }
                 }
                 //TODO add uncheck msg
             }
@@ -326,7 +338,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                Toast.makeText(getApplicationContext(), getResources().getString(R.string.ErrorReceivingPartnerData),Toast.LENGTH_LONG).show();
             }else{
                 byte[] providerPubKey = hexToByte(fields[0]);
-                app.startActionInsert(ECKey.fromPublicOnly(providerPubKey).getPubKeyHash(), 0);
+                app.insert(ECKey.fromPublicOnly(providerPubKey).getPubKeyHash(), 0);
                 app.startActionSync(fields[1], fields[2]);
             }
         }

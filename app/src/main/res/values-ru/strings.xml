@@ -20,8 +20,6 @@
     <string name="errorGetSignalServerParam">Ошибка получения параметров сигнального сервера</string>
     <string name="SyncFinish">Синхронизация завершена.</string>
     <string name="disconnect">Соединение прерванно.</string>
-    <string name="annotation_nfc">Чтобы начать процедуру верификации и синхронизации - приложите ваше устройство к устройству вашего партнера</string>
-    <string name="error_nfc">Ваше устройство не поддерживает технологию NFC, для сопряжения устройств используйте сканер QR-кода</string>
     <string name="getINTERNETPermission">Доступ к Интернету необходим для отображения предварительного просмотра в Интернете.</string>
     <string name="permission_is_not_available_INTERNET">Разрешение недоступно. Запрос разрешения ИНТЕРНЕТ.</string>
     <string name="getCAMERAPermission">Доступ к камере необходим для отображения предварительного просмотра камеры.</string>
@@ -33,12 +31,10 @@
     <string name="stopScan">Остановить</string>
     <string name="maxAge">Максимальный возраст хранения публичных ключей</string>
     <string name="maxAge_summ">Публичные ключи ваших партнеров при достижении этого возраста (в днях) будут автоматически удалены из локальной базы данных</string>
-    <string name="getNFCPermission">Доступ к NFC необходим для предварительного сопряжения устройств</string>
-    <string name="permission_is_not_available_NFC">Разрешение не доступно. Запрос разрешения NFC.</string>
     <string name="getFOREGROUND_SERVICEPermission">getFOREGROUND_SERVICEPermission</string>
     <string name="permission_is_not_available_FOREGROUND_SERVICE">permission_is_not_available_FOREGROUND_SERVICE</string>
     <string name="QR_generator_consumer">QR_generator_consumer</string>
-    <string name="maxSyncPubKeyInSession">Maximum number of identifiers updated at a time</string>
-    <string name="maxSyncPubKeyInSession_summ">This parameter determines the maximum number of identifiers allowed to be updated when synchronizing between people within the same session</string>
+    <string name="maxSyncPubKeyInSession">Максимальное количество идентификаторов, передаваемых в одном сообщении между приложениями</string>
+    <string name="maxSyncPubKeyInSession_summ">Фактически это размер одного сообщения между приложениями, он определяется так: 20 байт хеш суммы публичного ключа * данный параметр. Число сообщений определяется максимальным возратом хранения</string>
 
 </resources>

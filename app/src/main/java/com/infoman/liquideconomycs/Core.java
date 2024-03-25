@@ -1,50 +1,35 @@
 package com.infoman.liquideconomycs;
 
-import android.annotation.SuppressLint;
 import android.app.Application;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.Cursor;
+import android.database.SQLException;
 import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteStatement;
 import android.util.Log;
 
+import com.google.common.primitives.Bytes;
 import com.infoman.liquideconomycs.sync.ServiceIntent;
 import com.infoman.liquideconomycs.sync.WebSocketClient;
-import com.infoman.liquideconomycs.trie.File;
 
 import org.bitcoinj.core.ECKey;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.ListIterator;
 
 import androidx.core.util.Pair;
 
-import static com.infoman.liquideconomycs.Utils.EXTRA_INDEX;
 import static android.preference.PreferenceManager.getDefaultSharedPreferences;
-import static com.infoman.liquideconomycs.Utils.ACTION_FIND;
-import static com.infoman.liquideconomycs.Utils.ACTION_GENERATE_ANSWER;
-import static com.infoman.liquideconomycs.Utils.ACTION_INSERT;
 import static com.infoman.liquideconomycs.Utils.ACTION_START_SYNC;
-import static com.infoman.liquideconomycs.Utils.BROADCAST_ACTION_ANSWER;
-import static com.infoman.liquideconomycs.Utils.EXTRA_AGE;
-import static com.infoman.liquideconomycs.Utils.EXTRA_ANSWER;
-import static com.infoman.liquideconomycs.Utils.EXTRA_CMD;
-import static com.infoman.liquideconomycs.Utils.EXTRA_MASTER;
-import static com.infoman.liquideconomycs.Utils.EXTRA_MSG_TYPE;
-import static com.infoman.liquideconomycs.Utils.EXTRA_PAYLOAD;
 import static com.infoman.liquideconomycs.Utils.EXTRA_PROVIDE_SERVICE;
-import static com.infoman.liquideconomycs.Utils.EXTRA_PUBKEY;
 import static com.infoman.liquideconomycs.Utils.EXTRA_SIGNAL_SERVER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_TOKEN;
-import static com.infoman.liquideconomycs.Utils.compareDate;
-import static com.infoman.liquideconomycs.Utils.getDayMilliByIndex;
-import static java.lang.Long.parseLong;
+import static com.infoman.liquideconomycs.Utils.getDayMilliByIndex_;
+import static java.lang.Integer.parseInt;
 
 public class Core extends Application {
 
@@ -53,139 +38,94 @@ public class Core extends Application {
     public static Pair myKey;
     public WebSocketClient mClient;
     public long dateTimeLastSync;
-    //public static int[] waitingIntentCounts;
-    public List<Pair<byte[], Integer>> pubKeysForInsert;
-    public static File[] files;
+    public int maxAge;
+    public List<byte[]> pubKeysForInsert;
     public boolean provideService;
+    public int maxSyncPubKeyInSession;
     @Override
     public void onCreate() {
         super.onCreate();
         Context context = getApplicationContext();
         SharedPreferences sharedPref = androidx.preference.PreferenceManager.getDefaultSharedPreferences(context);
-        long maxAge = parseLong(sharedPref.getString("maxAge", "30"));
-        files = new File[(int) maxAge];
+        maxSyncPubKeyInSession = parseInt(sharedPref.getString("maxSyncPubKeyInSession", "50000"));
+        maxAge = parseInt(sharedPref.getString("maxAge", "30"));
         dbHelper = new DBHelper(context);
         db = dbHelper.getWritableDatabase();
-        //waitingIntentCounts = new int[(int) maxAge];
         pubKeysForInsert = new ArrayList<>();
         setMyKey();
-        ///////////create trie file//////////////////////////////////////////////////////
-        String nodeDir = context.getFilesDir().getAbsolutePath() + "/trie";
-        java.io.File nodeDirReference = new java.io.File(nodeDir);
-        while (!nodeDirReference.exists()) {
-            new java.io.File(nodeDir).mkdirs();
-        }
-        java.io.File[] trieFiles = nodeDirReference.listFiles();
-        for(java.io.File file: trieFiles){
-            long fileDate = parseLong(file.getName());
-            if(compareDate(new Date(), new Date(fileDate))>maxAge){
-                file.delete();
-                deleteFreeSpace(fileDate);
-            }
-        }
+        deleteOldKeys();
+    }
 
-        for(int i = 0; i < maxAge; i++){
-            long fileName = getDayMilliByIndex(i);
-            java.io.File nodeFileReference = new java.io.File(getFilesDir().getAbsolutePath() + "/trie/" + fileName);
-            if (!nodeFileReference.exists()) {
-                try {
-                    nodeFileReference.createNewFile();
-                } catch (IOException e) {
-                    e.printStackTrace();
+    public boolean find(byte[] pubKey){
+        boolean r = false;
+        Cursor query = db.rawQuery("SELECT ONE pubKey FROM main where pubKey =" + pubKey, null);
+        if (query.moveToFirst()) {
+            r = true;
+        }
+        query.close();
+        return r;
+    }
+
+    public void insertNewKeys(int day) {
+        try {
+            db.beginTransaction();
+            String sql = " INSERT OR IGNORE INTO main (pubKey, age) VALUES (?, ?)";
+            String sql_u = "UPDATE main SET age=? WHERE pubKey=? AND age + 0 < ? + 0";
+            SQLiteStatement statement = db.compileStatement(sql);
+            SQLiteStatement statement_u = db.compileStatement(sql_u);
+            ListIterator<byte[]> itrv = pubKeysForInsert.listIterator();
+            while (itrv.hasNext()){
+                byte[] pubKey = itrv.next();
+                statement.bindBlob(1, pubKey); // These match to the two question marks in the sql string
+                statement.bindLong(2, day);
+                if(statement.executeInsert() == -1){
+                    statement_u.bindLong(1, day);
+                    statement_u.bindBlob(2, pubKey);
+                    statement_u.bindLong(3, day);
+                    statement_u.executeUpdateDelete();
                 }
             }
-            try {
-                files[i] = new File(context,getFilesDir().getAbsolutePath() + "/trie" + "/" + fileName, "rw");
-            } catch (FileNotFoundException e) {
-                e.printStackTrace();
+
+            String sql_ = " INSERT OR IGNORE INTO mainCount (count, age) VALUES (?, ?)";
+            SQLiteStatement statement_ = db.compileStatement(sql_);
+            statement_.bindLong(1, pubKeysForInsert.size()); // These match to the two question marks in the sql string
+            statement_.bindLong(2, day);
+            if(statement_.executeInsert() == -1){
+                String sql_u_ = "UPDATE mainCount SET count=count+? WHERE age=?";
+                SQLiteStatement statement_u_ = db.compileStatement(sql_u_);
+                statement_u_.bindLong(1, pubKeysForInsert.size());
+                statement_u_.bindLong(1, day);
+                statement_u_.executeUpdateDelete();
             }
-        }
-        /////////////////////////////////////////////////////////////////////////////
-    }
 
-    /////////TRIE//////////////////////////////////////////////////////////////////////////////////
-    public void insertNodeBlob(long file, long position, byte[] blob, String table) {
-        ContentValues cv = new ContentValues();
-        cv.put("file", file);
-        cv.put("pos", position);
-        cv.put("node", blob);
-        db.insert(table, null, cv);
-        cv.clear();
-    }
-
-    public Cursor getNodeBlobs(String table) {
-        return db.rawQuery("SELECT * FROM " + table + " AS tableNodeBlobs", null);
-    }
-
-    public Cursor getFreeSpace(long file, int recordlength) {
-        return db.rawQuery("SELECT * FROM freeSpace where space>=" + recordlength + " AND file = "+file+" ORDER BY space ASC Limit 1", null);
-    }
-
-    public Cursor getFreeSpaceWitchCompress(long file, long pos, int space) {
-        return db.rawQuery("SELECT " +
-                "freeSpace.id," +
-                " CASE WHEN " + pos + " < freeSpace.pos "+
-                " then "+
-                    pos +
-                " else " +
-                    "freeSpace.pos " +
-                " end as pos, " +
-                " CASE WHEN "+ pos + " < freeSpace.pos AND freeSpace.pos + freeSpace.space < " + (pos + space) +
-                " then " +
-                    space +
-                " else " +
-                    " CASE WHEN freeSpace.pos < " + pos + " AND freeSpace.pos + freeSpace.space  BETWEEN " + pos + " AND " + (pos + space) +
-                    " then " +
-                        (pos + space) +" - freeSpace.pos " +
-                    " else "+
-                        " freeSpace.pos + freeSpace.space - " + pos +
-                    " end " +
-                " end as space " +
-                " FROM freeSpace AS freeSpace " +
-                " where freeSpace.file = "+file+" AND((freeSpace.pos < " + pos + " AND freeSpace.pos + freeSpace.space  BETWEEN " + pos + " AND " + (pos + space) + ")"+
-                " or (" + pos + " < freeSpace.pos AND " + (pos + space) + " BETWEEN freeSpace.pos AND freeSpace.pos + freeSpace.space)" +
-                " or ("+ pos + " < freeSpace.pos AND freeSpace.pos + freeSpace.space < " + (pos + space) + ")) limit 1", null);
-    }
-
-    public void insertFreeSpaceWitchCompressTrieFile(long file, long pos, int space) {
-        ContentValues cv = new ContentValues();
-        if (pos > 2070) {
-            Cursor query = getFreeSpaceWitchCompress(file, pos, space);
-            if (query.moveToFirst()) {
-                @SuppressLint("Range") long p = query.getLong(query.getColumnIndex("pos"));
-                @SuppressLint("Range") int s = query.getInt(query.getColumnIndex("space"));
-                @SuppressLint("Range") int id = query.getInt(query.getColumnIndex("id"));
-                cv.put("pos", p);
-                cv.put("space", s);
-                // обновляем по id
-                db.update("freeSpace", cv, "id = ?",
-                        new String[]{String.valueOf(id)});
-                cv.clear();
-            } else {
-                cv.put("file", file);
-                cv.put("pos", pos);
-                cv.put("space", space);
-                db.insert("freeSpace", null, cv);
-                cv.clear();
-            }
-            query.close();
+            db.setTransactionSuccessful();
+        } catch (SQLException e) {
+            Log.d("SQLException Error:", String.valueOf(e));
+        } finally {
+            db.endTransaction();
         }
     }
 
-    public void updateFreeSpace(long file, int id, long pos, int recordLength, int space) {
-        ContentValues cv = new ContentValues();
-        if (recordLength < space) {
-            cv.put("file", file);
-            cv.put("pos", pos + recordLength);
-            cv.put("space", space - recordLength);
-            db.update("freeSpace", cv, "id = ?",
-                    new String[] {String.valueOf(id)});
-            cv.clear();
-        }
-    }
+    private void deleteOldKeys() {
+        try {
+            db.beginTransaction();
 
-    public void deleteFreeSpace(long file) {
-        db.delete("freeSpace", "file = ?", new String[] {String.valueOf(file)});
+            String sql = " DELETE FROM main WHERE age < ?";
+            SQLiteStatement statement = db.compileStatement(sql);
+            statement.bindLong(1, getDayMilliByIndex_(- maxAge));
+            statement.executeUpdateDelete();
+
+            String sql_ = " DELETE FROM mainCount WHERE age < ?";
+            SQLiteStatement statement_ = db.compileStatement(sql_);
+            statement_.bindLong(1, getDayMilliByIndex_(- maxAge));
+            statement_.executeUpdateDelete();
+
+            db.setTransactionSuccessful();
+        } catch (SQLException e) {
+            Log.d("SQLException Error:", String.valueOf(e));
+        } finally {
+            db.endTransaction();
+        }
     }
 
     /////////MyKey/////////////////////////////////////////////////////////////////////////////////
@@ -215,59 +155,52 @@ public class Core extends Application {
         query.close();
     }
 
-    /////////Sync/////////////////////////////////////////////////////////////////////////////////
-    public Cursor getSyncTable() {
-        return db.rawQuery("SELECT * FROM sync AS sync", null);
+    ////////sync///////////////////////////////////////////////////////////////////////////////////
+    public void sendMsg(byte msgType, byte[] payload) {
+        if (mClient.mListener != null && mClient.isConnected() && payload.length > 0) {
+            byte[] type = new byte[1];
+            type[0] = msgType;
+            mClient.send(Bytes.concat(type, payload));
+        }
     }
 
-    public Cursor getPrefixByPos(int index, long pos) {
-        return db.rawQuery("SELECT * FROM sync where age = "+index+" AND pos = " + pos, null);
+    public void insert(byte[] dataForInsert, int age) {
+        for (int i = 0; i < dataForInsert.length;) {
+            pubKeysForInsert.add(Utils.getBytesPart(dataForInsert, i, 20));
+            i = i + 20;
+            if(i > maxSyncPubKeyInSession * 20){
+                break;
+            }
+        }
+        insertNewKeys(age);
     }
 
-    public void addPrefixByPos(long pos, byte[] key, int age, boolean exist) {
-        ContentValues cv = new ContentValues();
-        cv.put("pos", pos);
-        cv.put("prefix", key);
-        cv.put("age", age);
-        cv.put("exist", exist ? 1 : 0);
-        db.insert("sync", null, cv);
-        cv.clear();
+    public void generateAnswer(int age) {
+
+        byte[] answer = new byte[1];
+        answer[0] = (byte) age;
+        //LIMIT row_count OFFSET offset;
+        Cursor query_ = db.rawQuery("SELECT count FROM mainCount where age ="+getDayMilliByIndex_(-age), null);
+        if(query_.getCount() == 0){
+            return;
+        }
+        query_.moveToNext();
+        int countColIndex = query_.getColumnIndex("count");
+        Long rnd = Utils.getRandomNumber(0L, query_.getLong(countColIndex));
+        query_.close();
+
+        Cursor query = db.rawQuery("SELECT pubKey FROM main where age ="+getDayMilliByIndex_(-age)
+                + " LIMIT "+ maxSyncPubKeyInSession +" OFFSET "+rnd, null);
+        int pubKeyColIndex = query.getColumnIndex("pubKey");
+        while (query.moveToNext()) {
+            answer = Bytes.concat(answer, query.getBlob(pubKeyColIndex));
+        }
+        if(answer.length > 1) {
+            sendMsg(Utils.hashs, answer);
+        }
+        query.close();
     }
 
-    public void clearTable(String table) {
-        db.delete(table, null, null);
-    }
-
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-    //intents
-    //start
-    //Trie
-
-    public void startActionGenerateAnswer(byte msgType, byte[] payload) {
-        Intent intent = new Intent(this, com.infoman.liquideconomycs.trie.ServiceIntent.class)
-                .setAction(ACTION_GENERATE_ANSWER)
-                .putExtra(EXTRA_MSG_TYPE, msgType)
-                .putExtra(EXTRA_PAYLOAD, payload);
-        Utils.startIntent(this, intent);
-    }
-
-    public void startActionFind(String master, byte[] pubKey) {
-        Intent intent = new Intent(this, com.infoman.liquideconomycs.trie.ServiceIntent.class)
-                .setAction(ACTION_FIND)
-                .putExtra(EXTRA_MASTER, master)
-                .putExtra(EXTRA_PUBKEY, pubKey);
-        Utils.startIntent(this, intent);
-    }
-
-    public void startActionInsert(byte[] pubKey, int age) {
-        Intent intent = new Intent(this, com.infoman.liquideconomycs.trie.ServiceIntent.class)
-                .setAction(ACTION_INSERT)
-                .putExtra(EXTRA_PUBKEY, pubKey)
-                .putExtra(EXTRA_AGE, age);
-        Utils.startIntent(this, intent);
-    }
-
-    //Sync
     public void startActionSync(String signalServer, String token) {
         if(provideService) {
             SharedPreferences sharedPref = getDefaultSharedPreferences(this);
@@ -282,29 +215,4 @@ public class Core extends Application {
         Utils.startIntent(this, intent);
     }
 
-    public void insertNewPubKeys() {
-        ListIterator<Pair<byte[], Integer>> itr = pubKeysForInsert.listIterator();
-        Log.d("insert New PubKeys: ", String.format("%s", pubKeysForInsert.size()));
-        while (itr.hasNext())
-            startActionInsert((byte[]) itr.next().first, (Integer) itr.next().second);
-    }
-
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-    //broadcast
-    public void broadcastActionMsg(String master, String cmd, byte[] byteArray) {
-        Intent intent = new Intent(BROADCAST_ACTION_ANSWER)
-                .putExtra(EXTRA_MASTER, master)
-                .putExtra(EXTRA_CMD, cmd)
-                .putExtra(EXTRA_ANSWER, byteArray);
-        sendBroadcast(intent);
-    }
-
-    public void broadcastActionMsg(String master, String cmd, int index, byte[] byteArray) {
-        Intent intent = new Intent(BROADCAST_ACTION_ANSWER)
-                .putExtra(EXTRA_MASTER, master)
-                .putExtra(EXTRA_CMD, cmd)
-                .putExtra(EXTRA_INDEX, index)
-                .putExtra(EXTRA_ANSWER, byteArray);
-        sendBroadcast(intent);
-    }
 }
