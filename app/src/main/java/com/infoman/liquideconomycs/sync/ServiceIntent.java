@@ -141,7 +141,7 @@ public class ServiceIntent extends IntentService {
                                 app.generateAnswer(age);
                             }else if(!app.provideService && msgType == Utils.hashs){
                                 byte[] payload = Utils.getBytesPart(data, 2, data.length - 2);
-                                app.insert(payload, getDayMilliByIndex_(-age));
+                                app.insert(payload, getDayMilliByIndex_(age));
                             }else{
                                 if(!app.provideService) {
                                     app.mClient.disconnect();

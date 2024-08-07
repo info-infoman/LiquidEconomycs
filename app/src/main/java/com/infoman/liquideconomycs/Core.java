@@ -69,35 +69,15 @@ public class Core extends Application {
     public void insertNewKeys(int day) {
         try {
             db.beginTransaction();
-            String sql = " INSERT OR IGNORE INTO main (pubKey, age) VALUES (?, ?)";
-            String sql_u = "UPDATE main SET age=? WHERE pubKey=? AND age + 0 < ? + 0";
+            String sql = " INSERT INTO main (pubKey, age) VALUES (?, ?)";
             SQLiteStatement statement = db.compileStatement(sql);
-            SQLiteStatement statement_u = db.compileStatement(sql_u);
             ListIterator<byte[]> itrv = pubKeysForInsert.listIterator();
-            while (itrv.hasNext()){
+            while (itrv.hasNext()) {
                 byte[] pubKey = itrv.next();
                 statement.bindBlob(1, pubKey); // These match to the two question marks in the sql string
                 statement.bindLong(2, day);
-                if(statement.executeInsert() == -1){
-                    statement_u.bindLong(1, day);
-                    statement_u.bindBlob(2, pubKey);
-                    statement_u.bindLong(3, day);
-                    statement_u.executeUpdateDelete();
-                }
+                statement.executeInsert();
             }
-
-            String sql_ = " INSERT OR IGNORE INTO mainCount (count, age) VALUES (?, ?)";
-            SQLiteStatement statement_ = db.compileStatement(sql_);
-            statement_.bindLong(1, pubKeysForInsert.size()); // These match to the two question marks in the sql string
-            statement_.bindLong(2, day);
-            if(statement_.executeInsert() == -1){
-                String sql_u_ = "UPDATE mainCount SET count=count+? WHERE age=?";
-                SQLiteStatement statement_u_ = db.compileStatement(sql_u_);
-                statement_u_.bindLong(1, pubKeysForInsert.size());
-                statement_u_.bindLong(1, day);
-                statement_u_.executeUpdateDelete();
-            }
-
             db.setTransactionSuccessful();
         } catch (SQLException e) {
             Log.d("SQLException Error:", String.valueOf(e));
@@ -165,6 +145,7 @@ public class Core extends Application {
     }
 
     public void insert(byte[] dataForInsert, int age) {
+        pubKeysForInsert.clear();
         for (int i = 0; i < dataForInsert.length;) {
             pubKeysForInsert.add(Utils.getBytesPart(dataForInsert, i, 20));
             i = i + 20;
@@ -172,7 +153,7 @@ public class Core extends Application {
                 break;
             }
         }
-        insertNewKeys(age);
+        insertNewKeys(-age);
     }
 
     public void generateAnswer(int age) {
@@ -186,7 +167,7 @@ public class Core extends Application {
         }
         query_.moveToNext();
         int countColIndex = query_.getColumnIndex("count");
-        Long rnd = Utils.getRandomNumber(0L, query_.getLong(countColIndex));
+        long rnd = Utils.getRandomNumber(0L, query_.getLong(countColIndex));
         query_.close();
 
         Cursor query = db.rawQuery("SELECT pubKey FROM main where age ="+getDayMilliByIndex_(-age)

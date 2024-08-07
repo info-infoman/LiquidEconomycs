@@ -60,7 +60,7 @@ public class SettingsActivity extends AppCompatActivity {
         ECKey myECKey;
         byte[] myPubKey;
         Log.d("app.test", "START");
-        for(int i=0;i<100000;i++) {
+        for(int i=0;i<10000;i++) {
             myECKey = new ECKey();
             myPubKey = myECKey.getPubKeyHash();
             if(Bytes.concat(myPubKey).length != 20){
@@ -68,7 +68,10 @@ public class SettingsActivity extends AppCompatActivity {
             }
             app.pubKeysForInsert.add(myPubKey);
         }
-        Log.d("app.test", "START INSERT %" + getDayMilliByIndex_(-0));
+        Log.d("app.test", "START INSERT " + getDayMilliByIndex_(-2));
+        app.insertNewKeys(getDayMilliByIndex_(-2));
+        Log.d("app.test", "END INSERT");
+        Log.d("app.test", "START UPDATE " + getDayMilliByIndex_(-0));
         app.insertNewKeys(getDayMilliByIndex_(-0));
         Log.d("app.test", "END UPDATE");
         /*for(int i=0;i<10000;i++) {
