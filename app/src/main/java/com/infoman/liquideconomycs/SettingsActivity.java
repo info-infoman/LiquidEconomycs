@@ -14,6 +14,8 @@ import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.preference.PreferenceFragmentCompat;
 
+import static com.infoman.liquideconomycs.Utils.getDayMilliByIndex_;
+
 public class SettingsActivity extends AppCompatActivity {
     private Core app;
 
@@ -57,23 +59,28 @@ public class SettingsActivity extends AppCompatActivity {
         Context c = getApplicationContext();
         ECKey myECKey;
         byte[] myPubKey;
-
-        /*for(int i=0;i<1000;i++) {
-            myECKey = new ECKey();
-            myPubKey = myECKey.getPubKeyHash();
-            if(Bytes.concat(myPubKey).length != 20){
-                Log.d("app.trie", "ERROR! inserted key to small");
-            }
-            app.startActionInsert(myPubKey, 2);
-        }*/
-
+        Log.d("app.test", "START");
         for(int i=0;i<10000;i++) {
             myECKey = new ECKey();
             myPubKey = myECKey.getPubKeyHash();
             if(Bytes.concat(myPubKey).length != 20){
                 Log.d("app.trie", "ERROR! inserted key to small");
             }
-            app.startActionInsert(myPubKey, 0);
+            app.pubKeysForInsert.add(myPubKey);
         }
+        Log.d("app.test", "START INSERT " + getDayMilliByIndex_(-2));
+        app.insertNewKeys(getDayMilliByIndex_(-2));
+        Log.d("app.test", "END INSERT");
+        Log.d("app.test", "START UPDATE " + getDayMilliByIndex_(-0));
+        app.insertNewKeys(getDayMilliByIndex_(-0));
+        Log.d("app.test", "END UPDATE");
+        /*for(int i=0;i<10000;i++) {
+            myECKey = new ECKey();
+            myPubKey = myECKey.getPubKeyHash();
+            if(Bytes.concat(myPubKey).length != 20){
+                Log.d("app.trie", "ERROR! inserted key to small");
+            }
+            app.startActionInsert(myPubKey, 0);
+        }*/
     }
 }

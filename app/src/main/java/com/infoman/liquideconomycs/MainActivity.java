@@ -2,10 +2,8 @@ package com.infoman.liquideconomycs;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
-import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -37,7 +35,6 @@ import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.Sha256Hash;
 import org.bitcoinj.core.SignatureDecodeException;
 
-import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import androidx.annotation.NonNull;
@@ -46,10 +43,6 @@ import androidx.core.app.ActivityCompat;
 import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentTransaction;
 
-import static com.infoman.liquideconomycs.Utils.BROADCAST_ACTION_ANSWER;
-import static com.infoman.liquideconomycs.Utils.EXTRA_ANSWER;
-import static com.infoman.liquideconomycs.Utils.EXTRA_CMD;
-import static com.infoman.liquideconomycs.Utils.EXTRA_MASTER;
 import static com.infoman.liquideconomycs.Utils.chekSig;
 import static com.infoman.liquideconomycs.Utils.hexToByte;
 import static org.bitcoinj.core.ECKey.ECDSASignature.decodeFromDER;
@@ -64,33 +57,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     private Button              startBtn;
     public TextView             resultTextView, notation, role_capture, scan_gen;
     private QRCodeReaderView    qrCodeReaderView;
-    private String[] fields;
-
-    // Перехватывает события от фоновых сервисов
-    private final BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
-        @Override public void onReceive(Context context, Intent intent) {
-        if (Objects.equals(intent.getAction(), BROADCAST_ACTION_ANSWER)) {
-            final String master = intent.getStringExtra(EXTRA_MASTER), cmd = intent.getStringExtra(EXTRA_CMD);
-            if(master.equals("Main")){
-                if(cmd.equals("Find")){
-                    final byte[] answer = intent.getByteArrayExtra(EXTRA_ANSWER);
-                    if(app.provideService){
-                        shakeIt();
-                        if(answer.length > 0) {
-                            Toast.makeText(context, getResources().getString(R.string.pubKeyFound),Toast.LENGTH_LONG).show();
-                        }else{
-                            DialogsFragment alert = new DialogsFragment(context, "MainActivity", 0);
-                            FragmentManager manager = getSupportFragmentManager();
-                            FragmentTransaction transaction = manager.beginTransaction();
-                            alert.show(transaction, "dialog");
-                        }
-                        app.startActionSync("","");
-                    }
-                }
-            }
-        }
-        }
-    };
 
     //Overrides/////////////////////////////////////////////////////////////////////////////////////
     @Override protected void onCreate(Bundle savedInstanceState) {
@@ -112,8 +78,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     requestFOREGROUND_SERVICEPermission();
                 }
-
-        registerReceiver(mBroadcastReceiver, new IntentFilter(BROADCAST_ACTION_ANSWER));
 
         Switch aSwitch = findViewById(R.id.aSwitch);
         tbResive = findViewById(R.id.tbResive);
@@ -170,7 +134,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
     @Override protected void onPause() {
         super.onPause();
-        unregisterReceiver(mBroadcastReceiver);
         stopScanner();
     }
 
@@ -178,8 +141,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         super.onResume();
         Context context = getApplicationContext();
         app = (Core) context;
-
-        registerReceiver(mBroadcastReceiver, new IntentFilter(BROADCAST_ACTION_ANSWER));
 
         stopScanner();
 
@@ -316,7 +277,18 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             else{
                 byte[] accepterPubKey = Utils.hexToByte(fields[0]);
                 if(chekSig(accepterPubKey, decodeFromDER(Utils.hexToByte(fields[1])), accepterPubKey)) {
-                        app.startActionFind("Main", ECKey.fromPublicOnly(accepterPubKey).getPubKeyHash());
+                    if(app.provideService){
+                        shakeIt();
+                        if(app.find(ECKey.fromPublicOnly(accepterPubKey).getPubKeyHash())){
+                            Toast.makeText(getApplicationContext(), getResources().getString(R.string.pubKeyFound),Toast.LENGTH_LONG).show();
+                        }else{
+                            DialogsFragment alert = new DialogsFragment(getApplicationContext(), "MainActivity", 0);
+                            FragmentManager manager = getSupportFragmentManager();
+                            FragmentTransaction transaction = manager.beginTransaction();
+                            alert.show(transaction, "dialog");
+                        }
+                        app.startActionSync("","");
+                    }
                 }
                 //TODO add uncheck msg
             }
@@ -326,7 +298,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                Toast.makeText(getApplicationContext(), getResources().getString(R.string.ErrorReceivingPartnerData),Toast.LENGTH_LONG).show();
             }else{
                 byte[] providerPubKey = hexToByte(fields[0]);
-                app.startActionInsert(ECKey.fromPublicOnly(providerPubKey).getPubKeyHash(), 0);
+                app.insert(ECKey.fromPublicOnly(providerPubKey).getPubKeyHash(), 0);
                 app.startActionSync(fields[1], fields[2]);
             }
         }

@@ -48,10 +48,5 @@
             android:enabled="true"
             android:exported="true"
             android:process=".liquideconomycs_syncServiceIntent" />
-        <service
-            android:name=".trie.ServiceIntent"
-            android:enabled="true"
-            android:exported="true"
-            android:process=".liquideconomycs_trieServiceIntent" />
     </application>
 </manifest>

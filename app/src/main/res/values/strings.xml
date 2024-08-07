@@ -32,8 +32,6 @@
     <string name="errorGetSignalServerParam">Error get signal server params</string>
     <string name="SyncFinish">Sync is finish</string>
     <string name="disconnect">Сonnection is broken</string>
-    <string name="annotation_nfc">To begin the verification and synchronization procedure - attach your device to your partner’s device</string>
-    <string name="error_nfc">Your device does not support NFC technology, use a QR code scanner to pair devices.</string>
     <string name="getINTERNETPermission">INTERNET access is required to display the INTERNET preview.</string>
     <string name="permission_is_not_available_INTERNET">Permission is not available. Requesting INTERNET permission.</string>
     <string name="getCAMERAPermission">Camera access is required to display the camera preview.</string>
@@ -45,11 +43,9 @@
     <string name="stopScan">stop scanning</string>
     <string name="maxAge">Maximum age for storing public keys</string>
     <string name="maxAge_summ">The public keys of your partners on reaching this age (in days) will be automatically deleted from the local database</string>
-    <string name="getNFCPermission">Access to NFC is required to pre-pair devices</string>
-    <string name="permission_is_not_available_NFC">Permission is not available. NFC permission request.</string>
     <string name="getFOREGROUND_SERVICEPermission">getFOREGROUND_SERVICEPermission</string>
     <string name="permission_is_not_available_FOREGROUND_SERVICE">permission_is_not_available_FOREGROUND_SERVICE</string>
     <string name="QR_generator_consumer">QR_generator_consumer</string>
-    <string name="maxSyncPubKeyInSession">Maximum number of identifiers updated at a time</string>
-    <string name="maxSyncPubKeyInSession_summ">This parameter determines the maximum number of identifiers allowed to be updated when synchronizing between people within the same session</string>
+    <string name="maxSyncPubKeyInSession">Maximum number of identifiers transmitted in one message between applications</string>
+    <string name="maxSyncPubKeyInSession_summ">In fact, this is the size of one message between applications, it is defined as follows: 20 bytes hash of the public key sum * this parameter. The number of messages is determined by the maximum storage age</string>
 </resources>

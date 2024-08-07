@@ -21,23 +21,15 @@ public class Utils {
     public static final String
         EXTRA_MASTER        = "com.infoman.liquideconomycs.extra.mster",
         EXTRA_CMD           = "com.infoman.liquideconomycs.extra.cmd",
-        ACTION_INSERT       = "com.infoman.liquideconomycs.action.insert",
-        ACTION_FIND         = "com.infoman.liquideconomycs.action.find",
-        ACTION_GENERATE_ANSWER = "com.infoman.liquideconomycs.action.getAnswer",
         ACTION_START_SYNC   = "com.infoman.liquideconomycs.action.start",
 
     //input param
         EXTRA_SIGNAL_SERVER = "com.infoman.liquideconomycs.extra.signalServer",
         EXTRA_PROVIDE_SERVICE = "com.infoman.liquideconomycs.extra.provideService",
         EXTRA_TOKEN         = "com.infoman.liquideconomycs.extra.token",
-        EXTRA_PUBKEY        = "com.infoman.liquideconomycs.extra.pubKey",
-        EXTRA_AGE           = "com.infoman.liquideconomycs.extra.age",
-        EXTRA_MSG_TYPE      = "com.infoman.liquideconomycs.extra.msgType",
-        EXTRA_PAYLOAD       = "com.infoman.liquideconomycs.extra.payload",
 
         BROADCAST_ACTION_ANSWER = "com.infoman.liquideconomycs.broadcast_action.answer",
-        EXTRA_ANSWER        = "com.infoman.liquideconomycs.extra.answer",
-        EXTRA_INDEX        = "com.infoman.liquideconomycs.extra.index";
+        EXTRA_ANSWER        = "com.infoman.liquideconomycs.extra.answer";
 
     public static byte[] getBytesPart(byte[] src, int off, int len){
         byte[] result= new byte[len];
@@ -45,33 +37,17 @@ public class Utils {
         return result;
     }
 
-    public static long compareDate(Date newDate, Date oldDate){
-        return  (newDate.getTime() - oldDate.getTime())/86400000;
-    }
-
-    public static boolean compareDate(byte[] d1, byte[] d2, long maxAge){
-        return (Utils.compareDate(Utils.reconstructAgeFromBytes(d1), Utils.reconstructAgeFromBytes(d2)) > maxAge);
-    }
-
-    public static Date reconstructAgeFromBytes(byte[] d) {
-        long timestampRecovered = ((d[0]&0xFF) << 8);
-        timestampRecovered += d[1]&0xFF;
-        timestampRecovered *= 86400000;
-        return new Date(timestampRecovered);
-    }
-
-    public static long getDayMilliByIndex(int index){
+    public static int getDayMilliByIndex_(int index){
+        int year = 0;
+        int month = 0;
+        int day = 0;
         Calendar calendar = Calendar.getInstance();
         calendar.setTime(new Date());
-        calendar.set(Calendar.HOUR_OF_DAY, 0);
-        calendar.set(Calendar.MINUTE, 0);
-        calendar.set(Calendar.SECOND, 0);
-        calendar.set(Calendar.MILLISECOND, 0);
-        return calendar.getTime().getTime()-(86400000L*index);
-    }
-
-    public static byte[] Sig(byte[] privKey, byte[] digest) {
-        return ECKey.fromPrivate(privKey).sign(Sha256Hash.wrap(Sha256Hash.hash(digest))).encodeToDER();
+        calendar.add(Calendar.DAY_OF_MONTH, index);
+        year = calendar.get(Calendar.YEAR) * 10000;
+        month = (calendar.get(Calendar.MONTH) + 1) * 100;
+        day = calendar.get(Calendar.DAY_OF_MONTH);
+        return year + month + day;
     }
 
     public static boolean chekSig(byte[] pubKey, ECKey.ECDSASignature sig, byte[] payload) throws SignatureDecodeException {
@@ -113,5 +89,10 @@ public class Utils {
         }
         context.startService(intent);
     }
+
+    public static long getRandomNumber(long min, long max) {
+        return min + (long) (Math.random() * (max - min));
+    }
+
 
 }
