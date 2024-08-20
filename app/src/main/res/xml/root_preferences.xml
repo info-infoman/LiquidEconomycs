@@ -18,7 +18,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
     <PreferenceCategory app:title="@string/sync_header">
         <EditTextPreference
-            android:defaultValue="ws://192.168.0.130:80"
+            android:defaultValue="ws://192.168.0.130:3000"
             android:key="Signal_server_URL"
             android:selectAllOnFocus="true"
             android:singleLine="true"

@@ -31,7 +31,6 @@ import static com.infoman.liquideconomycs.Utils.ACTION_START_SYNC;
 import static com.infoman.liquideconomycs.Utils.EXTRA_PROVIDE_SERVICE;
 import static com.infoman.liquideconomycs.Utils.EXTRA_SIGNAL_SERVER;
 import static com.infoman.liquideconomycs.Utils.EXTRA_TOKEN;
-import static com.infoman.liquideconomycs.Utils.getDayMilliByIndex_;
 
 public class ServiceIntent extends IntentService {
 
@@ -91,13 +90,12 @@ public class ServiceIntent extends IntentService {
                 app.dateTimeLastSync = new Date().getTime();
                 int lastIndex = 0;
                 final String TAG = "WebSocketClient";
-
+                Log.d(TAG, "start!");
                 final String signalServer = intent.getStringExtra(EXTRA_SIGNAL_SERVER),
                         token = intent.getStringExtra(EXTRA_TOKEN);
 
                 //todo sync processor
                 List<BasicNameValuePair> mExtraHeaders = Collections.singletonList(new BasicNameValuePair("Cookie", "session=abcd"));
-
 
                 app.mClient = new WebSocketClient(new WebSocketClient.Listener() {
 
@@ -110,6 +108,7 @@ public class ServiceIntent extends IntentService {
 
                     @Override
                     public void onMessage(String message) {
+                        Log.d(TAG, message);
                         if (message.equals("Completed")) {
                             //get hash of root in first trie
                             if (!app.provideService) {
@@ -141,7 +140,7 @@ public class ServiceIntent extends IntentService {
                                 app.generateAnswer(age);
                             }else if(!app.provideService && msgType == Utils.hashs){
                                 byte[] payload = Utils.getBytesPart(data, 2, data.length - 2);
-                                app.insert(payload, getDayMilliByIndex_(age));
+                                app.insert(payload, age);
                             }else{
                                 if(!app.provideService) {
                                     app.mClient.disconnect();
@@ -166,6 +165,7 @@ public class ServiceIntent extends IntentService {
                 while ((new Date().getTime() - app.dateTimeLastSync) / 1000 < 10){
 
                 }
+
                 //Таймер проверки ответов
                 while ((new Date().getTime() - app.dateTimeLastSync) / 1000 < 150 && app.mClient.isConnected()){
                     //start sync in next node trie file
@@ -180,8 +180,8 @@ public class ServiceIntent extends IntentService {
                     }
                 }
                 app.mClient.disconnect();
-                stopSelf();
                 stopForeground(true);
+                stopSelf();
             }
         }
     }

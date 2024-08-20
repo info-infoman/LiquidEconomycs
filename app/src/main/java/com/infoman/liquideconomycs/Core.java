@@ -9,6 +9,7 @@ import android.database.Cursor;
 import android.database.SQLException;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteStatement;
+import android.preference.PreferenceManager;
 import android.util.Log;
 
 import com.google.common.primitives.Bytes;
@@ -23,7 +24,6 @@ import java.util.ListIterator;
 
 import androidx.core.util.Pair;
 
-import static android.preference.PreferenceManager.getDefaultSharedPreferences;
 import static com.infoman.liquideconomycs.Utils.ACTION_START_SYNC;
 import static com.infoman.liquideconomycs.Utils.EXTRA_PROVIDE_SERVICE;
 import static com.infoman.liquideconomycs.Utils.EXTRA_SIGNAL_SERVER;
@@ -58,7 +58,12 @@ public class Core extends Application {
 
     public boolean find(byte[] pubKey){
         boolean r = false;
-        Cursor query = db.rawQuery("SELECT ONE pubKey FROM main where pubKey =" + pubKey, null);
+        String sPubKey = "x'" + Utils.byteToHex(pubKey) + "'";
+
+        String LOG_TAG = "CORE find: ";
+        Log.d(LOG_TAG, sPubKey);
+
+        Cursor query = db.rawQuery("SELECT pubKey FROM main where pubKey = " + sPubKey, null);
         if (query.moveToFirst()) {
             r = true;
         }
@@ -153,7 +158,7 @@ public class Core extends Application {
                 break;
             }
         }
-        insertNewKeys(-age);
+        insertNewKeys(getDayMilliByIndex_(-age));
     }
 
     public void generateAnswer(int age) {
@@ -161,12 +166,12 @@ public class Core extends Application {
         byte[] answer = new byte[1];
         answer[0] = (byte) age;
         //LIMIT row_count OFFSET offset;
-        Cursor query_ = db.rawQuery("SELECT count FROM mainCount where age ="+getDayMilliByIndex_(-age), null);
+        Cursor query_ = db.rawQuery("SELECT count_ FROM mainCount where age ="+getDayMilliByIndex_(-age), null);
         if(query_.getCount() == 0){
             return;
         }
         query_.moveToNext();
-        int countColIndex = query_.getColumnIndex("count");
+        int countColIndex = query_.getColumnIndex("count_");
         long rnd = Utils.getRandomNumber(0L, query_.getLong(countColIndex));
         query_.close();
 
@@ -184,7 +189,7 @@ public class Core extends Application {
 
     public void startActionSync(String signalServer, String token) {
         if(provideService) {
-            SharedPreferences sharedPref = getDefaultSharedPreferences(this);
+            SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(this);
             signalServer = sharedPref.getString("Signal_server_URL", "");
             token = sharedPref.getString("Signal_server_Token", "");
         }

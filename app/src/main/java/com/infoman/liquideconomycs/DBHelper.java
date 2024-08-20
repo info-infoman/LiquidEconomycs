@@ -39,8 +39,7 @@ public class DBHelper extends SQLiteOpenHelper {
                     "BEFORE INSERT ON main\n" +
                     "WHEN EXISTS (SELECT pubKey FROM main WHERE pubKey = NEW.pubKey AND age + 0 < NEW.age + 0)\n" +
                     "BEGIN\n" +
-                    "  UPDATE main\n" +
-                    "    SET (age) = (NEW.age)\n" +
+                    "  UPDATE main SET age = (NEW.age)\n" +
                     "    WHERE pubKey = NEW.pubKey;\n" +
                     "  INSERT INTO mainCount (age, count_) VALUES (NEW.age, 1);\n" +
                     "  SELECT raise(IGNORE);\n" +
@@ -58,10 +57,10 @@ public class DBHelper extends SQLiteOpenHelper {
                     "END;");
             db.execSQL("CREATE TRIGGER bulk_update_mainCount\n" +
                     "BEFORE INSERT ON mainCount\n" +
-                    "WHEN EXISTS (SELECT * FROM mainCount WHERE age = NEW.age)\n" +
+                    "WHEN EXISTS (SELECT age, count_ FROM mainCount WHERE age = NEW.age)\n" +
                     "BEGIN\n" +
                     "  UPDATE mainCount\n" +
-                    "    SET (count_) = (count_ + NEW.count_)\n" +
+                    "    SET count_ = (count_ + NEW.count_)\n" +
                     "    WHERE age = NEW.age;\n" +
                     "  SELECT raise(IGNORE);\n" +
                     "END;");
