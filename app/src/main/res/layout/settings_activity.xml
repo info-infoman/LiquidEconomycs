@@ -18,14 +18,6 @@
 
         </FrameLayout>
 
-        <Button
-            android:id="@+id/loadDemoPubKeys"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="LoadDemoPubKeys"
-            app:layout_constraintBottom_toBottomOf="parent"
-            tools:layout_editor_absoluteX="411dp" />
-
     </androidx.constraintlayout.widget.ConstraintLayout>
 
 </LinearLayout>

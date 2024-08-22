@@ -264,10 +264,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         qrCodeReaderView.startCamera();
     }
 
-    //Тригер чтений QR кода
-    //В случае если provideService то запускается проверка партнера на наличие в реестре
-    //Иначе стартует сервис добавления\обновления идентификатора в дерево
-    //и сервис синхронизации(останавливается по таймеру если синхронизация не начата)
     public void codeReadTrigger(String text) throws SignatureDecodeException {
         resultTextView.setText(text);
         String[] fields = Utils.parseQRString(text);
@@ -290,7 +286,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         app.startActionSync("","");
                     }
                 }
-                //TODO add uncheck msg
             }
         }else{
             shakeIt();

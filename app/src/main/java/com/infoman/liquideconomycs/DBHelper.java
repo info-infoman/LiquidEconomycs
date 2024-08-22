@@ -10,7 +10,6 @@ public class DBHelper extends SQLiteOpenHelper {
     private static final String LOG_TAG = "DBHelper: ";
 
     public DBHelper(Context context) {
-            // конструктор суперкласса
             super(context, "myDB", null, 1);
         }
 

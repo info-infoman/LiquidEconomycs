@@ -11,7 +11,6 @@ import org.bitcoinj.core.SignatureDecodeException;
 import java.util.Calendar;
 import java.util.Date;
 
-
 public class Utils {
 
     public static byte
@@ -19,17 +18,10 @@ public class Utils {
             hashs       = 1;
 
     public static final String
-        EXTRA_MASTER        = "com.infoman.liquideconomycs.extra.mster",
-        EXTRA_CMD           = "com.infoman.liquideconomycs.extra.cmd",
         ACTION_START_SYNC   = "com.infoman.liquideconomycs.action.start",
-
-    //input param
         EXTRA_SIGNAL_SERVER = "com.infoman.liquideconomycs.extra.signalServer",
         EXTRA_PROVIDE_SERVICE = "com.infoman.liquideconomycs.extra.provideService",
-        EXTRA_TOKEN         = "com.infoman.liquideconomycs.extra.token",
-
-        BROADCAST_ACTION_ANSWER = "com.infoman.liquideconomycs.broadcast_action.answer",
-        EXTRA_ANSWER        = "com.infoman.liquideconomycs.extra.answer";
+        EXTRA_TOKEN         = "com.infoman.liquideconomycs.extra.token";
 
     public static byte[] getBytesPart(byte[] src, int off, int len){
         byte[] result= new byte[len];
@@ -55,8 +47,8 @@ public class Utils {
     }
 
     public static String[] parseQRString(String str){
-        String delimeter = " "; // Разделитель
-        return str.split(delimeter); // Разделения строки str с помощью метода split()
+        String delimeter = " ";
+        return str.split(delimeter);
     }
 
     public static String byteToHex(byte[] b1) {

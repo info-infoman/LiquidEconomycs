@@ -4,7 +4,6 @@ import android.content.Context;
 import android.os.Bundle;
 import android.text.InputType;
 import android.util.Log;
-import android.widget.Button;
 
 import com.google.common.primitives.Bytes;
 
@@ -27,8 +26,8 @@ public class SettingsActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.settings_activity);
 
-        final Button loadDemo = findViewById(R.id.loadDemoPubKeys);
-        loadDemo.setOnClickListener(v -> insertDemoInTrie());
+        /*final Button loadDemo = findViewById(R.id.loadDemoPubKeys);
+        loadDemo.setOnClickListener(v -> insertDemoInTrie());*/
 
         getSupportFragmentManager()
                 .beginTransaction()
@@ -71,16 +70,5 @@ public class SettingsActivity extends AppCompatActivity {
         Log.d("app.test", "START INSERT " + getDayMilliByIndex_(-0));
         app.insertNewKeys(getDayMilliByIndex_(-0));
         Log.d("app.test", "END INSERT");
-        /*Log.d("app.test", "START UPDATE " + getDayMilliByIndex_(-0));
-        app.insertNewKeys(getDayMilliByIndex_(-0));
-        Log.d("app.test", "END UPDATE");*/
-        /*for(int i=0;i<10000;i++) {
-            myECKey = new ECKey();
-            myPubKey = myECKey.getPubKeyHash();
-            if(Bytes.concat(myPubKey).length != 20){
-                Log.d("app.trie", "ERROR! inserted key to small");
-            }
-            app.startActionInsert(myPubKey, 0);
-        }*/
     }
 }

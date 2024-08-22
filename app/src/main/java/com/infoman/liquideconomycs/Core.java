@@ -114,18 +114,12 @@ public class Core extends Application {
     }
 
     /////////MyKey/////////////////////////////////////////////////////////////////////////////////
-    public Pair getMyKey() {
-        return myKey;
-    }
-
     public void setMyKey() {
         ContentValues cv = new ContentValues();
         Cursor query = db.rawQuery("SELECT * FROM users where privKey IS NOT NULL", null);
         if (query.moveToFirst()) {
             int pubKeyColIndex = query.getColumnIndex("pubKey"), privKeyColIndex = query.getColumnIndex("privKey");
             myKey = new Pair(query.getBlob(pubKeyColIndex), query.getBlob(privKeyColIndex));
-            //update self key in trie
-
         } else {
             ECKey myECKey = new ECKey();
             byte[] myPrivKey = myECKey.getPrivKeyBytes(), myPubKey = ECKey.fromPrivate(myPrivKey).getPubKey();
@@ -133,7 +127,6 @@ public class Core extends Application {
             cv.put("pubKey", myPubKey);
             cv.put("privKey", myPrivKey);
             db.insert("users", null, cv);
-            //startActionInsert(this, "Core", myPubKey, Utils.ageToBytes());
             cv.clear();
             setMyKey();
         }

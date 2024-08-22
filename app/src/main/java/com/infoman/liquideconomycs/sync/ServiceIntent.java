@@ -116,7 +116,6 @@ public class ServiceIntent extends IntentService {
                             }
                             app.dateTimeLastSync = new Date().getTime();
                         } else {
-                            //app.broadcastActionMsg(master, "Sync", getResources().getString(R.string.onCheckTokenError));
                             app.mClient.disconnect();
                         }
                     }
@@ -134,7 +133,7 @@ public class ServiceIntent extends IntentService {
 
                         byte msgType = Utils.getBytesPart(data, 0, 1)[0];
                         int age = Utils.getBytesPart(data, 1, 1)[0];
-                        if(age <= app.maxAge){
+                        if(age <= app.maxAge && age > -1){
                             //Проверка типа сообщения
                             if (app.provideService && msgType == Utils.getHashs) {
                                 app.generateAnswer(age);
@@ -146,6 +145,8 @@ public class ServiceIntent extends IntentService {
                                     app.mClient.disconnect();
                                 }
                             }
+                        }else{
+                            app.mClient.disconnect();
                         }
                     }
 
@@ -169,7 +170,7 @@ public class ServiceIntent extends IntentService {
                 //Таймер проверки ответов
                 while ((new Date().getTime() - app.dateTimeLastSync) / 1000 < 150 && app.mClient.isConnected()){
                     //start sync in next node trie file
-                    if (!app.provideService && (new Date().getTime() - app.dateTimeLastSync) / 1000 > 10) {
+                    if (!app.provideService && (new Date().getTime() - app.dateTimeLastSync) / 1000 > 5) {
                         if(lastIndex < app.maxAge-1) {
                             lastIndex++;
                             byte[] ask = new byte[1];
