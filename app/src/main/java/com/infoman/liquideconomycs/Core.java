@@ -36,11 +36,7 @@ public class Core extends Application {
     private DBHelper dbHelper;
     private static SQLiteDatabase db;
     public static Pair myKey;
-    public WebSocketClient mClient;
-    public long dateTimeLastSync;
     public int maxAge;
-    public List<byte[]> pubKeysForInsert;
-    public boolean provideService;
     public int maxSyncPubKeyInSession;
     @Override
     public void onCreate() {
@@ -51,7 +47,6 @@ public class Core extends Application {
         maxAge = parseInt(sharedPref.getString("maxAge", "30"));
         dbHelper = new DBHelper(context);
         db = dbHelper.getWritableDatabase();
-        pubKeysForInsert = new ArrayList<>();
         setMyKey();
         deleteOldKeys();
     }
@@ -59,10 +54,6 @@ public class Core extends Application {
     public boolean find(byte[] pubKey){
         boolean r = false;
         String sPubKey = "x'" + Utils.byteToHex(pubKey) + "'";
-
-        String LOG_TAG = "CORE find: ";
-        Log.d(LOG_TAG, sPubKey);
-
         Cursor query = db.rawQuery("SELECT pubKey FROM main where pubKey = " + sPubKey, null);
         if (query.moveToFirst()) {
             r = true;
@@ -71,7 +62,7 @@ public class Core extends Application {
         return r;
     }
 
-    public void insertNewKeys(int day) {
+    public void insertNewKeys(int day, List<byte[]> pubKeysForInsert) {
         try {
             db.beginTransaction();
             String sql = " INSERT INTO main (pubKey, age) VALUES (?, ?)";
@@ -134,7 +125,7 @@ public class Core extends Application {
     }
 
     ////////sync///////////////////////////////////////////////////////////////////////////////////
-    public void sendMsg(byte msgType, byte[] payload) {
+    public void sendMsg(byte msgType, byte[] payload, WebSocketClient mClient) {
         if (mClient.mListener != null && mClient.isConnected() && payload.length > 0) {
             byte[] type = new byte[1];
             type[0] = msgType;
@@ -143,7 +134,7 @@ public class Core extends Application {
     }
 
     public void insert(byte[] dataForInsert, int age) {
-        pubKeysForInsert.clear();
+        List<byte[]> pubKeysForInsert = new ArrayList<>();
         for (int i = 0; i < dataForInsert.length;) {
             pubKeysForInsert.add(Utils.getBytesPart(dataForInsert, i, 20));
             i = i + 20;
@@ -151,36 +142,32 @@ public class Core extends Application {
                 break;
             }
         }
-        insertNewKeys(getDayMilliByIndex_(-age));
+        insertNewKeys(getDayMilliByIndex_(-age), pubKeysForInsert);
     }
 
-    public void generateAnswer(int age) {
-
+    public void generateAnswer(int age, WebSocketClient mClient) {
         byte[] answer = new byte[1];
         answer[0] = (byte) age;
         //LIMIT row_count OFFSET offset;
-        Cursor query_ = db.rawQuery("SELECT count_ FROM mainCount where age ="+getDayMilliByIndex_(-age), null);
-        if(query_.getCount() == 0){
-            return;
+        Cursor queryMainCount = db.rawQuery("SELECT count_ FROM mainCount where age ="+getDayMilliByIndex_(-age), null);
+        if(queryMainCount.moveToNext()) {
+            int countColIndex = queryMainCount.getColumnIndex("count_");
+            long rnd = Utils.getRandomNumber(0L, queryMainCount.getLong(countColIndex));
+            Cursor queryMain = db.rawQuery("SELECT pubKey FROM main where age ="+getDayMilliByIndex_(-age)
+                    + " LIMIT "+ maxSyncPubKeyInSession +" OFFSET "+rnd, null);
+            int pubKeyColIndex = queryMain.getColumnIndex("pubKey");
+            while (queryMain.moveToNext()) {
+                answer = Bytes.concat(answer, queryMain.getBlob(pubKeyColIndex));
+            }
+            if(answer.length > 1) {
+                sendMsg(Utils.hashs, answer, mClient);
+            }
+            queryMain.close();
         }
-        query_.moveToNext();
-        int countColIndex = query_.getColumnIndex("count_");
-        long rnd = Utils.getRandomNumber(0L, query_.getLong(countColIndex));
-        query_.close();
-
-        Cursor query = db.rawQuery("SELECT pubKey FROM main where age ="+getDayMilliByIndex_(-age)
-                + " LIMIT "+ maxSyncPubKeyInSession +" OFFSET "+rnd, null);
-        int pubKeyColIndex = query.getColumnIndex("pubKey");
-        while (query.moveToNext()) {
-            answer = Bytes.concat(answer, query.getBlob(pubKeyColIndex));
-        }
-        if(answer.length > 1) {
-            sendMsg(Utils.hashs, answer);
-        }
-        query.close();
+        queryMainCount.close();
     }
 
-    public void startActionSync(String signalServer, String token) {
+    public void startActionSync(String signalServer, String token, boolean provideService) {
         if(provideService) {
             SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(this);
             signalServer = sharedPref.getString("Signal_server_URL", "");
@@ -193,5 +180,4 @@ public class Core extends Application {
                 .putExtra(EXTRA_PROVIDE_SERVICE, provideService);
         Utils.startIntent(this, intent);
     }
-
 }

@@ -81,14 +81,16 @@ public class ServiceIntent extends IntentService {
     @Override
     protected void onHandleIntent(Intent intent) {
         String action = null;
+        WebSocketClient mClient = null;
+        final long[] dateTimeLastSync = {0L};
         if (intent != null) {
             action = intent.getAction();
             if (ACTION_START_SYNC.equals(action) /*&& !app.isSynchronized*/) {
 
-                app.provideService = intent.getBooleanExtra(EXTRA_PROVIDE_SERVICE, true);
+                boolean provideService = intent.getBooleanExtra(EXTRA_PROVIDE_SERVICE, true);
 
-                app.dateTimeLastSync = new Date().getTime();
-                int lastIndex = 0;
+                dateTimeLastSync[0] = new Date().getTime();
+                final int[] lastIndex = {0};
                 final String TAG = "WebSocketClient";
                 Log.d(TAG, "start!");
                 final String signalServer = intent.getStringExtra(EXTRA_SIGNAL_SERVER),
@@ -97,13 +99,14 @@ public class ServiceIntent extends IntentService {
                 //todo sync processor
                 List<BasicNameValuePair> mExtraHeaders = Collections.singletonList(new BasicNameValuePair("Cookie", "session=abcd"));
 
-                app.mClient = new WebSocketClient(new WebSocketClient.Listener() {
+                WebSocketClient finalMClient = mClient;
+                mClient = new WebSocketClient(new WebSocketClient.Listener() {
 
                     @Override
                     public void onConnect() {
                         Log.d(TAG, "Connected!");
                         //first send information about as for signal server
-                        app.mClient.send(token);
+                        finalMClient.send(token);
                     }
 
                     @Override
@@ -111,12 +114,12 @@ public class ServiceIntent extends IntentService {
                         Log.d(TAG, message);
                         if (message.equals("Completed")) {
                             //get hash of root in first trie
-                            if (!app.provideService) {
-                                app.sendMsg(Utils.getHashs, new byte[1]);
+                            if (!provideService) {
+                                app.sendMsg(Utils.getHashs, new byte[1], finalMClient);
                             }
-                            app.dateTimeLastSync = new Date().getTime();
+                            dateTimeLastSync[0] = new Date().getTime();
                         } else {
-                            app.mClient.disconnect();
+                            finalMClient.disconnect();
                         }
                     }
 
@@ -124,10 +127,10 @@ public class ServiceIntent extends IntentService {
                     @Override
                     public void onMessage(byte[] data) {
                         Log.d(TAG, String.format("Got binary message! %s", Arrays.toString(data)));
-                        app.dateTimeLastSync = new Date().getTime();
+                        dateTimeLastSync[0] = new Date().getTime();
 
-                        if(!app.provideService && data.length < 21 || app.provideService && data.length < 2) {
-                            app.mClient.disconnect();
+                        if(!provideService && data.length < 21 || provideService && data.length < 2) {
+                            finalMClient.disconnect();
                             return;
                         }
 
@@ -135,18 +138,18 @@ public class ServiceIntent extends IntentService {
                         int age = Utils.getBytesPart(data, 1, 1)[0];
                         if(age <= app.maxAge && age > -1){
                             //Проверка типа сообщения
-                            if (app.provideService && msgType == Utils.getHashs) {
-                                app.generateAnswer(age);
-                            }else if(!app.provideService && msgType == Utils.hashs){
+                            if (provideService && msgType == Utils.getHashs) {
+                                app.generateAnswer(age, finalMClient);
+                            }else if(!provideService && msgType == Utils.hashs){
                                 byte[] payload = Utils.getBytesPart(data, 2, data.length - 2);
                                 app.insert(payload, age);
                             }else{
-                                if(!app.provideService) {
-                                    app.mClient.disconnect();
+                                if(!provideService) {
+                                    finalMClient.disconnect();
                                 }
                             }
                         }else{
-                            app.mClient.disconnect();
+                            finalMClient.disconnect();
                         }
                     }
 
@@ -161,28 +164,28 @@ public class ServiceIntent extends IntentService {
 
                 }, mExtraHeaders);
 
-                app.mClient.connect(URI.create(signalServer));
+                mClient.connect(URI.create(signalServer));
 
-                while ((new Date().getTime() - app.dateTimeLastSync) / 1000 < 10){
+                while ((new Date().getTime() - dateTimeLastSync[0]) / 1000 < 10){
 
                 }
 
                 //Таймер проверки ответов
-                while ((new Date().getTime() - app.dateTimeLastSync) / 1000 < 150 && app.mClient.isConnected()){
+                while ((new Date().getTime() - dateTimeLastSync[0]) / 1000 < 150 && mClient.isConnected()){
                     //start sync in next node trie file
-                    if (!app.provideService && (new Date().getTime() - app.dateTimeLastSync) / 1000 > 5) {
-                        if(lastIndex < app.maxAge-1) {
-                            lastIndex++;
+                    if (!provideService && (new Date().getTime() - dateTimeLastSync[0]) / 1000 > 5) {
+                        if(lastIndex[0] < app.maxAge-1) {
+                            lastIndex[0]++;
                             byte[] ask = new byte[1];
-                            ask[0] = (byte) lastIndex;
-                            app.sendMsg(Utils.getHashs, ask);
-                            app.dateTimeLastSync = new Date().getTime();
+                            ask[0] = (byte) lastIndex[0];
+                            app.sendMsg(Utils.getHashs, ask, mClient);
+                            dateTimeLastSync[0] = new Date().getTime();
                         }
                     }
                 }
-                app.mClient.disconnect();
-                stopForeground(true);
-                stopSelf();
+                mClient.disconnect();
+                //stopForeground(true);
+                //stopSelf();
             }
         }
     }

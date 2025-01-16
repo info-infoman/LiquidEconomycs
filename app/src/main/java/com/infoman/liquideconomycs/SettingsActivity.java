@@ -5,9 +5,10 @@ import android.os.Bundle;
 import android.text.InputType;
 import android.util.Log;
 
-import com.google.common.primitives.Bytes;
-
 import org.bitcoinj.core.ECKey;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
@@ -55,20 +56,15 @@ public class SettingsActivity extends AppCompatActivity {
     }
 
     private void insertDemoInTrie(){
+        List<byte[]> pubKeysForInsert = new ArrayList<>();
         Context c = getApplicationContext();
         ECKey myECKey;
         byte[] myPubKey;
-        Log.d("app.test", "START");
         for(int i=0;i<1000;i++) {
             myECKey = new ECKey();
             myPubKey = myECKey.getPubKeyHash();
-            if(Bytes.concat(myPubKey).length != 20){
-                Log.d("app.trie", "ERROR! inserted key to small");
-            }
-            app.pubKeysForInsert.add(myPubKey);
+            pubKeysForInsert.add(myPubKey);
         }
-        Log.d("app.test", "START INSERT " + getDayMilliByIndex_(-0));
-        app.insertNewKeys(getDayMilliByIndex_(-0));
-        Log.d("app.test", "END INSERT");
+        app.insertNewKeys(getDayMilliByIndex_(-0), pubKeysForInsert);
     }
 }

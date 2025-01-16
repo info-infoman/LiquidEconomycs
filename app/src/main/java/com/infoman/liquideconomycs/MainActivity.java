@@ -57,6 +57,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     private Button              startBtn;
     public TextView             resultTextView, notation, role_capture, scan_gen;
     private QRCodeReaderView    qrCodeReaderView;
+    private boolean             provideService;
 
     //Overrides/////////////////////////////////////////////////////////////////////////////////////
     @Override protected void onCreate(Bundle savedInstanceState) {
@@ -95,13 +96,13 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             if(isChecked){
                 tbResive.setChecked(false);
                 tbMade.setChecked(true);
-                app.provideService = true;
+                provideService = true;
                 role_capture.setText(getResources().getString(R.string.Provide_service));
-                app.startActionSync("", "");
+                app.startActionSync("", "", true);
             }else{
                 tbResive.setChecked(true);
                 tbMade.setChecked(false);
-                app.provideService = false;
+                provideService = false;
                 role_capture.setText(getResources().getString(R.string.Accept_service));
             }
             role_capture.startAnimation(AnimationUtils.loadAnimation(getApplicationContext(),
@@ -123,7 +124,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             }
         });
 
-        app.provideService = false;
+        provideService = false;
         role_capture.setText(getResources().getString(R.string.Accept_service));
         stopScanner();
     }
@@ -144,8 +145,8 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
         stopScanner();
 
-        if(app.provideService){
-            app.startActionSync("","");
+        if(provideService){
+            app.startActionSync("","", true);
         }
     }
 
@@ -267,24 +268,22 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     public void codeReadTrigger(String text) throws SignatureDecodeException {
         resultTextView.setText(text);
         String[] fields = Utils.parseQRString(text);
-        if(app.provideService){
+        if(provideService){
             if(fields.length != 2 || fields[1].equals("") || fields[0].equals("")) {
                 Toast.makeText(getApplicationContext(), getResources().getString(R.string.ErrorReceivingPartnerData), Toast.LENGTH_LONG).show();}
             else{
                 byte[] accepterPubKey = Utils.hexToByte(fields[0]);
                 if(chekSig(accepterPubKey, decodeFromDER(Utils.hexToByte(fields[1])), accepterPubKey)) {
-                    if(app.provideService){
-                        shakeIt();
-                        if(app.find(ECKey.fromPublicOnly(accepterPubKey).getPubKeyHash())){
-                            Toast.makeText(getApplicationContext(), getResources().getString(R.string.pubKeyFound),Toast.LENGTH_LONG).show();
-                        }else{
-                            DialogsFragment alert = new DialogsFragment(getApplicationContext(), "MainActivity", 0);
-                            FragmentManager manager = getSupportFragmentManager();
-                            FragmentTransaction transaction = manager.beginTransaction();
-                            alert.show(transaction, "dialog");
-                        }
-                        app.startActionSync("","");
+                    shakeIt();
+                    if(app.find(ECKey.fromPublicOnly(accepterPubKey).getPubKeyHash())){
+                        Toast.makeText(getApplicationContext(), getResources().getString(R.string.pubKeyFound),Toast.LENGTH_LONG).show();
+                    }else{
+                        DialogsFragment alert = new DialogsFragment(getApplicationContext(), "MainActivity", 0);
+                        FragmentManager manager = getSupportFragmentManager();
+                        FragmentTransaction transaction = manager.beginTransaction();
+                        alert.show(transaction, "dialog");
                     }
+                    app.startActionSync("","", provideService);
                 }
             }
         }else{
@@ -294,7 +293,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             }else{
                 byte[] providerPubKey = hexToByte(fields[0]);
                 app.insert(ECKey.fromPublicOnly(providerPubKey).getPubKeyHash(), 0);
-                app.startActionSync(fields[1], fields[2]);
+                app.startActionSync(fields[1], fields[2], provideService);
             }
         }
     }
@@ -328,14 +327,14 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         ImageView img = findViewById(R.id.image);
         assert app.myKey.first != null;
         String msg = Utils.byteToHex((byte[]) app.myKey.first)+" ";
-        if(!app.provideService) {
+        if(!provideService) {
             //generate QR msg = pubKey & sig digest from pubKey
             assert app.myKey.second != null;
             msg = msg + Utils.byteToHex(ECKey.fromPrivate((byte[]) app.myKey.second).sign(Sha256Hash.wrap(Sha256Hash.hash((byte[]) app.myKey.first))).encodeToDER());
 
         }
 
-        if (app.provideService) {
+        if (provideService) {
             SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
             String signalServer = sharedPref.getString("Signal_server_URL", ""), token = sharedPref.getString("Signal_server_Token", "");
             assert signalServer != null;
