@@ -162,12 +162,10 @@ public class Core extends Application {
             while (queryMain.moveToNext()) {
                 answer = Bytes.concat(answer, queryMain.getBlob(pubKeyColIndex));
             }
-            if(answer.length > 1) {
-                sendMsg(Utils.hashs, answer, mClient);
-            }
             queryMain.close();
         }
         queryMainCount.close();
+        sendMsg(Utils.hashs, answer, mClient);
     }
 
     public String startActionSync(String signalServer, String token, boolean provideService) {
@@ -195,7 +193,7 @@ public class Core extends Application {
     private String getSyncServer() {
         String res = "";
         Cursor query = db.rawQuery("SELECT server FROM syncServers where ("
-                + new Date().getTime() + " - dateTimeLastSync) / 1000 < 150", null);
+                + new Date().getTime() + " - dateTimeLastSync) / 1000 < 60", null);
         int countColIndex = query.getColumnIndex("server");
         if(query.moveToNext()) {
             res = query.getString(countColIndex);

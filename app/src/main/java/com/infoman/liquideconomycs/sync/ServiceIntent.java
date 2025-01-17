@@ -121,8 +121,7 @@ public class ServiceIntent extends IntentService {
                         Log.d(TAG, String.format("Got binary message! %s", Arrays.toString(data)));
                         boolean success = true;
 
-                        if(!provideService && data.length < 21 || provideService && data.length < 2) {
-                            finalMClient.disconnect();
+                        if(data.length < 2) {
                             return;
                         }
 
@@ -133,8 +132,16 @@ public class ServiceIntent extends IntentService {
                             if (provideService && msgType == Utils.getHashs) {
                                 app.generateAnswer(age, finalMClient);
                             }else if(!provideService && msgType == Utils.hashs && lastIndex[0] == age){
-                                byte[] payload = Utils.getBytesPart(data, 2, data.length - 2);
-                                app.insert(payload, age);
+                                if(data.length >= 22) {
+                                    byte[] payload = Utils.getBytesPart(data, 2, data.length - 2);
+                                    app.insert(payload, age);
+                                }
+                                if(lastIndex[0] < app.maxAge-1) {
+                                    lastIndex[0]++;
+                                    byte[] ask = new byte[1];
+                                    ask[0] = (byte) lastIndex[0];
+                                    app.sendMsg(Utils.getHashs, ask, finalMClient);
+                                }
                             }else{
                                 success = false;
                             }
@@ -144,8 +151,6 @@ public class ServiceIntent extends IntentService {
                                 app.insertOrUpdateSyncServer(signalServerHost);
                             }
 
-                        }else{
-                            finalMClient.disconnect();
                         }
                     }
 
@@ -162,27 +167,11 @@ public class ServiceIntent extends IntentService {
 
                 mClient.connect(URI.create(signalServer));
 
-                while ((new Date().getTime() - dateTimeLastSync[0]) / 1000 < 10){
-                    //timer for connect 10s
+                while ((new Date().getTime() - dateTimeLastSync[0]) / 1000 < 60){
+                    //timer for connect&msg 60s
                 }
 
-                while ((new Date().getTime() - dateTimeLastSync[0]) / 1000 < 150 && mClient.isConnected()){
-                    //timer for msg 150s
-                    if (!provideService && (new Date().getTime() - dateTimeLastSync[0]) / 1000 > 5) {
-                        //every 5s ask new get hashs msg
-                        if(lastIndex[0] < app.maxAge-1) {
-                            lastIndex[0]++;
-                            byte[] ask = new byte[1];
-                            ask[0] = (byte) lastIndex[0];
-                            app.sendMsg(Utils.getHashs, ask, mClient);
-                            dateTimeLastSync[0] = new Date().getTime();
-                            app.insertOrUpdateSyncServer(signalServerHost);
-                        }
-                    }
-                }
                 mClient.disconnect();
-                //stopForeground(true);
-                //stopSelf();
             }
         }
     }
