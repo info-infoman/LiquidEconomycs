@@ -180,7 +180,7 @@ public class Core extends Application {
                 serverIsStarted = false;
             }
         }
-        if(serverIsStarted) {
+        if(!serverIsStarted && !Objects.equals(signalServer, "")) {
             Intent intent = new Intent(this, ServiceIntent.class)
                     .setAction(ACTION_START_SYNC)
                     .putExtra(EXTRA_SIGNAL_SERVER, signalServer)
@@ -193,19 +193,19 @@ public class Core extends Application {
 
     private String getSyncServer() {
         String res = "";
-        Cursor queryStartedServer = db.rawQuery("SELECT server FROM syncServers where ("
+        Cursor query = db.rawQuery("SELECT server FROM syncServers where ("
                 + new Date().getTime() + " - dateTimeLastSync) / 1000 < 150", null);
-        int countColIndex = queryStartedServer.getColumnIndex("server");
-        if(queryStartedServer.moveToNext()) {
-            res = queryStartedServer.getString(countColIndex);
+        int countColIndex = query.getColumnIndex("server");
+        if(query.moveToNext()) {
+            res = query.getString(countColIndex);
         }else{
-            queryStartedServer = db.rawQuery("SELECT server FROM syncServers " +
+            query = db.rawQuery("SELECT server FROM syncServers " +
                     "ORDER BY dateTimeLastSync DESC", null);
-            if(queryStartedServer.moveToNext()) {
-                res = queryStartedServer.getString(countColIndex);
+            if(query.moveToNext()) {
+                res = query.getString(countColIndex);
             }
         }
-        queryStartedServer.close();
+        query.close();
         return res;
     }
 
