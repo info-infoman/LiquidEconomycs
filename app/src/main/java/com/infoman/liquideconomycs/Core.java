@@ -168,45 +168,56 @@ public class Core extends Application {
         sendMsg(Utils.hashs, answer, mClient);
     }
 
-    public String startActionSync(String signalServer, String token, boolean provideService) {
-        boolean serverIsStarted = true;
+    public String startActionSync(String server, String token, boolean provideService) {
+        boolean serverIsStarted = false;
         if(provideService) {
-            Pair server = getSyncServer();
-            signalServer = (String) server.first;
-            if(Objects.equals(signalServer, "")) {
-                SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(this);
-                signalServer = sharedPref.getString("Signal_server_URL", "");
-                insertOrUpdateSyncServer(signalServer);
-                serverIsStarted = (boolean) server.second;
-            }
+            //get def server
+            SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(this);
+            String defServer = sharedPref.getString("Signal_server_URL", "");
+            Pair serverState = getSyncServer(defServer);
+            server = (String) serverState.first;
+            insertOrUpdateSyncServer(server);
+            serverIsStarted = (boolean) serverState.second;
         }
-        if(!serverIsStarted  && !Objects.equals(signalServer, "")) {
+        if(!serverIsStarted  && !Objects.equals(server, "")) {
             Intent intent = new Intent(this, ServiceIntent.class)
                     .setAction(ACTION_START_SYNC)
-                    .putExtra(EXTRA_SIGNAL_SERVER, signalServer)
+                    .putExtra(EXTRA_SIGNAL_SERVER, server)
                     .putExtra(EXTRA_TOKEN, token)
                     .putExtra(EXTRA_PROVIDE_SERVICE, provideService);
             Utils.startIntent(this, intent);
         }
-        return signalServer;
+        return server;
     }
 
-    private Pair getSyncServer() {
-        Pair res = null;
-        Cursor query = db.rawQuery("SELECT server FROM syncServers where ("
+    /* get defServer state if defServer is set
+    or get any connected server if defServer not connected
+    or last active server if defServer is't set*/
+    private Pair getSyncServer(String server) {
+        boolean isConnected = false;
+        Cursor query = db.rawQuery("SELECT server FROM syncServers where (server = "+ server +" AND "
                 + new Date().getTime() + " - dateTimeLastSync) / 1000 < 60", null);
         int countColIndex = query.getColumnIndex("server");
         if(query.moveToNext()) {
-            res = new Pair(query.getString(countColIndex), true);
-        }else{
-            query = db.rawQuery("SELECT server FROM syncServers " +
-                    "ORDER BY dateTimeLastSync DESC", null);
-            if(query.moveToNext()) {
-                res = new Pair(query.getString(countColIndex), false);
+            server = query.getString(countColIndex);
+            isConnected = true;
+        }else {
+            query = db.rawQuery("SELECT server FROM syncServers where ("
+                    + new Date().getTime() + " - dateTimeLastSync) / 1000 < 60", null);
+            countColIndex = query.getColumnIndex("server");
+            if (query.moveToNext()) {
+                server = query.getString(countColIndex);
+                isConnected = true;
+            } else if(Objects.equals(server, "")) {
+                query = db.rawQuery("SELECT server FROM syncServers " +
+                        "ORDER BY dateTimeLastSync DESC", null);
+                if (query.moveToNext()) {
+                    server = query.getString(countColIndex);
+                }
             }
         }
         query.close();
-        return res;
+        return new Pair(server, isConnected);
     }
 
     public void insertOrUpdateSyncServer(String signalServer) {
