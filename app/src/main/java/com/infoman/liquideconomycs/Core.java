@@ -172,11 +172,11 @@ public class Core extends Application {
     public String startActionSync(String signalServer, String token, boolean provideService) {
         boolean serverIsStarted = true;
         if(provideService) {
-            signalServer = getStartedServer();
+            signalServer = getSyncServer();
             if(Objects.equals(signalServer, "")) {
                 SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(this);
                 signalServer = sharedPref.getString("Signal_server_URL", "");
-                insertNewSyncServer(signalServer);
+                insertOrUpdateSyncServer(signalServer);
                 serverIsStarted = false;
             }
         }
@@ -191,41 +191,31 @@ public class Core extends Application {
         return signalServer;
     }
 
-    private String getStartedServer() {
+    private String getSyncServer() {
         String res = "";
         Cursor queryStartedServer = db.rawQuery("SELECT server FROM syncServers where ("
                 + new Date().getTime() + " - dateTimeLastSync) / 1000 < 150", null);
+        int countColIndex = queryStartedServer.getColumnIndex("server");
         if(queryStartedServer.moveToNext()) {
-            int countColIndex = queryStartedServer.getColumnIndex("server");
             res = queryStartedServer.getString(countColIndex);
+        }else{
+            queryStartedServer = db.rawQuery("SELECT server FROM syncServers " +
+                    "ORDER BY dateTimeLastSync DESC", null);
+            if(queryStartedServer.moveToNext()) {
+                res = queryStartedServer.getString(countColIndex);
+            }
         }
         queryStartedServer.close();
         return res;
     }
 
-    private void insertNewSyncServer(String signalServer) {
+    public void insertOrUpdateSyncServer(String signalServer) {
         try {
             db.beginTransaction();
             String sql = " INSERT INTO syncServers (server, dateTimeLastSync) VALUES (?, ?)";
             SQLiteStatement statement = db.compileStatement(sql);
             statement.bindString(1, signalServer); // These match to the two question marks in the sql string
             statement.bindLong(2, new Date().getTime());
-            statement.executeInsert();
-            db.setTransactionSuccessful();
-        } catch (SQLException e) {
-            Log.d("SQLException Error:", String.valueOf(e));
-        } finally {
-            db.endTransaction();
-        }
-    }
-
-    public void setDateTimeLastSync(String server, long dateTimeLastSync){
-        try {
-            db.beginTransaction();
-            String sql = " UPDATE syncServers SET dateTimeLastSync = ? WHERE server = ? ";
-            SQLiteStatement statement = db.compileStatement(sql);
-            statement.bindString(2, server); // These match to the two question marks in the sql string
-            statement.bindLong(1, dateTimeLastSync);
             statement.executeInsert();
             db.setTransactionSuccessful();
         } catch (SQLException e) {

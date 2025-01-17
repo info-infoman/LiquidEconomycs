@@ -108,9 +108,8 @@ public class ServiceIntent extends IntentService {
                         dateTimeLastSync[0] = new Date().getTime();
                         if (!provideService) {
                             app.sendMsg(Utils.getHashs, new byte[1], finalMClient);
-                        }else{
-                            app.setDateTimeLastSync(signalServerHost, dateTimeLastSync[0]);
                         }
+                        app.insertOrUpdateSyncServer(signalServerHost);
                     }
 
                     @Override
@@ -121,6 +120,7 @@ public class ServiceIntent extends IntentService {
                     public void onMessage(byte[] data) {
                         Log.d(TAG, String.format("Got binary message! %s", Arrays.toString(data)));
                         dateTimeLastSync[0] = new Date().getTime();
+                        app.insertOrUpdateSyncServer(signalServerHost);
 
                         if(!provideService && data.length < 21 || provideService && data.length < 2) {
                             finalMClient.disconnect();
@@ -132,7 +132,6 @@ public class ServiceIntent extends IntentService {
                         if(age <= app.maxAge && age > -1){
                             //Проверка типа сообщения
                             if (provideService && msgType == Utils.getHashs) {
-                                app.setDateTimeLastSync(signalServerHost, dateTimeLastSync[0]);
                                 app.generateAnswer(age, finalMClient);
                             }else if(!provideService && msgType == Utils.hashs){
                                 byte[] payload = Utils.getBytesPart(data, 2, data.length - 2);
@@ -174,6 +173,7 @@ public class ServiceIntent extends IntentService {
                             ask[0] = (byte) lastIndex[0];
                             app.sendMsg(Utils.getHashs, ask, mClient);
                             dateTimeLastSync[0] = new Date().getTime();
+                            app.insertOrUpdateSyncServer(signalServerHost);
                         }
                     }
                 }

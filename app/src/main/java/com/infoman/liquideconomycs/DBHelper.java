@@ -20,6 +20,15 @@ public class DBHelper extends SQLiteOpenHelper {
                     + "id integer primary key autoincrement,"
                     + "server String,"
                     + "dateTimeLastSync Long" + ");");
+            db.execSQL("CREATE TRIGGER bulk_update_syncServers\n" +
+                    "BEFORE INSERT ON syncServers\n" +
+                    "WHEN EXISTS (SELECT server, dateTimeLastSync FROM syncServers WHERE server = NEW.server)\n" +
+                    "BEGIN\n" +
+                    "  UPDATE syncServers\n" +
+                    "    SET dateTimeLastSync = NEW.dateTimeLastSync\n" +
+                    "    WHERE server = NEW.server;\n" +
+                    "  SELECT raise(IGNORE);\n" +
+                    "END;");
             db.execSQL("create table users ("
                     + "id integer primary key autoincrement,"
                     + "pubKey BLOB,"
