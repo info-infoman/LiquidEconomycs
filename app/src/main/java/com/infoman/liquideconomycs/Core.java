@@ -171,15 +171,16 @@ public class Core extends Application {
     public String startActionSync(String signalServer, String token, boolean provideService) {
         boolean serverIsStarted = true;
         if(provideService) {
-            signalServer = getSyncServer();
+            Pair server = getSyncServer();
+            signalServer = (String) server.first;
             if(Objects.equals(signalServer, "")) {
                 SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(this);
                 signalServer = sharedPref.getString("Signal_server_URL", "");
                 insertOrUpdateSyncServer(signalServer);
-                serverIsStarted = false;
+                serverIsStarted = (boolean) server.second;
             }
         }
-        if(!serverIsStarted && !Objects.equals(signalServer, "")) {
+        if(!serverIsStarted  && !Objects.equals(signalServer, "")) {
             Intent intent = new Intent(this, ServiceIntent.class)
                     .setAction(ACTION_START_SYNC)
                     .putExtra(EXTRA_SIGNAL_SERVER, signalServer)
@@ -190,18 +191,18 @@ public class Core extends Application {
         return signalServer;
     }
 
-    private String getSyncServer() {
-        String res = "";
+    private Pair getSyncServer() {
+        Pair res = null;
         Cursor query = db.rawQuery("SELECT server FROM syncServers where ("
                 + new Date().getTime() + " - dateTimeLastSync) / 1000 < 60", null);
         int countColIndex = query.getColumnIndex("server");
         if(query.moveToNext()) {
-            res = query.getString(countColIndex);
+            res = new Pair(query.getString(countColIndex), true);
         }else{
             query = db.rawQuery("SELECT server FROM syncServers " +
                     "ORDER BY dateTimeLastSync DESC", null);
             if(query.moveToNext()) {
-                res = query.getString(countColIndex);
+                res = new Pair(query.getString(countColIndex), false);
             }
         }
         query.close();
