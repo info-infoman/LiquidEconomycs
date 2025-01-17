@@ -119,8 +119,7 @@ public class ServiceIntent extends IntentService {
                     @Override
                     public void onMessage(byte[] data) {
                         Log.d(TAG, String.format("Got binary message! %s", Arrays.toString(data)));
-                        dateTimeLastSync[0] = new Date().getTime();
-                        app.insertOrUpdateSyncServer(signalServerHost);
+                        boolean success = true;
 
                         if(!provideService && data.length < 21 || provideService && data.length < 2) {
                             finalMClient.disconnect();
@@ -130,17 +129,21 @@ public class ServiceIntent extends IntentService {
                         byte msgType = Utils.getBytesPart(data, 0, 1)[0];
                         int age = Utils.getBytesPart(data, 1, 1)[0];
                         if(age <= app.maxAge && age > -1){
-                            //Проверка типа сообщения
+
                             if (provideService && msgType == Utils.getHashs) {
                                 app.generateAnswer(age, finalMClient);
-                            }else if(!provideService && msgType == Utils.hashs){
+                            }else if(!provideService && msgType == Utils.hashs && lastIndex[0] == age){
                                 byte[] payload = Utils.getBytesPart(data, 2, data.length - 2);
                                 app.insert(payload, age);
                             }else{
-                                if(!provideService) {
-                                    finalMClient.disconnect();
-                                }
+                                success = false;
                             }
+
+                            if(success){
+                                dateTimeLastSync[0] = new Date().getTime();
+                                app.insertOrUpdateSyncServer(signalServerHost);
+                            }
+
                         }else{
                             finalMClient.disconnect();
                         }
@@ -194,7 +197,8 @@ public class ServiceIntent extends IntentService {
         String name = "Service: liquideconomycs SyncServiceIntent ";
         int importance = NotificationManager.IMPORTANCE_LOW;
 
-        NotificationChannel mChannel = new NotificationChannel("Service: liquideconomycs SyncServiceIntent", name, importance);
+        NotificationChannel mChannel = new NotificationChannel(
+                "Service: liquideconomycs SyncServiceIntent", name, importance);
 
         mChannel.enableLights(true);
         mChannel.setLightColor(Color.BLUE);

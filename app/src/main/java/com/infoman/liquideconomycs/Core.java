@@ -151,7 +151,8 @@ public class Core extends Application {
         byte[] answer = new byte[1];
         answer[0] = (byte) age;
         //LIMIT row_count OFFSET offset;
-        Cursor queryMainCount = db.rawQuery("SELECT count_ FROM mainCount where age ="+getDayMilliByIndex_(-age), null);
+        Cursor queryMainCount = db.rawQuery("SELECT count_ FROM mainCount " +
+                "where age ="+getDayMilliByIndex_(-age), null);
         if(queryMainCount.moveToNext()) {
             int countColIndex = queryMainCount.getColumnIndex("count_");
             long rnd = Utils.getRandomNumber(0L, queryMainCount.getLong(countColIndex));
