@@ -93,35 +93,28 @@ public class ServiceIntent extends IntentService {
                 final int[] lastIndex = {0};
                 final String TAG = "WebSocketClient";
                 Log.d(TAG, "start!");
-                final String signalServer = intent.getStringExtra(EXTRA_SIGNAL_SERVER),
-                        token = intent.getStringExtra(EXTRA_TOKEN);
+                final String signalServerHost = intent.getStringExtra(EXTRA_SIGNAL_SERVER),
+                signalServer = signalServerHost + "?chatRoom=" + intent.getStringExtra(EXTRA_TOKEN);
 
                 //todo sync processor
-                List<BasicNameValuePair> mExtraHeaders = Collections.singletonList(new BasicNameValuePair("Cookie", "session=abcd"));
+                List<BasicNameValuePair> mExtraHeaders = Collections.singletonList(
+                        new BasicNameValuePair("Cookie", "session=abcd"));
 
                 WebSocketClient finalMClient = mClient;
                 mClient = new WebSocketClient(new WebSocketClient.Listener() {
 
                     @Override
                     public void onConnect() {
-                        Log.d(TAG, "Connected!");
-                        //first send information about as for signal server
-                        finalMClient.send(token);
+                        dateTimeLastSync[0] = new Date().getTime();
+                        if (!provideService) {
+                            app.sendMsg(Utils.getHashs, new byte[1], finalMClient);
+                        }else{
+                            app.setDateTimeLastSync(signalServerHost, dateTimeLastSync[0]);
+                        }
                     }
 
                     @Override
-                    public void onMessage(String message) {
-                        Log.d(TAG, message);
-                        if (message.equals("Completed")) {
-                            //get hash of root in first trie
-                            if (!provideService) {
-                                app.sendMsg(Utils.getHashs, new byte[1], finalMClient);
-                            }
-                            dateTimeLastSync[0] = new Date().getTime();
-                        } else {
-                            finalMClient.disconnect();
-                        }
-                    }
+                    public void onMessage(String message) {}
 
                     @SuppressLint("Range")
                     @Override
@@ -139,6 +132,7 @@ public class ServiceIntent extends IntentService {
                         if(age <= app.maxAge && age > -1){
                             //Проверка типа сообщения
                             if (provideService && msgType == Utils.getHashs) {
+                                app.setDateTimeLastSync(signalServerHost, dateTimeLastSync[0]);
                                 app.generateAnswer(age, finalMClient);
                             }else if(!provideService && msgType == Utils.hashs){
                                 byte[] payload = Utils.getBytesPart(data, 2, data.length - 2);
@@ -167,13 +161,13 @@ public class ServiceIntent extends IntentService {
                 mClient.connect(URI.create(signalServer));
 
                 while ((new Date().getTime() - dateTimeLastSync[0]) / 1000 < 10){
-
+                    //timer for connect 10s
                 }
 
-                //Таймер проверки ответов
                 while ((new Date().getTime() - dateTimeLastSync[0]) / 1000 < 150 && mClient.isConnected()){
-                    //start sync in next node trie file
+                    //timer for msg 150s
                     if (!provideService && (new Date().getTime() - dateTimeLastSync[0]) / 1000 > 5) {
+                        //every 5s ask new get hashs msg
                         if(lastIndex[0] < app.maxAge-1) {
                             lastIndex[0]++;
                             byte[] ask = new byte[1];

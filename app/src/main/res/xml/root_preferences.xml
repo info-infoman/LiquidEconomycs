@@ -24,12 +24,6 @@
             android:singleLine="true"
             android:title="@string/Signal_server_URL" />
         <EditTextPreference
-            android:defaultValue="JKGIT87877hgkljhg8"
-            android:key="Signal_server_Token"
-            android:selectAllOnFocus="true"
-            android:singleLine="true"
-            android:title="@string/Signal_server_Token" />
-        <EditTextPreference
             android:defaultValue="30"
             android:dialogTitle="@string/maxAge"
             android:inputType="number"

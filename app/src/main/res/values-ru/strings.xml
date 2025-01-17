@@ -16,7 +16,6 @@
     <string name="onCheckToken">Начинаю синхронизацию...</string>
     <string name="onCheckTokenError">Ошибка верификации токена!</string>
     <string name="Signal_server_URL">WebSocket URL сигнального сервера</string>
-    <string name="Signal_server_Token">Токен сигнального сервера</string>
     <string name="errorGetSignalServerParam">Ошибка получения параметров сигнального сервера</string>
     <string name="SyncFinish">Синхронизация завершена.</string>
     <string name="disconnect">Соединение прерванно.</string>

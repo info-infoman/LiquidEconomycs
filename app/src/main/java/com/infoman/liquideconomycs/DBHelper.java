@@ -16,7 +16,10 @@ public class DBHelper extends SQLiteOpenHelper {
         @Override
         public void onCreate(SQLiteDatabase db) {
             Log.d(LOG_TAG, "--- onCreate database ---");
-            //our pubKeys
+            db.execSQL("create table syncServers ("
+                    + "id integer primary key autoincrement,"
+                    + "server String,"
+                    + "dateTimeLastSync Long" + ");");
             db.execSQL("create table users ("
                     + "id integer primary key autoincrement,"
                     + "pubKey BLOB,"

@@ -4,7 +4,6 @@ import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Color;
@@ -13,7 +12,6 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
-import android.preference.PreferenceManager;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.AnimationUtils;
@@ -98,7 +96,6 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                 tbMade.setChecked(true);
                 provideService = true;
                 role_capture.setText(getResources().getString(R.string.Provide_service));
-                app.startActionSync("", "", true);
             }else{
                 tbResive.setChecked(true);
                 tbMade.setChecked(false);
@@ -142,12 +139,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         super.onResume();
         Context context = getApplicationContext();
         app = (Core) context;
-
         stopScanner();
-
-        if(provideService){
-            app.startActionSync("","", true);
-        }
     }
 
     @Override public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
@@ -283,17 +275,16 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
                         FragmentTransaction transaction = manager.beginTransaction();
                         alert.show(transaction, "dialog");
                     }
-                    app.startActionSync("","", provideService);
                 }
             }
         }else{
             shakeIt();
-            if(fields.length < 3 || fields[1].equals("") || fields[2].equals("") || fields[0].equals("")){
+            if(fields.length < 2 || fields[1].equals("") || fields[0].equals("")){
                Toast.makeText(getApplicationContext(), getResources().getString(R.string.ErrorReceivingPartnerData),Toast.LENGTH_LONG).show();
             }else{
                 byte[] providerPubKey = hexToByte(fields[0]);
                 app.insert(ECKey.fromPublicOnly(providerPubKey).getPubKeyHash(), 0);
-                app.startActionSync(fields[1], fields[2], provideService);
+                String ss = app.startActionSync(fields[1], fields[0], provideService);
             }
         }
     }
@@ -335,10 +326,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         }
 
         if (provideService) {
-            SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(getApplicationContext());
-            String signalServer = sharedPref.getString("Signal_server_URL", ""), token = sharedPref.getString("Signal_server_Token", "");
+            String signalServer = app.startActionSync("", Utils.byteToHex((byte[]) app.myKey.first), provideService);
             assert signalServer != null;
-            msg = msg + (!signalServer.equals("") ? signalServer + " " + token : "");
+            msg = msg + signalServer;
         }
         QRCodeWriter writer = new QRCodeWriter();
         try {

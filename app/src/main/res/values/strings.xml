@@ -28,7 +28,6 @@
     <string name="onCheckToken">Begin synchronization...</string>
     <string name="onCheckTokenError">Token verification error!</string>
     <string name="Signal_server_URL">Signal server WebSocket URL</string>
-    <string name="Signal_server_Token">Signal server token</string>
     <string name="errorGetSignalServerParam">Error get signal server params</string>
     <string name="SyncFinish">Sync is finish</string>
     <string name="disconnect">Сonnection is broken</string>

@@ -19,8 +19,10 @@ import com.infoman.liquideconomycs.sync.WebSocketClient;
 import org.bitcoinj.core.ECKey;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Objects;
 
 import androidx.core.util.Pair;
 
@@ -167,17 +169,69 @@ public class Core extends Application {
         queryMainCount.close();
     }
 
-    public void startActionSync(String signalServer, String token, boolean provideService) {
+    public String startActionSync(String signalServer, String token, boolean provideService) {
+        boolean serverIsStarted = true;
         if(provideService) {
-            SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(this);
-            signalServer = sharedPref.getString("Signal_server_URL", "");
-            token = sharedPref.getString("Signal_server_Token", "");
+            signalServer = getStartedServer();
+            if(Objects.equals(signalServer, "")) {
+                SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(this);
+                signalServer = sharedPref.getString("Signal_server_URL", "");
+                insertNewSyncServer(signalServer);
+                serverIsStarted = false;
+            }
         }
-        Intent intent = new Intent(this, ServiceIntent.class)
-                .setAction(ACTION_START_SYNC)
-                .putExtra(EXTRA_SIGNAL_SERVER, signalServer)
-                .putExtra(EXTRA_TOKEN, token)
-                .putExtra(EXTRA_PROVIDE_SERVICE, provideService);
-        Utils.startIntent(this, intent);
+        if(serverIsStarted) {
+            Intent intent = new Intent(this, ServiceIntent.class)
+                    .setAction(ACTION_START_SYNC)
+                    .putExtra(EXTRA_SIGNAL_SERVER, signalServer)
+                    .putExtra(EXTRA_TOKEN, token)
+                    .putExtra(EXTRA_PROVIDE_SERVICE, provideService);
+            Utils.startIntent(this, intent);
+        }
+        return signalServer;
+    }
+
+    private String getStartedServer() {
+        String res = "";
+        Cursor queryStartedServer = db.rawQuery("SELECT server FROM syncServers where ("
+                + new Date().getTime() + " - dateTimeLastSync) / 1000 < 150", null);
+        if(queryStartedServer.moveToNext()) {
+            int countColIndex = queryStartedServer.getColumnIndex("server");
+            res = queryStartedServer.getString(countColIndex);
+        }
+        queryStartedServer.close();
+        return res;
+    }
+
+    private void insertNewSyncServer(String signalServer) {
+        try {
+            db.beginTransaction();
+            String sql = " INSERT INTO syncServers (server, dateTimeLastSync) VALUES (?, ?)";
+            SQLiteStatement statement = db.compileStatement(sql);
+            statement.bindString(1, signalServer); // These match to the two question marks in the sql string
+            statement.bindLong(2, new Date().getTime());
+            statement.executeInsert();
+            db.setTransactionSuccessful();
+        } catch (SQLException e) {
+            Log.d("SQLException Error:", String.valueOf(e));
+        } finally {
+            db.endTransaction();
+        }
+    }
+
+    public void setDateTimeLastSync(String server, long dateTimeLastSync){
+        try {
+            db.beginTransaction();
+            String sql = " UPDATE syncServers SET dateTimeLastSync = ? WHERE server = ? ";
+            SQLiteStatement statement = db.compileStatement(sql);
+            statement.bindString(2, server); // These match to the two question marks in the sql string
+            statement.bindLong(1, dateTimeLastSync);
+            statement.executeInsert();
+            db.setTransactionSuccessful();
+        } catch (SQLException e) {
+            Log.d("SQLException Error:", String.valueOf(e));
+        } finally {
+            db.endTransaction();
+        }
     }
 }
