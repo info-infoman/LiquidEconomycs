@@ -172,6 +172,8 @@ public class ServiceIntent extends IntentService {
                 }
 
                 mClient.disconnect();
+                stopForeground(true);
+                stopSelf();
             }
         }
     }

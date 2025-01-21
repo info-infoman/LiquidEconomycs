@@ -160,10 +160,11 @@
                         </option>
                         <option name="values">
                           <map>
+                            <entry key="assetSourceType" value="FILE" />
                             <entry key="color" value="ffe878" />
                             <entry key="opacityPercent" value="77" />
-                            <entry key="outputName" value="warning" />
-                            <entry key="sourceFile" value="C:\Users\adik.m" />
+                            <entry key="outputName" value="network_svgrepo_com__1_2" />
+                            <entry key="sourceFile" value="C:\Users\infoman\Downloads\network-svgrepo-com (1).svg" />
                           </map>
                         </option>
                       </PersistentState>

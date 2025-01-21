@@ -9,8 +9,16 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
+        <Button
+            android:id="@+id/loadDemo"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="LoadDemo"
+            tools:layout_editor_absoluteX="161dp"
+            tools:layout_editor_absoluteY="553dp" />
+
         <FrameLayout
-            android:id="@+id/settings"
+            android:id="@+id/settingsBtn"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             tools:layout_editor_absoluteX="match_parent"

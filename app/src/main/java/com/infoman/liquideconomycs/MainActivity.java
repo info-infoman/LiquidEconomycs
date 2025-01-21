@@ -17,10 +17,8 @@ import android.view.ViewGroup;
 import android.view.animation.AnimationUtils;
 import android.widget.Button;
 import android.widget.ImageView;
-import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
-import android.widget.ToggleButton;
 
 import com.dlazaro66.qrcodereaderview.QRCodeReaderView;
 import com.google.android.material.snackbar.Snackbar;
@@ -51,65 +49,71 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
     private Core                app;
     private ViewGroup           mainLayout;
-    private ToggleButton        tbResive, tbMade;
-    private Button              startBtn;
-    public TextView             resultTextView, notation, role_capture, scan_gen;
+    private Button              startBtn, acceptBtn, provideBtn, settingsBtn, helpBtn , statBtn;
+    public TextView             resultTextView, /*notation,*/ role_capture, scan_gen;
     private QRCodeReaderView    qrCodeReaderView;
     private boolean             provideService;
 
     //Overrides/////////////////////////////////////////////////////////////////////////////////////
+    @SuppressLint("MissingInflatedId")
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         Context context = getApplicationContext();
         app = (Core) context;
         setContentView(R.layout.activity_main);
-        mainLayout = findViewById(R.id.main_layout);
-        notation = findViewById(R.id.notation);
 
         if (ActivityCompat.checkSelfPermission(this,
                 Manifest.permission.INTERNET) != PackageManager.PERMISSION_GRANTED) {
-                    requestINTERNETPermission();
-                }
-
+            requestINTERNETPermission();
+        }
         if (ActivityCompat.checkSelfPermission(this,
                 Manifest.permission.FOREGROUND_SERVICE) != PackageManager.PERMISSION_GRANTED
                 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    requestFOREGROUND_SERVICEPermission();
-                }
+            requestFOREGROUND_SERVICEPermission();
+        }
 
-        Switch aSwitch = findViewById(R.id.aSwitch);
-        tbResive = findViewById(R.id.tbResive);
-        tbMade = findViewById(R.id.tbMade);
-
+        mainLayout = findViewById(R.id.main_layout);
         role_capture = findViewById(R.id.role_capture);
         scan_gen = findViewById(R.id.scan_gen);
         startBtn = findViewById(R.id.startScanner);
+        settingsBtn = findViewById(R.id.settingsBtn);
+        helpBtn = findViewById(R.id.helpBtn);
+        statBtn = findViewById(R.id.statBtn);
+        acceptBtn = findViewById(R.id.acceptBtn);
+        provideBtn = findViewById(R.id.provideBtn);
 
-        Button settings = findViewById(R.id.settings);
-
-        stopScanner();
-
-        aSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            if(isChecked){
-                tbResive.setChecked(false);
-                tbMade.setChecked(true);
-                provideService = true;
-                role_capture.setText(getResources().getString(R.string.Provide_service));
-            }else{
-                tbResive.setChecked(true);
-                tbMade.setChecked(false);
-                provideService = false;
-                role_capture.setText(getResources().getString(R.string.Accept_service));
-            }
+        acceptBtn.setOnClickListener(v -> {
+            provideService = false;
+            role_capture.setText(getResources().getString(R.string.Accept_service));
             role_capture.startAnimation(AnimationUtils.loadAnimation(getApplicationContext(),
                     R.anim.zoom_in));
             stopScanner();
         });
 
-        settings.setOnClickListener(v -> {
+        provideBtn.setOnClickListener(v -> {
+            provideService = true;
+            role_capture.setText(getResources().getString(R.string.Provide_service));
+            role_capture.startAnimation(AnimationUtils.loadAnimation(getApplicationContext(),
+                    R.anim.zoom_in));
+            stopScanner();
+        });
+
+        settingsBtn.setOnClickListener(v -> {
             Intent intent;
             intent = new Intent(getApplicationContext(), SettingsActivity.class);
+            startActivity(intent);
+        });
+
+        helpBtn.setOnClickListener(v -> {
+            Intent intent;
+            intent = new Intent(getApplicationContext(), HelpActivity.class);
+            startActivity(intent);
+        });
+
+        statBtn.setOnClickListener(v -> {
+            Intent intent;
+            intent = new Intent(getApplicationContext(), StatActivity.class);
             startActivity(intent);
         });
 
@@ -337,7 +341,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             Bitmap bmp = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565);
             for (int x = 0; x < width; x++) {
                 for (int y = 0; y < height; y++) {
-                    bmp.setPixel(x, y, bitMatrix.get(x, y) ? Color.BLACK : Color.WHITE);
+                    bmp.setPixel(x, y, bitMatrix.get(x, y) ? Color.BLACK : 0xF5F5F5);
                 }
             }
             img.setImageBitmap(bmp);
@@ -348,7 +352,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
 
         scan_gen.setVisibility(View.VISIBLE);
         startBtn.setVisibility(View.VISIBLE);
-        notation.setText(getResources().getString(R.string.annotation_qr));
+        //notation.setText(getResources().getString(R.string.annotation_qr));
     }
 
     private void clearQRCodeReaderViewView(ViewGroup v) {

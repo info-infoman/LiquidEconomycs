@@ -12,6 +12,7 @@ import android.database.sqlite.SQLiteStatement;
 import android.preference.PreferenceManager;
 import android.util.Log;
 
+import com.github.mikephil.charting.data.BarEntry;
 import com.google.common.primitives.Bytes;
 import com.infoman.liquideconomycs.sync.ServiceIntent;
 import com.infoman.liquideconomycs.sync.WebSocketClient;
@@ -176,7 +177,6 @@ public class Core extends Application {
             String defServer = sharedPref.getString("Signal_server_URL", "");
             Pair serverState = getSyncServer(defServer);
             server = (String) serverState.first;
-            insertOrUpdateSyncServer(server);
             serverIsStarted = (boolean) serverState.second;
         }
         if(!serverIsStarted  && !Objects.equals(server, "")) {
@@ -195,23 +195,23 @@ public class Core extends Application {
     or last active server if defServer is't set*/
     private Pair getSyncServer(String server) {
         boolean isConnected = false;
-        Cursor query = db.rawQuery("SELECT server FROM syncServers where (server = "+ server +" AND "
-                + new Date().getTime() + " - dateTimeLastSync) / 1000 < 60", null);
+        Cursor query = db.rawQuery("SELECT server FROM syncServers where server = ? " +
+                "AND (" + new Date().getTime() + " - dateTimeLastSync) / 1000 < 60 LIMIT 1", new String[]{server});
         int countColIndex = query.getColumnIndex("server");
-        if(query.moveToNext()) {
+        if(query.moveToFirst()) {
             server = query.getString(countColIndex);
             isConnected = true;
         }else {
             query = db.rawQuery("SELECT server FROM syncServers where ("
-                    + new Date().getTime() + " - dateTimeLastSync) / 1000 < 60", null);
+                    + new Date().getTime() + " - dateTimeLastSync) / 1000 < 60 LIMIT 1", null);
             countColIndex = query.getColumnIndex("server");
-            if (query.moveToNext()) {
+            if (query.moveToFirst()) {
                 server = query.getString(countColIndex);
                 isConnected = true;
             } else if(Objects.equals(server, "")) {
                 query = db.rawQuery("SELECT server FROM syncServers " +
-                        "ORDER BY dateTimeLastSync DESC", null);
-                if (query.moveToNext()) {
+                        "ORDER BY dateTimeLastSync DESC LIMIT 1", null);
+                if (query.moveToFirst()) {
                     server = query.getString(countColIndex);
                 }
             }
@@ -234,5 +234,21 @@ public class Core extends Application {
         } finally {
             db.endTransaction();
         }
+    }
+
+    //stat
+    public ArrayList getStat(){
+        ArrayList res = new ArrayList<>();
+        for(int i = 0; i < maxAge; i++){
+            int count = 0;
+            Cursor query = db.rawQuery("SELECT count_ FROM mainCount WHERE age = "+getDayMilliByIndex_(-i), null);
+            int countColIndex = query.getColumnIndex("count_");
+            if(query.moveToFirst()) {
+                count = query.getInt(countColIndex);
+            }
+            res.add(count);
+            query.close();
+        }
+        return res;
     }
 }

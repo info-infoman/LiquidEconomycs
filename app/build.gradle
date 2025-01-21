@@ -19,6 +19,13 @@ android {
     }
     useLibrary 'org.apache.http.legacy'
     namespace 'com.infoman.liquideconomycs'
+    buildFeatures {
+        viewBinding true
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
 }
 
 dependencies {
@@ -29,16 +36,18 @@ dependencies {
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     implementation 'com.google.android.material:material:1.11.0'
+    implementation 'androidx.legacy:legacy-support-v4:1.0.0'
     androidTestImplementation 'com.android.support.test:runner:1.0.2'
     androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.2'
-    //implementation 'com.dlazaro66.qrcodereaderview:qrcodereaderview:2.0.3'
+    implementation 'com.dlazaro66.qrcodereaderview:qrcodereaderview:2.0.2'
     //implementation 'com.google.zxing:core:3.3.0'
-    implementation ('com.dlazaro66.qrcodereaderview:qrcodereaderview:2.0.3@aar'){
-        transitive = true
-    }
+    //implementation ('com.dlazaro66.qrcodereaderview:qrcodereaderview:2.0.3@aar'){
+    //    transitive = true
+    //}
     implementation 'com.github.bumptech.glide:glide:4.11.0'
     implementation "com.android.support:design:30.0.0"
     implementation "com.google.guava:guava:21.0"
     implementation 'org.bitcoinj:bitcoinj-core:0.15.5'
     implementation 'com.android.support:multidex:1.0.3'
+    implementation 'com.github.PhilJay:MPAndroidChart:v3.1.0'
 }

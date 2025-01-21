@@ -47,4 +47,8 @@
     <string name="QR_generator_consumer">QR_generator_consumer</string>
     <string name="maxSyncPubKeyInSession">Maximum number of identifiers transmitted in one message between applications</string>
     <string name="maxSyncPubKeyInSession_summ">In fact, this is the size of one message between applications, it is defined as follows: 20 bytes hash of the public key sum * this parameter. The number of messages is determined by the maximum storage age</string>
+    <string name="title_activity_help">How it work</string>
+    <string name="title_activity_stat">Statistics</string>
+    <string name="description_stat">Total active members: </string>
+
 </resources>

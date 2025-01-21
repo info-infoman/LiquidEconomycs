@@ -1,8 +1,10 @@
 package com.infoman.liquideconomycs;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.os.Bundle;
 import android.text.InputType;
+import android.widget.Button;
 
 import org.bitcoinj.core.ECKey;
 
@@ -14,6 +16,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.preference.PreferenceFragmentCompat;
 
 import static com.infoman.liquideconomycs.Utils.getDayMilliByIndex_;
+import static com.infoman.liquideconomycs.Utils.getRandomNumber;
 
 public class SettingsActivity extends AppCompatActivity {
     private Core app;
@@ -26,12 +29,12 @@ public class SettingsActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.settings_activity);
 
-        /*final Button loadDemo = findViewById(R.id.loadDemoPubKeys);
-        loadDemo.setOnClickListener(v -> insertDemoInTrie());*/
+        @SuppressLint({"MissingInflatedId", "LocalSuppress"}) final Button loadDemo = findViewById(R.id.loadDemo);
+        loadDemo.setOnClickListener(v -> insertDemoInTrie());
 
         getSupportFragmentManager()
                 .beginTransaction()
-                .replace(R.id.settings, new SettingsFragment())
+                .replace(R.id.settingsBtn, new SettingsFragment())
                 .commit();
         ActionBar actionBar = getSupportActionBar();
         if (actionBar != null) {
@@ -59,11 +62,14 @@ public class SettingsActivity extends AppCompatActivity {
         Context c = getApplicationContext();
         ECKey myECKey;
         byte[] myPubKey;
-        for(int i=0;i<1000;i++) {
-            myECKey = new ECKey();
-            myPubKey = myECKey.getPubKeyHash();
-            pubKeysForInsert.add(myPubKey);
+        for (int a = 0; a < app.maxAge; a++) {
+            long rnd = getRandomNumber(0L,500);
+            for (int i = 0; i < rnd; i++) {
+                myECKey = new ECKey();
+                myPubKey = myECKey.getPubKeyHash();
+                pubKeysForInsert.add(myPubKey);
+            }
+            app.insertNewKeys(getDayMilliByIndex_(-a), pubKeysForInsert);
         }
-        app.insertNewKeys(getDayMilliByIndex_(-0), pubKeysForInsert);
     }
 }
