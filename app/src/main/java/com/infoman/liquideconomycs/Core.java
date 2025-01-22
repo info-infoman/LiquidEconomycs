@@ -5,6 +5,7 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.res.Configuration;
 import android.database.Cursor;
 import android.database.SQLException;
 import android.database.sqlite.SQLiteDatabase;
@@ -248,6 +249,19 @@ public class Core extends Application {
             }
             res.add(count);
             query.close();
+        }
+        return res;
+    }
+
+    public boolean themeIsNight() {
+        boolean res = false;
+        switch (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) {
+            case Configuration.UI_MODE_NIGHT_YES:
+                res = true;
+                break;
+            case Configuration.UI_MODE_NIGHT_NO:
+                res = false;
+                break;
         }
         return res;
     }

@@ -7,6 +7,7 @@ import com.github.mikephil.charting.charts.HorizontalBarChart;
 import com.github.mikephil.charting.components.Description;
 import com.github.mikephil.charting.components.Legend;
 import com.github.mikephil.charting.components.XAxis;
+import com.github.mikephil.charting.components.YAxis;
 import com.github.mikephil.charting.data.BarData;
 import com.github.mikephil.charting.data.BarDataSet;
 import com.github.mikephil.charting.data.BarEntry;
@@ -30,12 +31,16 @@ public class StatActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.stat_activity);
 
+        int color = Color.BLACK;
+        if (app.themeIsNight()) {
+            color = Color.WHITE;
+        }
+
+
         ArrayList data, dataSet, lableCart;
         data = app.getStat();
         dataSet = new ArrayList<>();
         lableCart = new ArrayList<>();
-
-
 
         int totalCount = 0;
         for (int i = 0; i < app.maxAge; i++) {
@@ -52,11 +57,12 @@ public class StatActivity extends AppCompatActivity {
         }
 
         Description description = new Description();
-        description.setText(getResources().getString(R.string.description_stat)+ " " + totalCount);
-        description.setTextColor(Color.RED);
+        description.setText(getResources().getString(R.string.description_stat) + " " + totalCount);
+        description.setTextColor(color);
         description.setTextSize(14);
 
         BarDataSet barSet = new BarDataSet(dataSet, "");
+        barSet.setValueTextColor(color);
         BarData barData = new BarData(barSet);
         h_chartBar = findViewById(R.id.h_chartBar);
         h_chartBar.setData(barData);
@@ -68,9 +74,13 @@ public class StatActivity extends AppCompatActivity {
         legend.setEnabled(true);
         XAxis xAxis = h_chartBar.getXAxis();
         xAxis.setLabelCount(app.maxAge);
-        xAxis.setTextColor(Color.RED);
+        xAxis.setTextColor(color);
         xAxis.setDrawGridLines(false);
         xAxis.setPosition(xAxis.getPosition().BOTTOM);
+        YAxis left = h_chartBar.getAxisLeft();
+        left.setTextColor(color);
+        YAxis right = h_chartBar.getAxisRight();
+        right.setTextColor(color);
         h_chartBar.getXAxis().setValueFormatter(new IndexAxisValueFormatter(lableCart));
     }
 }

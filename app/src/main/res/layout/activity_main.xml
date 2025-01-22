@@ -99,7 +99,6 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@+id/scan_gen"
             app:layout_constraintVertical_bias="0.0"
-            app:srcCompat="@android:color/transparent"
             tools:ignore="ContentDescription,MissingConstraints" />
 
         <FrameLayout

@@ -31,7 +31,6 @@ import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.Sha256Hash;
 import org.bitcoinj.core.SignatureDecodeException;
 
-import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import androidx.annotation.NonNull;
@@ -320,6 +319,12 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
     }
 
     public void generatePairingMsg() {
+        int colorBg = 0xF9F9F9F9;
+        int colorQR = Color.BLACK;
+        if (app.themeIsNight()) {
+            colorBg = 0x303030;
+            colorQR = Color.WHITE;
+        }
         ImageView img = findViewById(R.id.image);
         assert app.myKey.first != null;
         String msg = Utils.byteToHex((byte[]) app.myKey.first)+" ";
@@ -344,7 +349,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             Bitmap bmp = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565);
             for (int x = 0; x < width; x++) {
                 for (int y = 0; y < height; y++) {
-                    bmp.setPixel(x, y, bitMatrix.get(x, y) ? Color.BLACK : 0xF5F5F5);
+                    bmp.setPixel(x, y, bitMatrix.get(x, y) ? colorQR : colorBg);
                 }
             }
             img.setImageBitmap(bmp);
