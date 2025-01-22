@@ -12,7 +12,6 @@ import android.database.sqlite.SQLiteStatement;
 import android.preference.PreferenceManager;
 import android.util.Log;
 
-import com.github.mikephil.charting.data.BarEntry;
 import com.google.common.primitives.Bytes;
 import com.infoman.liquideconomycs.sync.ServiceIntent;
 import com.infoman.liquideconomycs.sync.WebSocketClient;
@@ -41,6 +40,7 @@ public class Core extends Application {
     public static Pair myKey;
     public int maxAge;
     public int maxSyncPubKeyInSession;
+    public WebSocketClient mClient;
     @Override
     public void onCreate() {
         super.onCreate();
@@ -128,7 +128,7 @@ public class Core extends Application {
     }
 
     ////////sync///////////////////////////////////////////////////////////////////////////////////
-    public void sendMsg(byte msgType, byte[] payload, WebSocketClient mClient) {
+    public void sendMsg(byte msgType, byte[] payload) {
         if (mClient.mListener != null && mClient.isConnected() && payload.length > 0) {
             byte[] type = new byte[1];
             type[0] = msgType;
@@ -148,7 +148,7 @@ public class Core extends Application {
         insertNewKeys(getDayMilliByIndex_(-age), pubKeysForInsert);
     }
 
-    public void generateAnswer(int age, WebSocketClient mClient) {
+    public void generateAnswer(int age) {
         byte[] answer = new byte[1];
         answer[0] = (byte) age;
         //LIMIT row_count OFFSET offset;
@@ -166,7 +166,7 @@ public class Core extends Application {
             queryMain.close();
         }
         queryMainCount.close();
-        sendMsg(Utils.hashs, answer, mClient);
+        sendMsg(Utils.hashs, answer);
     }
 
     public String startActionSync(String server, String token, boolean provideService) {

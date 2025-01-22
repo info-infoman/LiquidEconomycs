@@ -81,7 +81,6 @@ public class ServiceIntent extends IntentService {
     @Override
     protected void onHandleIntent(Intent intent) {
         String action = null;
-        WebSocketClient mClient = null;
         final long[] dateTimeLastSync = {0L};
         if (intent != null) {
             action = intent.getAction();
@@ -100,14 +99,13 @@ public class ServiceIntent extends IntentService {
                 List<BasicNameValuePair> mExtraHeaders = Collections.singletonList(
                         new BasicNameValuePair("Cookie", "session=abcd"));
 
-                WebSocketClient finalMClient = mClient;
-                mClient = new WebSocketClient(new WebSocketClient.Listener() {
+                app.mClient = new WebSocketClient(new WebSocketClient.Listener() {
 
                     @Override
                     public void onConnect() {
                         dateTimeLastSync[0] = new Date().getTime();
                         if (!provideService) {
-                            app.sendMsg(Utils.getHashs, new byte[1], finalMClient);
+                            app.sendMsg(Utils.getHashs, new byte[1]);
                         }
                         app.insertOrUpdateSyncServer(signalServerHost);
                     }
@@ -130,7 +128,7 @@ public class ServiceIntent extends IntentService {
                         if(age <= app.maxAge && age > -1){
 
                             if (provideService && msgType == Utils.getHashs) {
-                                app.generateAnswer(age, finalMClient);
+                                app.generateAnswer(age);
                             }else if(!provideService && msgType == Utils.hashs && lastIndex[0] == age){
                                 if(data.length >= 22) {
                                     byte[] payload = Utils.getBytesPart(data, 2, data.length - 2);
@@ -140,7 +138,7 @@ public class ServiceIntent extends IntentService {
                                     lastIndex[0]++;
                                     byte[] ask = new byte[1];
                                     ask[0] = (byte) lastIndex[0];
-                                    app.sendMsg(Utils.getHashs, ask, finalMClient);
+                                    app.sendMsg(Utils.getHashs, ask);
                                 }
                             }else{
                                 success = false;
@@ -165,13 +163,17 @@ public class ServiceIntent extends IntentService {
 
                 }, mExtraHeaders);
 
-                mClient.connect(URI.create(signalServer));
+                app.mClient.connect(URI.create(signalServer));
 
-                while ((new Date().getTime() - dateTimeLastSync[0]) / 1000 < 60){
+                while ((new Date().getTime() - dateTimeLastSync[0]) / 1000 < 10 && !provideService){
                     //timer for connect&msg 60s
                 }
 
-                mClient.disconnect();
+                while ((new Date().getTime() - dateTimeLastSync[0]) / 1000 < 50 && provideService){
+                    //timer for connect&msg 60s
+                }
+
+                app.mClient.disconnect();
                 stopForeground(true);
                 stopSelf();
             }

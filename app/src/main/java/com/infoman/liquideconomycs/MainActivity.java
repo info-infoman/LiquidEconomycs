@@ -31,6 +31,7 @@ import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.Sha256Hash;
 import org.bitcoinj.core.SignatureDecodeException;
 
+import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import androidx.annotation.NonNull;
@@ -286,9 +287,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             if(fields.length < 2 || fields[1].equals("") || fields[0].equals("")){
                Toast.makeText(getApplicationContext(), getResources().getString(R.string.ErrorReceivingPartnerData),Toast.LENGTH_LONG).show();
             }else{
-                byte[] providerPubKey = hexToByte(fields[0]);
-                app.insert(ECKey.fromPublicOnly(providerPubKey).getPubKeyHash(), 0);
-                String ss = app.startActionSync(fields[1], fields[0], provideService);
+                byte[] providerPubKey = ECKey.fromPublicOnly(hexToByte(fields[0])).getPubKeyHash();
+                app.insert(providerPubKey, 0);
+                String ss = app.startActionSync(fields[1], Utils.byteToHex(providerPubKey), provideService);
             }
         }
     }
@@ -330,7 +331,9 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         }
 
         if (provideService) {
-            String signalServer = app.startActionSync("", Utils.byteToHex((byte[]) app.myKey.first), provideService);
+            String signalServer = app.startActionSync("", Utils.byteToHex(
+                    ECKey.fromPublicOnly((byte[]) app.myKey.first).getPubKeyHash()
+            ), provideService);
             assert signalServer != null;
             msg = msg + signalServer;
         }
