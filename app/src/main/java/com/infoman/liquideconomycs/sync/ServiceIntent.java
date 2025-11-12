@@ -12,6 +12,7 @@ import android.graphics.Color;
 import android.os.Build;
 import android.util.Log;
 
+import com.google.common.primitives.Bytes;
 import com.infoman.liquideconomycs.Core;
 import com.infoman.liquideconomycs.Utils;
 
@@ -93,7 +94,8 @@ public class ServiceIntent extends IntentService {
                 final String TAG = "WebSocketClient";
                 Log.d(TAG, "start!");
                 final String signalServerHost = intent.getStringExtra(EXTRA_SIGNAL_SERVER),
-                signalServer = signalServerHost + "?chatRoom=" + intent.getStringExtra(EXTRA_TOKEN);
+                signalServer = signalServerHost;
+                final String chatRoom = intent.getStringExtra(EXTRA_TOKEN);
 
                 //todo sync processor
                 List<BasicNameValuePair> mExtraHeaders = Collections.singletonList(
@@ -104,6 +106,7 @@ public class ServiceIntent extends IntentService {
                     @Override
                     public void onConnect() {
                         dateTimeLastSync[0] = new Date().getTime();
+                        app.mClient.send(chatRoom);
                         if (!provideService) {
                             app.sendMsg(Utils.getHashs, new byte[1]);
                         }

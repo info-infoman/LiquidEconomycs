@@ -30,6 +30,7 @@ import com.google.zxing.qrcode.QRCodeWriter;
 import org.bitcoinj.core.ECKey;
 import org.bitcoinj.core.Sha256Hash;
 import org.bitcoinj.core.SignatureDecodeException;
+import org.bitcoinj.core.Base58;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -288,7 +289,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
             }else{
                 byte[] providerPubKey = ECKey.fromPublicOnly(hexToByte(fields[0])).getPubKeyHash();
                 app.insert(providerPubKey, 0);
-                String ss = app.startActionSync(fields[1], Utils.byteToHex(providerPubKey), provideService);
+                String ss = app.startActionSync(fields[1], Base58.encodeChecked(1, providerPubKey), provideService);
             }
         }
     }
@@ -336,7 +337,7 @@ public class MainActivity extends AppCompatActivity implements ActivityCompat.On
         }
 
         if (provideService) {
-            String signalServer = app.startActionSync("", Utils.byteToHex(
+            String signalServer = app.startActionSync("", Base58.encodeChecked(1,
                     ECKey.fromPublicOnly((byte[]) app.myKey.first).getPubKeyHash()
             ), provideService);
             assert signalServer != null;
